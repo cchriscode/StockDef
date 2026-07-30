@@ -106,6 +106,12 @@ canvas.battle { width: 100%; background: #171720; border: 1px solid #2a2a3e; bor
   display: flex; flex-direction: column; gap: 4px; background: #20202e; border: 1px solid #3c3c52;
   padding: 8px; border-radius: 8px; z-index: 12;
 }
+.wave-preview {
+  position: absolute; top: 8px; left: 10px; display: flex; gap: 10px; align-items: center;
+  background: rgba(24,24,36,0.88); border: 1px solid #3c3c52; border-radius: 8px;
+  padding: 5px 12px; font-size: 13px; z-index: 9;
+}
+.wave-preview b { color: #ffd54f; }
 .buy-bar { display: flex; gap: 8px; align-items: center; }
 .buy-bar .spacer { flex: 1; }
 .disclaimer { font-size: 10px; color: #55556a; text-align: center; } /* C6 */

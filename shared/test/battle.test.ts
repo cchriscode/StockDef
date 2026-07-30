@@ -5,6 +5,7 @@ import type { StageParams } from '../src/types.js';
 
 function params(over: Partial<StageParams> = {}): StageParams {
   return {
+    regionId: 'R1',
     aum: 2000, totalBaseIncome: 325, incomePerWave: 25, incomeLastWave: 25,
     heat: 1, lossRate: 0.6, payoutBase: 0.9, drawBand: 0.25,
     towerSlots: 6, maxPositions: 24, waveCount: 13,
@@ -60,6 +61,57 @@ describe('Battle 엔진', () => {
     b.advanceTo(390 + 40);
     expect(b.baseHP).toBe(0);
     expect(b.victory).toBe(false);
+  });
+  it('조합 분배: 총 수 보존 + 보스 웨이브(R1은 W13만)는 보스 +1 (미리보기 기준)', () => {
+    const b = new Battle(params(), []);
+    const w6 = b.previewWave(6).reduce((s, c) => s + c.count, 0);
+    expect(w6).toBe(7); // R1 W6 count=7, 보스 없음
+    expect(b.previewWave(7).find((c) => c.type === 'boss')).toBeUndefined();
+    const w13 = b.previewWave(13);
+    expect(w13.find((c) => c.type === 'boss')?.count).toBe(1);
+    expect(w13.reduce((s, c) => s + c.count, 0)).toBe(14 + 1); // W13 count=14 + 보스
+  });
+  it('타겟팅 모드 순환: first → last → strong → close → first (Bloons)', () => {
+    const b = new Battle(params(), []);
+    b.addGold(200);
+    b.buildTower(0, 'basic');
+    expect(b.towers[0]!.mode).toBe('first');
+    expect(b.cycleTargeting(0)).toBe('last');
+    expect(b.cycleTargeting(0)).toBe('strong');
+    expect(b.cycleTargeting(0)).toBe('close');
+    expect(b.cycleTargeting(0)).toBe('first');
+  });
+  it('armor는 물리 피해만 감소, 마법(공시폭탄)은 관통 (Kingdom Rush)', () => {
+    const b = new Battle(params(), []);
+    // 실드(armor 0.6, mr 0) 하나를 수동 주입
+    const anyB = b as unknown as { enemies: { hp: number; maxHp: number; armor: number; mr: number; air: boolean; x: number; stunUntil: number }[] };
+    b.addGold(500);
+    anyB.enemies.push({ id: 999, type: 'shield', x: 500, hp: 100, maxHp: 100, baseSpeed: 0, dps: 0, armor: 0.6, mr: 0, air: false, size: 9, wave: 1, baseDmg: 0, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0 } as never);
+    b.useSkill(); // 마법 80 → mr 0 → 정확히 80 피해
+    expect(anyB.enemies[0].hp).toBeCloseTo(20, 5);
+  });
+  it('블로킹: 인턴은 3기까지 붙잡고 초과분은 통과한다 (Age of War 블로커)', () => {
+    const b = new Battle(params(), []);
+    const anyB = b as unknown as { enemies: unknown[]; units: unknown[] };
+    b.addGold(100);
+    b.spawnUnit('intern');
+    const u = b.units[0];
+    u.x = 500;
+    for (let i = 0; i < 5; i++) {
+      anyB.enemies.push({ id: 900 + i, type: 'grunt', x: 510, hp: 1000, maxHp: 1000, baseSpeed: 30, dps: 0, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 10, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0 } as never);
+    }
+    const xs0 = b.enemies.map((e) => e.x);
+    b.advanceTo(b.t + 1);
+    const moved = b.enemies.filter((e, i) => e.x < xs0[i] - 5).length;
+    expect(moved).toBe(2); // 3기는 블로킹, 2기는 통과
+  });
+  it('힐러: 주변 지상 아군을 회복시킨다', () => {
+    const b = new Battle(params(), []);
+    const anyB = b as unknown as { enemies: { hp: number }[] };
+    anyB.enemies.push({ id: 800, type: 'healer', x: 500, hp: 100, maxHp: 100, baseSpeed: 0, dps: 0, armor: 0, mr: 0.3, air: false, size: 8, wave: 1, baseDmg: 0, healPerSec: 9, slowUntil: 0, slowPct: 0, stunUntil: 0 } as never);
+    anyB.enemies.push({ id: 801, type: 'grunt', x: 540, hp: 50, maxHp: 100, baseSpeed: 0, dps: 0, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 0, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0 } as never);
+    b.advanceTo(b.t + 2);
+    expect(anyB.enemies[1].hp).toBeGreaterThan(60); // ~9HP/s × 2s
   });
   it('heat 반영: 점령 2개(1.04) → 적 수 ceil(count×1.04)', () => {
     const b = new Battle(params({ heat: 1.04 }), []);

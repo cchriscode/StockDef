@@ -32,6 +32,7 @@ function makeParams(region: RegionId): StageParams {
   const captured = CAPTURED[region];
   const income = baseIncome(captured);
   return {
+    regionId: region,
     // §9.3 전제: R1 AUM 2000 / R2 2400 / R3 2800 (데스크 업그레이드 진행 가정)
     aum: BALANCE.AUM_BY_DESK_LV[captured],
     totalBaseIncome: income.total, incomePerWave: income.perWave, incomeLastWave: income.lastWave,
@@ -61,7 +62,7 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
   const buildOrder: ('basic' | 'aa' | 'basic' | 'splash' | 'aa' | 'splash')[] = ['basic', 'aa', 'basic', 'splash', 'aa', 'splash'];
   let built = 0;
 
-  for (let t = 0.5; t <= 390 + 40; t += 0.5) {
+  for (let t = 0.5; t <= 390 + 45; t += 0.5) { // 오버타임 상한(+40) 너머까지 돌아야 done 판정에 도달
     b.advanceTo(t);
     if (b.phase === 'done') break;
     const bar = Math.floor(Math.min(t, 389));
@@ -90,9 +91,12 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
       openUntil = closeIdx + 2;
     }
 
-    // 전투 지출 (그리디)
+    // 전투 지출 (그리디) — 3번 슬롯 기본 포탑은 강적 타겟팅(힐러·탱커 저격, 평균적 카운터 플레이 반영)
     if (built < buildOrder.length) {
-      if (b.buildTower(built, buildOrder[built])) built += 1;
+      if (b.buildTower(built, buildOrder[built])) {
+        if (built === 2) { b.cycleTargeting(2); b.cycleTargeting(2); } // first → last → strong
+        built += 1;
+      }
     } else {
       for (let s = 0; s < 6; s++) if (b.gold >= 400) b.upgradeTower(s);
       if (b.gold >= 320) b.spawnUnit('trader');

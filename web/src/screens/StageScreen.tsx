@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  BALANCE, Battle, TOWERS, UNITS,
+  BALANCE, Battle, ENEMY_TYPES, TOWERS, UNITS,
   type BarsFile, type Direction, type FinishRes, type RegionId, type StageStartRes, type WsServerMsg,
 } from '@tf/shared';
 import { api, getSettings, getToken, track } from '../net/api.js';
@@ -57,7 +57,10 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
   const [banner, setBanner] = useState<{ text: string; kind: 'panic' | 'fomo' } | null>(null);
   const [stakePct, setStakePct] = useState(0.25);
   const [expiry, setExpiry] = useState(30);
-  const [slotMenu, setSlotMenu] = useState<number | null>(null);
+  const [slotMenu, setSlotMenuState] = useState<number | null>(null);
+  const slotMenuRef = useRef<number | null>(null); // 렌더 루프에서 사거리 원 표시용
+  const setSlotMenu = (v: number | null) => { slotMenuRef.current = v; setSlotMenuState(v); };
+  const [, forceUi] = useState(0); // 타겟팅 모드 변경 등 즉시 반영
   const [guide, setGuide] = useState<GuideStep>(isTut ? 0 : 5);
   const [errMsg, setErrMsg] = useState('');
   const [tint, setTint] = useState('');
@@ -176,7 +179,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         });
       }
       if (battleRef.current) {
-        drawBattle(battleRef.current, s.battle, Date.now() < s.shakeUntil ? 5 : 0);
+        drawBattle(battleRef.current, s.battle, Date.now() < s.shakeUntil ? 5 : 0, slotMenuRef.current);
       }
 
       // HUD는 100ms 스로틀 — 캔버스는 60fps, DOM 리렌더는 10fps면 충분
@@ -363,21 +366,38 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         {slotMenu != null && (
           <div className="slot-menu" style={{ left: `${(battle.towerSlotX(slotMenu) / 1000) * 100}%` }}>
             {battle.towers[slotMenu] ? (
-              battle.towers[slotMenu]!.lv < 2 ? (
-                <button onClick={() => upgradeTower(slotMenu)}>
-                  업그레이드 {TOWERS.find((t) => t.key === battle.towers[slotMenu]!.key)!.upgradeCost} G
+              <>
+                <button onClick={() => { battle.cycleTargeting(slotMenu); forceUi((v) => v + 1); }}>
+                  타겟: {{ first: '선두', last: '후미', strong: '강적', close: '근접' }[battle.towers[slotMenu]!.mode]} ↻
                 </button>
-              ) : (
-                <span className="small">최대 레벨</span>
-              )
+                {battle.towers[slotMenu]!.lv < 2 ? (
+                  <button onClick={() => upgradeTower(slotMenu)}>
+                    업그레이드 {TOWERS.find((t) => t.key === battle.towers[slotMenu]!.key)!.upgradeCost} G
+                  </button>
+                ) : (
+                  <span className="small">최대 레벨</span>
+                )}
+              </>
             ) : (
               TOWERS.map((t) => (
                 <button key={t.key} disabled={hud.gold < t.cost} onClick={() => buildTower(slotMenu, t.key)}>
                   {t.name} {t.cost} G
+                  <span className="small dim"> {t.dmgType === 'magic' ? '마법·슬로우' : t.target === 'air' ? '대공 전용' : '물리'}</span>
                 </button>
               ))
             )}
             <button className="ghost" onClick={() => setSlotMenu(null)}>✕</button>
+          </div>
+        )}
+        {/* 준비 페이즈: 이번 웨이브 조합 미리보기 */}
+        {hud.prep && hud.wave >= 1 && hud.wave <= hud.waveCount && (
+          <div className="wave-preview">
+            <b>W{hud.wave}</b>
+            {battle.previewWave(hud.wave).map((c) => (
+              <span key={c.type} title={ENEMY_TYPES[c.type].name}>
+                {ENEMY_TYPES[c.type].icon}×{c.count}
+              </span>
+            ))}
           </div>
         )}
       </div>

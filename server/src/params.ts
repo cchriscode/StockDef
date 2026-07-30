@@ -35,6 +35,7 @@ export function buildStageParams(accountId: string, regionId: RegionId): StagePa
   const lossRate = Math.max(0.1, BALANCE.LOSS_RATE[regionId] - DEPT_EFFECTS.legalCut(depts.legal));
 
   return {
+    regionId,
     aum: BALANCE.AUM_BY_DESK_LV[depts.trading_desk - 1],
     totalBaseIncome: income.total,
     incomePerWave: income.perWave,

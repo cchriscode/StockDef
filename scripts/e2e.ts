@@ -58,7 +58,7 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
 
   while (true) {
     await new Promise((r) => setTimeout(r, 100));
-    const elapsedBars = (Date.now() - t0) / barMs; // 캡 없음 — overtime까지 진행해야 done 도달
+    const elapsedBars = (Date.now() - t0) / barMs; // 캡 없음 — overtime 상한(+40) 너머까지 진행해야 done 도달
     battle.advanceTo(elapsedBars);
     if (battle.phase === 'done') break;
     const bar = Math.floor(Math.min(elapsedBars, totalBars));

@@ -1,25 +1,42 @@
 // FR-6 전투 시뮬레이션 — 렌더러와 완전 분리된 순수 로직 (§11).
 // 웹 클라이언트는 이 엔진의 상태를 그리기만 하고, 봇 시뮬레이터는 헤드리스로 돌린다.
-import { BALANCE, TOWERS, UNITS, type TowerSpec, type UnitSpec } from './balance.js';
-import type { MarketEvent, StageParams } from './types.js';
+//
+// 심화 메커니즘 레퍼런스:
+//  - Kingdom Rush: armor(물리 감소)/마법 관통 이분법, 공중은 특정 타워만 요격, 힐러 저격
+//  - Bloons TD: 타워 타겟팅 모드 first/last/strong/close
+//  - Age of War: 블로커+원거리 역할 조합, 본진 자동 포탑, 화면 클리어 스킬
+import {
+  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_TYPES, TOWERS, UNITS, WAVE_COMPS,
+  type DmgType, type EnemyTypeSpec, type TargetingMode, type TowerSpec, type UnitSpec,
+} from './balance.js';
+import type { MarketEvent, RegionId, StageParams } from './types.js';
 
 export const FIELD_W = 1000;
 const PLAYER_BASE_X = 0;
 const ENEMY_BASE_X = FIELD_W;
 const UNIT_SPAWN_X = 70;
-const ENGAGE_RANGE = 26;
-const ENEMY_ARRIVE_DMG = 10;
 const SIM_DT = 0.05;
+const HEAL_RADIUS = 120;
+const PROJ_HIT_DIST = 12;
 
 export interface Enemy {
   id: number;
+  type: EnemyTypeSpec['key'];
   x: number;
   hp: number;
   maxHp: number;
-  speed: number;
-  air: boolean;
+  baseSpeed: number;
   dps: number;
+  armor: number;
+  mr: number;
+  air: boolean;
+  size: number;
   wave: number;
+  baseDmg: number;
+  healPerSec: number;
+  slowUntil: number;
+  slowPct: number;
+  stunUntil: number;
 }
 
 export interface Unit {
@@ -28,8 +45,8 @@ export interface Unit {
   x: number;
   hp: number;
   maxHp: number;
-  dps: number;
-  speed: number;
+  spec: UnitSpec;
+  shotCd: number;
 }
 
 export interface Tower {
@@ -37,7 +54,30 @@ export interface Tower {
   key: TowerSpec['key'];
   lv: 1 | 2;
   cooldown: number;
-  lastTargetX: number | null; // 렌더용
+  mode: TargetingMode;
+  lastTargetX: number | null;
+}
+
+export interface Projectile {
+  id: number;
+  x: number;
+  targetId: number;
+  air: boolean; // 목표 레인 (렌더용)
+  fromTower: boolean;
+  speed: number;
+  dmg: number;
+  dmgType: DmgType;
+  splashRadius: number;
+  slowPct: number;
+  slowDur: number;
+}
+
+export interface Fx {
+  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'skill';
+  x: number;
+  air: boolean;
+  amount: number;
+  t: number; // 발생 시각 (battle.t)
 }
 
 interface WaveMod {
@@ -51,7 +91,7 @@ interface WaveMod {
 interface PendingSpawn {
   at: number;
   wave: number;
-  air: boolean;
+  type: EnemyTypeSpec['key'];
   hp: number;
   speed: number;
 }
@@ -69,12 +109,15 @@ export class Battle {
   towers: (Tower | null)[];
   units: Unit[] = [];
   enemies: Enemy[] = [];
-  waveIdx = 0; // 0 = 시작 전, 1..waveCount
+  projectiles: Projectile[] = [];
+  fx: Fx[] = [];
+  waveIdx = 0;
   phase: BattlePhase = 'prep';
   skillReadyAt = 0;
+  baseTurretCd = 0;
   victory = false;
   t = 0;
-  activeEvent: MarketEvent | null = null; // 현재 웨이브에 적용 중인 이벤트 (배너용)
+  activeEvent: MarketEvent | null = null;
 
   private waveMods: WaveMod[];
   private pending: PendingSpawn[] = [];
@@ -93,7 +136,7 @@ export class Battle {
       countMult: 1, speedMult: 1, allyAtkMult: 1, enemyHpMult: 1, event: null,
     }));
     for (const ev of events) {
-      const targetWave = Math.floor(ev.t / BALANCE.CYCLE_SECONDS) + 2; // 발동 시점 웨이브의 다음
+      const targetWave = Math.floor(ev.t / BALANCE.CYCLE_SECONDS) + 2;
       if (targetWave < 1 || targetWave > params.waveCount) continue;
       const mod = this.waveMods[targetWave];
       mod.countMult = 1; mod.speedMult = 1; mod.allyAtkMult = 1; mod.enemyHpMult = 1;
@@ -125,7 +168,7 @@ export class Battle {
     if (slot < 0 || slot >= this.towers.length || this.towers[slot]) return false;
     const spec = TOWERS.find((s) => s.key === key)!;
     if (!this.spend(spec.cost)) return false;
-    this.towers[slot] = { slot, key, lv: 1, cooldown: 0, lastTargetX: null };
+    this.towers[slot] = { slot, key, lv: 1, cooldown: 0, mode: 'first', lastTargetX: null };
     return true;
   }
 
@@ -138,6 +181,15 @@ export class Battle {
     return true;
   }
 
+  /** Bloons식 타겟팅 모드 순환: first → last → strong → close */
+  cycleTargeting(slot: number): TargetingMode | null {
+    const tw = this.towers[slot];
+    if (!tw) return null;
+    const modes: TargetingMode[] = ['first', 'last', 'strong', 'close'];
+    tw.mode = modes[(modes.indexOf(tw.mode) + 1) % modes.length];
+    return tw.mode;
+  }
+
   unitCost(key: UnitSpec['key']): number {
     const spec = UNITS.find((s) => s.key === key)!;
     return Math.floor(spec.cost * this.params.unitCostMult);
@@ -147,7 +199,7 @@ export class Battle {
     const spec = UNITS.find((s) => s.key === key)!;
     if (!this.spend(this.unitCost(key))) return false;
     const hp = Math.round(spec.hp * this.params.unitHpMult);
-    this.units.push({ id: this.nextId++, key, x: UNIT_SPAWN_X, hp, maxHp: hp, dps: spec.dps, speed: spec.speed });
+    this.units.push({ id: this.nextId++, key, x: UNIT_SPAWN_X, hp, maxHp: hp, spec, shotCd: 0 });
     return true;
   }
 
@@ -155,13 +207,130 @@ export class Battle {
     if (this.t < this.skillReadyAt) return false;
     if (!this.spend(BALANCE.SKILL_COST)) return false;
     this.skillReadyAt = this.t + BALANCE.SKILL_COOLDOWN_S;
-    for (const e of this.enemies) if (!e.air) e.hp -= BALANCE.SKILL_DAMAGE;
-    this.enemies = this.enemies.filter((e) => e.hp > 0);
+    // 공시폭탄: 마법 광역 + 스턴 (armor 관통, mr에만 감소)
+    for (const e of this.enemies) {
+      if (e.air) continue;
+      this.damage(e, BALANCE.SKILL_DAMAGE, 'magic');
+      e.stunUntil = Math.max(e.stunUntil, this.t + 1.2);
+      this.pushFx('stun', e.x, false, 0);
+    }
+    this.pushFx('skill', 500, false, 0);
+    this.enemies = this.enemies.filter((e) => this.aliveOrDeathFx(e));
     return true;
   }
 
   towerSlotX(slot: number): number {
     return 100 + slot * 46;
+  }
+
+  /** 준비 페이즈 UI용: 다음 웨이브 조합 미리보기 */
+  previewWave(w: number): { type: EnemyTypeSpec['key']; count: number }[] {
+    if (w < 1 || w > this.params.waveCount) return [];
+    const list = this.compose(w);
+    const agg = new Map<EnemyTypeSpec['key'], number>();
+    for (const t of list) agg.set(t, (agg.get(t) ?? 0) + 1);
+    if (BOSS_WAVES[this.params.regionId].includes(w)) agg.set('boss', 1);
+    return [...agg.entries()].map(([type, count]) => ({ type, count }));
+  }
+
+  // ─── 내부 ───
+  private pushFx(kind: Fx['kind'], x: number, air: boolean, amount: number) {
+    this.fx.push({ kind, x, air, amount, t: this.t });
+    if (this.fx.length > 90) this.fx.splice(0, this.fx.length - 90);
+  }
+
+  /** 피해 적용 — Kingdom Rush식: 물리는 armor, 마법은 mr에만 감소 */
+  private damage(e: Enemy, raw: number, type: DmgType) {
+    const mult = type === 'physical' ? 1 - e.armor : 1 - e.mr;
+    const dealt = raw * mult;
+    e.hp -= dealt;
+    if (dealt >= 1) this.pushFx('dmg', e.x, e.air, Math.round(dealt));
+  }
+
+  private aliveOrDeathFx(e: Enemy): boolean {
+    if (e.hp > 0) return true;
+    this.pushFx('death', e.x, e.air, 0);
+    return false;
+  }
+
+  /** 웨이브 총 수를 조합 비율로 분배 (최대 잔여 방식 — 총합 보존) */
+  private compose(w: number): EnemyTypeSpec['key'][] {
+    const spec = this.params.waveTable[w - 1];
+    const mod = this.waveMods[w];
+    const total = Math.ceil(spec.count * this.params.heat * mod.countMult);
+    const ratios = WAVE_COMPS[this.params.regionId][w - 1] ?? { grunt: 1 };
+    const entries = Object.entries(ratios) as [EnemyTypeSpec['key'], number][];
+    const rsum = entries.reduce((s, [, r]) => s + r, 0);
+    const counts = entries.map(([type, r]) => ({ type, exact: (total * r) / rsum, n: Math.floor((total * r) / rsum) }));
+    let left = total - counts.reduce((s, c) => s + c.n, 0);
+    counts.sort((a, b) => (b.exact - b.n) - (a.exact - a.n));
+    for (let i = 0; left > 0; i = (i + 1) % counts.length, left--) counts[i].n += 1;
+    // 라운드로빈 섞기 (러너·탱커가 스트림에 섞여 나오도록)
+    const out: EnemyTypeSpec['key'][] = [];
+    const queues = counts.map((c) => ({ type: c.type, n: c.n }));
+    while (out.length < total) {
+      for (const q of queues) if (q.n > 0) { out.push(q.type); q.n -= 1; }
+    }
+    return out;
+  }
+
+  private scheduleWave(w: number) {
+    const spec = this.params.waveTable[w - 1];
+    const mod = this.waveMods[w];
+    const types = this.compose(w);
+    const interval = BALANCE.WAVE_SECONDS / types.length;
+    const waveStart = (w - 1) * BALANCE.CYCLE_SECONDS + BALANCE.PREP_SECONDS;
+    types.forEach((type, i) => {
+      const et = ENEMY_TYPES[type];
+      this.pending.push({
+        at: waveStart + i * interval, wave: w, type,
+        hp: spec.hp * this.params.heat * mod.enemyHpMult * et.hpMult,
+        speed: 30 * spec.speed * mod.speedMult * et.speedMult,
+      });
+    });
+    if (BOSS_WAVES[this.params.regionId].includes(w)) {
+      const et = ENEMY_TYPES.boss;
+      this.pending.push({
+        at: waveStart + 2, wave: w, type: 'boss',
+        hp: spec.hp * this.params.heat * mod.enemyHpMult * et.hpMult,
+        speed: 30 * spec.speed * et.speedMult,
+      });
+    }
+    this.pending.sort((a, b) => a.at - b.at);
+  }
+
+  private spawn(p: PendingSpawn) {
+    const et = ENEMY_TYPES[p.type];
+    this.enemies.push({
+      id: this.nextId++, type: p.type, x: ENEMY_BASE_X - 10,
+      hp: p.hp, maxHp: p.hp, baseSpeed: p.speed,
+      dps: (6 + p.wave * 1.2) * et.dpsMult,
+      armor: et.armor, mr: et.mr, air: et.isAir, size: et.size,
+      wave: p.wave, baseDmg: et.baseDmg, healPerSec: et.healPerSec,
+      slowUntil: 0, slowPct: 0, stunUntil: 0,
+    });
+  }
+
+  private enemySpeed(e: Enemy): number {
+    return e.baseSpeed * (this.t < e.slowUntil ? 1 - e.slowPct : 1);
+  }
+
+  private fireProjectile(fromX: number, target: Enemy, dmg: number, spec: { dmgType: DmgType; projSpeed: number; splashRadius: number; slowPct: number; slowDur: number }, fromTower: boolean) {
+    this.projectiles.push({
+      id: this.nextId++, x: fromX, targetId: target.id, air: target.air, fromTower,
+      speed: spec.projSpeed, dmg, dmgType: spec.dmgType,
+      splashRadius: spec.splashRadius, slowPct: spec.slowPct, slowDur: spec.slowDur,
+    });
+  }
+
+  private pickTarget(candidates: Enemy[], mode: TargetingMode, towerX: number): Enemy | undefined {
+    if (!candidates.length) return undefined;
+    switch (mode) {
+      case 'first': return candidates.reduce((a, b) => (a.x < b.x ? a : b)); // 본진에 가장 가까운
+      case 'last': return candidates.reduce((a, b) => (a.x > b.x ? a : b));
+      case 'strong': return candidates.reduce((a, b) => (a.hp > b.hp ? a : b));
+      case 'close': return candidates.reduce((a, b) => (Math.abs(a.x - towerX) < Math.abs(b.x - towerX) ? a : b));
+    }
   }
 
   // ─── 시뮬레이션 ───
@@ -183,35 +352,19 @@ export class Battle {
 
     if (t < this.stageEndT) {
       const w = Math.floor(t / cycle) + 1;
-      const inWave = t - (w - 1) * cycle >= BALANCE.PREP_SECONDS;
       this.waveIdx = w;
-      this.phase = inWave ? 'wave' : 'prep';
-
-      // 웨이브 시작 시 기본 수입 (FR-6.8)
+      this.phase = t - (w - 1) * cycle >= BALANCE.PREP_SECONDS ? 'wave' : 'prep';
       if (!this.incomeGranted.has(w)) {
         this.incomeGranted.add(w);
-        const amount = w === this.params.waveCount ? this.params.incomeLastWave : this.params.incomePerWave;
-        this.addGold(amount);
+        this.addGold(w === this.params.waveCount ? this.params.incomeLastWave : this.params.incomePerWave);
         this.activeEvent = this.waveMods[w].event;
       }
-
-      // 웨이브 스폰 스케줄 (진행 20초에 균등 분배)
-      if (inWave && !this.spawnedWaves.has(w)) {
+      if (this.phase === 'wave' && !this.spawnedWaves.has(w)) {
         this.spawnedWaves.add(w);
-        const spec = this.params.waveTable[w - 1];
-        const mod = this.waveMods[w];
-        const count = Math.ceil(spec.count * this.params.heat * mod.countMult);
-        const hp = spec.hp * this.params.heat * mod.enemyHpMult;
-        const speed = 30 * spec.speed * mod.speedMult;
-        const interval = BALANCE.WAVE_SECONDS / count;
-        const waveStart = (w - 1) * cycle + BALANCE.PREP_SECONDS;
-        for (let i = 0; i < count; i++) {
-          const air = spec.air && i % 3 === 2; // 공중 플래그 웨이브는 1/3이 공중
-          this.pending.push({ at: waveStart + i * interval, wave: w, air, hp, speed });
-        }
+        this.scheduleWave(w);
       }
     } else if (this.enemies.length > 0 || this.pending.length > 0) {
-      this.phase = 'overtime'; // 13웨이브 종료 후 잔적 처리 (최대 40초)
+      this.phase = 'overtime';
       if (t > this.stageEndT + 40) {
         this.enemies = [];
         this.pending = [];
@@ -222,84 +375,148 @@ export class Battle {
       return;
     }
 
-    // 스폰 실행
-    while (this.pending.length && this.pending[0].at <= t) {
-      const p = this.pending.shift()!;
-      this.enemies.push({
-        id: this.nextId++, x: ENEMY_BASE_X - 10,
-        hp: p.hp, maxHp: p.hp, speed: p.speed, air: p.air,
-        dps: 6 + p.wave * 1.2, wave: p.wave,
-      });
-    }
-    this.pending.sort((a, b) => a.at - b.at);
+    while (this.pending.length && this.pending[0].at <= t) this.spawn(this.pending.shift()!);
 
     const atkMult = this.currentAllyAtkMult();
 
-    // 유닛 이동·교전
-    for (const u of this.units) {
-      const target = this.enemies
-        .filter((e) => !e.air && e.x >= u.x && e.x - u.x <= ENGAGE_RANGE)
-        .sort((a, b) => a.x - b.x)[0];
-      if (target) {
-        target.hp -= u.dps * atkMult * dt;
-      } else if (u.x >= ENEMY_BASE_X - 60) {
-        this.enemyBaseHP -= u.dps * atkMult * dt; // FR-6.10 적 본진 공격
-      } else {
-        u.x += u.speed * dt;
+    // 힐러 오라 (Kingdom Rush 실드 사제 — strong 타겟팅으로 저격하는 카운터 플레이)
+    for (const h of this.enemies) {
+      if (h.healPerSec <= 0 || h.hp <= 0) continue;
+      for (const e of this.enemies) {
+        if (e === h || e.air || e.hp <= 0 || e.hp >= e.maxHp) continue;
+        if (Math.abs(e.x - h.x) <= HEAL_RADIUS) {
+          e.hp = Math.min(e.maxHp, e.hp + h.healPerSec * dt);
+        }
       }
     }
 
-    // 적 이동·교전
+    // 블로킹 배정: 지상 적 → 사거리 내 유닛, 유닛당 block 수 제한 (초과분은 통과)
+    const blockCount = new Map<number, number>();
+    const engagedBy = new Map<number, Unit>(); // enemyId → 붙잡은 유닛
     for (const e of this.enemies) {
-      if (e.air) {
-        e.x -= e.speed * dt; // 공중은 유닛 무시하고 직행
+      if (e.air || this.t < e.stunUntil) continue;
+      const candidates = this.units
+        .filter((u) => u.x <= e.x && e.x - u.x <= 28 && (blockCount.get(u.id) ?? 0) < u.spec.block)
+        .sort((a, b) => b.x - a.x);
+      const u = candidates[0];
+      if (u) {
+        blockCount.set(u.id, (blockCount.get(u.id) ?? 0) + 1);
+        engagedBy.set(e.id, u);
+      }
+    }
+
+    // 유닛 행동 (Age of War 역할: 블로커는 붙잡고, 원거리는 뒤에서, 브루저는 광역)
+    for (const u of this.units) {
+      u.shotCd -= dt;
+      const inRange = this.enemies.filter((e) =>
+        e.hp > 0 && e.x >= u.x - 6 && e.x - u.x <= u.spec.range && (!e.air || u.spec.antiAirPct > 0));
+      const ground = inRange.filter((e) => !e.air).sort((a, b) => a.x - b.x);
+      const airs = inRange.filter((e) => e.air).sort((a, b) => a.x - b.x);
+      const targets = ground.length ? ground.slice(0, u.spec.cleave) : airs.slice(0, 1);
+      if (targets.length) {
+        if (u.shotCd <= 0) {
+          u.shotCd = 0.8;
+          const dmg = u.spec.dps * 0.8 * atkMult;
+          for (const e of targets) {
+            const mult = e.air ? u.spec.antiAirPct : 1;
+            if (u.spec.range > 40) {
+              this.fireProjectile(u.x, e, dmg * mult, { dmgType: 'physical', projSpeed: 520, splashRadius: 0, slowPct: 0, slowDur: 0 }, false);
+            } else {
+              this.damage(e, dmg * mult, 'physical');
+            }
+          }
+        }
+      } else if (u.x >= ENEMY_BASE_X - 60) {
+        this.enemyBaseHP -= u.spec.dps * atkMult * dt; // FR-6.10 적 본진 공격
       } else {
-        const target = this.units
-          .filter((u) => u.x <= e.x && e.x - u.x <= ENGAGE_RANGE)
-          .sort((a, b) => b.x - a.x)[0];
-        if (target) target.hp -= e.dps * dt;
-        else e.x -= e.speed * dt;
+        u.x += u.spec.speed * dt;
+      }
+    }
+
+    // 적 행동
+    for (const e of this.enemies) {
+      if (e.hp <= 0) continue;
+      if (this.t < e.stunUntil) continue; // 스턴: 이동·공격 불가
+      const blocker = engagedBy.get(e.id);
+      if (blocker) {
+        blocker.hp -= e.dps * dt; // 블로킹된 적은 유닛과 교전 (공중은 배정 자체가 안 됨)
+      } else {
+        e.x -= this.enemySpeed(e) * dt;
       }
       if (e.x <= PLAYER_BASE_X + 12) {
-        this.baseHP -= ENEMY_ARRIVE_DMG;
+        this.baseHP -= e.baseDmg;
+        this.pushFx('death', e.x, e.air, 0);
         e.hp = 0;
       }
     }
 
-    // 타워 사격
+    // 타워 사격 (타겟팅 모드 적용)
     for (const tw of this.towers) {
       if (!tw) continue;
       tw.cooldown -= dt;
       if (tw.cooldown > 0) continue;
       const spec = TOWERS.find((s) => s.key === tw.key)!;
-      const dmgBase = spec.dmg * (tw.lv === 2 ? spec.lv2Mult : 1) * this.params.towerDmgMult * atkMult;
       const tx = this.towerSlotX(tw.slot);
-      const candidates = this.enemies
-        .filter((e) => (spec.target === 'air' ? e.air : !e.air) && Math.abs(e.x - tx) <= spec.range && e.hp > 0)
-        .sort((a, b) => a.x - b.x);
-      const target = candidates[0];
+      const candidates = this.enemies.filter((e) =>
+        (spec.target === 'air' ? e.air : !e.air) && e.hp > 0 && Math.abs(e.x - tx) <= spec.range);
+      const target = this.pickTarget(candidates, tw.mode, tx);
       if (!target) { tw.lastTargetX = null; continue; }
       tw.cooldown = 1 / spec.rate;
       tw.lastTargetX = target.x;
-      if (spec.splashRadius > 0) {
-        for (const e of this.enemies) {
-          if (!e.air && Math.abs(e.x - target.x) <= spec.splashRadius) e.hp -= dmgBase;
-        }
-      } else {
-        target.hp -= dmgBase;
+      const dmg = spec.dmg * (tw.lv === 2 ? spec.lv2Mult : 1) * this.params.towerDmgMult * atkMult;
+      const slowPct = tw.lv === 2 && spec.slowPct > 0 ? spec.slowPct + 0.1 : spec.slowPct;
+      this.fireProjectile(tx, target, dmg, { ...spec, slowPct }, true);
+    }
+
+    // 사옥 자동 포탑 (최후 방어선)
+    this.baseTurretCd -= dt;
+    if (this.baseTurretCd <= 0) {
+      const near = this.enemies.filter((e) => e.hp > 0 && e.x <= BASE_TURRET.range);
+      const target = this.pickTarget(near, 'first', 0);
+      if (target) {
+        this.baseTurretCd = 1 / BASE_TURRET.rate;
+        this.fireProjectile(20, target, BASE_TURRET.dmg * atkMult, { dmgType: BASE_TURRET.dmgType, projSpeed: 600, splashRadius: 0, slowPct: 0, slowDur: 0 }, true);
       }
     }
 
+    // 투사체 비행·명중
+    const byId = new Map(this.enemies.map((e) => [e.id, e]));
+    for (const p of this.projectiles) {
+      const target = byId.get(p.targetId);
+      const destX = target && target.hp > 0 ? target.x : p.x; // 목표 소실 시 현재 위치에서 소멸/폭발
+      const dir = Math.sign(destX - p.x) || 1;
+      p.x += dir * p.speed * dt;
+      const arrived = !target || target.hp <= 0 || Math.abs(p.x - destX) <= PROJ_HIT_DIST;
+      if (!arrived) continue;
+      p.speed = -1; // 소멸 마크
+      if (p.splashRadius > 0) {
+        for (const e of this.enemies) {
+          if (e.air || e.hp <= 0 || Math.abs(e.x - p.x) > p.splashRadius) continue;
+          this.damage(e, p.dmg, p.dmgType);
+          if (p.slowPct > 0) {
+            e.slowPct = Math.max(e.slowPct, p.slowPct);
+            e.slowUntil = Math.max(e.slowUntil, this.t + p.slowDur);
+          }
+        }
+      } else if (target && target.hp > 0) {
+        this.damage(target, p.dmg, p.dmgType);
+        if (p.slowPct > 0) {
+          target.slowPct = Math.max(target.slowPct, p.slowPct);
+          target.slowUntil = Math.max(target.slowUntil, this.t + p.slowDur);
+        }
+      }
+    }
+    this.projectiles = this.projectiles.filter((p) => p.speed > 0);
+
     // 사망 정리
     this.units = this.units.filter((u) => u.hp > 0);
-    this.enemies = this.enemies.filter((e) => e.hp > 0);
+    this.enemies = this.enemies.filter((e) => this.aliveOrDeathFx(e));
+    this.fx = this.fx.filter((f) => this.t - f.t < 1.4);
 
     if (this.enemyBaseHP <= 0) {
       this.enemyBaseDestroyed = true;
       this.enemyBaseHP = 0;
     }
-
-    // 패배 (FR-6.9)
     if (this.baseHP <= 0) {
       this.baseHP = 0;
       this.phase = 'done';

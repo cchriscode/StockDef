@@ -34,6 +34,7 @@ export type Direction = 'long' | 'short';
 
 // POST /api/stage/start 응답 (PRD §7.1)
 export interface StageParams {
+  regionId: RegionId;
   aum: number;
   totalBaseIncome: number;
   incomePerWave: number;
