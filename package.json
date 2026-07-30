@@ -1,0 +1,20 @@
+{
+  "name": "ticker-front",
+  "private": true,
+  "type": "module",
+  "workspaces": ["shared", "server", "web"],
+  "scripts": {
+    "dev": "concurrently -n srv,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
+    "fetch": "python pipeline/fetch_krx.py",
+    "build:data": "python pipeline/build.py",
+    "seed": "npm run seed -w server",
+    "test": "vitest run",
+    "sim": "tsx server/scripts/botsim.ts"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
