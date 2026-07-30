@@ -34,7 +34,7 @@ function regionState(accountId: string, regionId: RegionId, territories: Territo
   const meta = REGION_META[regionId];
   let state: MapRegion['state'] = 'locked';
   if (t?.captured_at) state = 'captured';
-  else if (regionId === 'R1') state = tutorialDone ? 'open' : 'locked';
+  else if (regionId === 'R1') state = 'open'; // FR-12.4: 튜토리얼 스킵 가능 → R1은 시작점으로 항상 개방
   else {
     const adj = territories.find((x) => x.region_id === meta.adjacent);
     if (adj?.captured_at) state = 'open';
@@ -53,7 +53,7 @@ function accountRow(accountId: string) {
 
 // ─── FR-1.2 진행도 ───
 router.get('/me', (req, res) => {
-  const accountId = (req as AuthedRequest).accountId;
+  const accountId = (req as unknown as AuthedRequest).accountId;
   const acc = accountRow(accountId);
   const territories = getTerritories(accountId);
   const codexCount = (db.prepare('SELECT COUNT(*) AS n FROM codex_entries WHERE account_id = ?').get(accountId) as { n: number }).n;
@@ -69,7 +69,7 @@ router.get('/me', (req, res) => {
 
 // ─── FR-2 지도 ───
 router.get('/map', (req, res) => {
-  const accountId = (req as AuthedRequest).accountId;
+  const accountId = (req as unknown as AuthedRequest).accountId;
   const acc = accountRow(accountId);
   const territories = getTerritories(accountId);
   const captured = territories.filter((t) => t.captured_at && t.region_id !== 'TUT').length;
@@ -88,7 +88,7 @@ router.get('/map', (req, res) => {
 
 // ─── FR-3.6 조합 배정 (쿨다운) + 세션 생성 ───
 router.post('/stage/start', (req, res) => {
-  const accountId = (req as AuthedRequest).accountId;
+  const accountId = (req as unknown as AuthedRequest).accountId;
   const { regionId, speed } = req.body as { regionId: RegionId; speed?: number };
   const spd = speed ?? 1;
   if (![0.5, 1, 2].includes(spd)) return res.status(400).json({ error: 'BAD_SPEED' });
@@ -143,7 +143,7 @@ router.post('/stage/start', (req, res) => {
 
 // ─── FR-8 정산 (§11 서버 독립 재계산 검증) ───
 router.post('/stage/finish', (req, res) => {
-  const accountId = (req as AuthedRequest).accountId;
+  const accountId = (req as unknown as AuthedRequest).accountId;
   const { sessionId, goldLeft, goldSpent, hpLeft, enemyBaseDestroyed } = req.body as FinishReq & { sessionId: string };
   const row = db.prepare('SELECT * FROM stage_sessions WHERE id = ? AND account_id = ?').get(sessionId, accountId) as SessionRow | undefined;
   if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -236,7 +236,7 @@ router.post('/stage/finish', (req, res) => {
 
 // ─── FR-9.3 공개 정보 (정산 후 별도 API — FR-4.4 준수) ───
 router.get('/stage/:id/reveal', (req, res) => {
-  const accountId = (req as AuthedRequest).accountId;
+  const accountId = (req as unknown as AuthedRequest).accountId;
   const row = db.prepare('SELECT * FROM stage_sessions WHERE id = ? AND account_id = ?').get(req.params.id, accountId) as SessionRow | undefined;
   if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
   if (row.status === 'active') return res.status(403).json({ error: 'STAGE_NOT_ENDED' });
@@ -260,7 +260,7 @@ router.get('/stage/:id/reveal', (req, res) => {
 
 // ─── FR-8.4 점령 보상 선택 ───
 router.post('/stage/:id/reward', (req, res) => {
-  const accountId = (req as AuthedRequest).accountId;
+  const accountId = (req as unknown as AuthedRequest).accountId;
   const { line } = req.body as { line: RewardLine };
   const row = db.prepare('SELECT * FROM stage_sessions WHERE id = ? AND account_id = ?').get(req.params.id, accountId) as SessionRow | undefined;
   if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -279,7 +279,7 @@ router.post('/stage/:id/reward', (req, res) => {
 
 // ─── FR-11 부서 업그레이드 ───
 router.post('/dept/upgrade', (req, res) => {
-  const accountId = (req as AuthedRequest).accountId;
+  const accountId = (req as unknown as AuthedRequest).accountId;
   const { deptKey } = req.body as { deptKey: string };
   const spec = DEPTS.find((d) => d.key === deptKey);
   if (!spec) return res.status(400).json({ error: 'BAD_DEPT' });
@@ -295,7 +295,7 @@ router.post('/dept/upgrade', (req, res) => {
 
 // ─── FR-10 도감 ───
 router.get('/codex', (req, res) => {
-  const accountId = (req as AuthedRequest).accountId;
+  const accountId = (req as unknown as AuthedRequest).accountId;
   const { sector, rarity, sort } = req.query as { sector?: string; rarity?: string; sort?: string };
   let rows = db.prepare(
     `SELECT ce.first_cleared_at, ce.best_accuracy, ce.best_grade,
@@ -313,7 +313,7 @@ router.get('/codex', (req, res) => {
 
 // ─── §12 텔레메트리 (최소) ───
 router.post('/telemetry', (req, res) => {
-  const accountId = (req as AuthedRequest).accountId;
+  const accountId = (req as unknown as AuthedRequest).accountId;
   const { events } = req.body as { events: { event: string; props?: unknown }[] };
   if (Array.isArray(events)) {
     const ins = db.prepare('INSERT INTO telemetry (account_id, event, props) VALUES (?, ?, ?)');

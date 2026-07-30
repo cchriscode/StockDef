@@ -1,0 +1,422 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  BALANCE, Battle, TOWERS, UNITS,
+  type BarsFile, type Direction, type FinishRes, type RegionId, type StageStartRes, type WsServerMsg,
+} from '@tf/shared';
+import { api, getSettings, getToken, track } from '../net/api.js';
+import { StageWs } from '../net/stageWs.js';
+import { clockLabel, drawChart, interpPct, pctOf, type OpenMarker } from '../game/chart.js';
+import { drawBattle } from '../game/battleRender.js';
+
+interface Props {
+  regionId: RegionId;
+  onFinish: (sessionId: string, finish: FinishRes, regionId: RegionId) => void;
+  onSkipTutorial: () => void;
+}
+
+interface ResultPopup {
+  outcome: 'win' | 'lose' | 'draw';
+  amount: number;
+}
+
+type GuideStep = 0 | 1 | 2 | 3 | 4 | 5; // FR-12.2 강제 가이드
+
+export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
+  const isTut = regionId === 'TUT';
+  const settings = getSettings();
+
+  const chartRef = useRef<HTMLCanvasElement>(null);
+  const battleRef = useRef<HTMLCanvasElement>(null);
+  const lastHud = useRef(0);
+
+  // 게임 가변 상태 (렌더 루프 전용 — ref)
+  const g = useRef<{
+    start: StageStartRes | null;
+    bars: BarsFile | null;
+    battle: Battle | null;
+    ws: StageWs | null;
+    t0: number;
+    barMs: number;
+    seq: number;
+    openMarker: (OpenMarker & { stake: number }) | null;
+    pendingOpen: boolean;
+    aum: number;
+    finished: boolean;
+    lastPayoutAt: number;
+    lastEventKey: string;
+    shakeUntil: number;
+  }>({
+    start: null, bars: null, battle: null, ws: null, t0: 0, barMs: 1000,
+    seq: 0, openMarker: null, pendingOpen: false, aum: 0, finished: false,
+    lastPayoutAt: 0, lastEventKey: '', shakeUntil: 0,
+  });
+
+  const [phase, setPhase] = useState<'loading' | 'playing' | 'settling' | 'error'>('loading');
+  const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0 });
+  const [popup, setPopup] = useState<ResultPopup | null>(null);
+  const [banner, setBanner] = useState<{ text: string; kind: 'panic' | 'fomo' } | null>(null);
+  const [stakePct, setStakePct] = useState(0.25);
+  const [expiry, setExpiry] = useState(30);
+  const [slotMenu, setSlotMenu] = useState<number | null>(null);
+  const [guide, setGuide] = useState<GuideStep>(isTut ? 0 : 5);
+  const [errMsg, setErrMsg] = useState('');
+  const [tint, setTint] = useState('');
+
+  const finishStage = useCallback(async (giveUp = false) => {
+    const s = g.current;
+    if (s.finished || !s.battle || !s.start) return;
+    s.finished = true;
+    s.ws?.close();
+    setPhase('settling');
+    const b = s.battle;
+    track('stage_end', { region: regionId, hp: b.baseHP, gold: b.gold, positions: s.seq });
+    try {
+      const res = await api.stageFinish(s.start.sessionId, {
+        goldLeft: Math.floor(b.gold),
+        goldSpent: Math.floor(b.goldSpent),
+        hpLeft: giveUp ? 0 : Math.max(0, Math.round(b.baseHP)),
+        enemyBaseDestroyed: b.enemyBaseDestroyed,
+      });
+      onFinish(s.start.sessionId, res, regionId);
+    } catch (e) {
+      setErrMsg(`정산 실패: ${(e as Error).message}`);
+      setPhase('error');
+    }
+  }, [onFinish, regionId]);
+
+  // ─── 초기화: §8.1 LOADING (bars 전량 프리로드 + WS 연결) ───
+  useEffect(() => {
+    let cancelled = false;
+    let raf = 0;
+    (async () => {
+      try {
+        const start = await api.stageStart(regionId, isTut ? 1 : settings.speed);
+        const bars = (await fetch(start.barsUrl).then((r) => r.json())) as BarsFile;
+        if (cancelled) return;
+        const s = g.current;
+        s.start = start;
+        s.bars = bars;
+        s.battle = new Battle(start.params, bars.events);
+        s.aum = start.params.aum;
+        s.barMs = 1000 / (isTut ? 1 : settings.speed);
+        const ws = new StageWs(start.sessionId, getToken());
+        s.ws = ws;
+        ws.onMsg = handleWs;
+        await ws.ready();
+        ws.start();
+        ws.beginClockSync(() => Math.floor((Date.now() - s.t0) / s.barMs));
+        track('stage_start', { region: regionId, speed: settings.speed, aum: start.params.aum, isTut });
+      } catch (e) {
+        if (!cancelled) {
+          setErrMsg(`스테이지 로딩 실패: ${(e as Error).message}`);
+          setPhase('error');
+        }
+      }
+    })();
+
+    function handleWs(m: WsServerMsg) {
+      const s = g.current;
+      if (m.op === 'started') {
+        s.t0 = Date.now();
+        setPhase('playing');
+        loop();
+      } else if (m.op === 'position.opened') {
+        s.pendingOpen = false;
+        s.aum = m.aumLeft;
+        s.openMarker = {
+          openBarIdx: m.openBarIdx,
+          closeBarIdx: m.closeBarIdx,
+          basePricePct: pctOf(m.basePrice, s.bars!.openPrice),
+          direction: s.openMarker?.direction ?? 'long',
+          stake: s.openMarker?.stake ?? 0,
+        };
+      } else if (m.op === 'position.resolved') {
+        s.aum = m.aumLeft;
+        s.openMarker = null;
+        s.battle?.addGold(m.payout);
+        s.lastPayoutAt = Date.now();
+        setPopup({ outcome: m.outcome, amount: m.payout });
+        setTimeout(() => setPopup(null), 800); // FR-5.9: 0.8초 이내
+        track('position_resolved', { outcome: m.outcome, m: m.m, payout: m.payout });
+        if (isTut) setGuide((cur) => (cur === 2 ? 3 : cur));
+      } else if (m.op === 'clock.resync') {
+        s.t0 = Date.now() - m.serverBarIdx * s.barMs;
+      } else if (m.op === 'error') {
+        s.pendingOpen = false;
+        if (s.openMarker && !s.openMarker.basePricePct) s.openMarker = null;
+      }
+    }
+
+    function loop() {
+      const s = g.current;
+      if (cancelled || s.finished || !s.battle || !s.bars) return;
+      // 전투 시간은 캡 없이 진행 (13웨이브 후 잔적 overtime 처리 — 엔진이 내부에서 종료 판단)
+      const elapsedBars = (Date.now() - s.t0) / s.barMs;
+      const barF = Math.min(elapsedBars, s.bars.barCount); // 차트 표시용만 캡
+      s.battle.advanceTo(elapsedBars);
+
+      // FR-7.2 이벤트 연출
+      const ev = s.battle.activeEvent;
+      const key = ev ? `${ev.t}:${ev.type}` : '';
+      if (key && key !== s.lastEventKey) {
+        s.lastEventKey = key;
+        const isPanic = ev!.type === 'panic_sell';
+        setBanner({ text: isPanic ? '⚡ 속보: 패닉 셀 — 다음 웨이브 적 증원!' : '⚡ 속보: FOMO 랠리 — 아군 공격력 상승!', kind: isPanic ? 'panic' : 'fomo' });
+        setTint(isPanic ? 'tint-panic' : 'tint-fomo');
+        if (!settings.reduceShake) s.shakeUntil = Date.now() + 600;
+        setTimeout(() => setBanner(null), 2000);
+        setTimeout(() => setTint(''), 2500);
+      }
+
+      if (chartRef.current) {
+        drawChart(chartRef.current, s.bars, barF, {
+          colorBlind: settings.colorBlind,
+          marker: s.openMarker,
+          showResearch: s.start!.params.hasInfoResearch,
+        });
+      }
+      if (battleRef.current) {
+        drawBattle(battleRef.current, s.battle, Date.now() < s.shakeUntil ? 5 : 0);
+      }
+
+      // HUD는 100ms 스로틀 — 캔버스는 60fps, DOM 리렌더는 10fps면 충분
+      const b = s.battle;
+      if (Date.now() - lastHud.current >= 100) {
+        lastHud.current = Date.now();
+        setHud({
+          gold: Math.floor(b.gold), aum: s.aum, hp: Math.max(0, Math.round(b.baseHP)),
+          wave: b.waveIdx, waveCount: s.start!.params.waveCount,
+          prep: b.phase === 'prep', barF, barCount: s.bars.barCount,
+          posCount: s.seq, skillCd: Math.max(0, Math.ceil(b.skillReadyAt - b.t)),
+        });
+      }
+
+      if (b.phase === 'done') {
+        void finishStage();
+        return;
+      }
+      raf = requestAnimationFrame(loop);
+    }
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      g.current.ws?.close();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regionId]);
+
+  // ─── FR-5 포지션 오픈 ───
+  const canOpen = (() => {
+    const s = g.current;
+    if (phase !== 'playing' || s.pendingOpen || s.openMarker || !s.start) return false;
+    if (s.seq >= s.start.params.maxPositions) return false;
+    if (s.aum < 1) return false;
+    if (hud.barF + expiry + 2 >= hud.barCount) return false;
+    if (isTut && guide < 1) return false;
+    if (isTut && guide === 1 && (hud.barF < 22 || hud.barF > 34)) return false;
+    if (isTut && guide === 2) return false;
+    return true;
+  })();
+
+  const openPosition = (direction: Direction) => {
+    const s = g.current;
+    if (!canOpen || !s.ws) return;
+    const stake = Math.max(1, Math.floor(s.aum * stakePct));
+    s.seq += 1;
+    s.pendingOpen = true;
+    s.openMarker = { openBarIdx: 0, closeBarIdx: 0, basePricePct: 0, direction, stake };
+    s.ws.openPosition(s.seq, direction, stake, expiry);
+    track('position_open', { seq: s.seq, direction, stakePct, expiry, waveIdx: hud.wave, phase: hud.prep ? 'prep' : 'wave' });
+    if (isTut && guide === 1) setGuide(2);
+  };
+
+  // ─── FR-6 전투 입력 ───
+  const spendTrack = (item: string, cost: number) => {
+    track('gold_spent', { item, cost, waveIdx: hud.wave, msSincePayout: g.current.lastPayoutAt ? Date.now() - g.current.lastPayoutAt : null });
+  };
+
+  const buildTower = (slot: number, key: 'basic' | 'aa' | 'splash') => {
+    const b = g.current.battle;
+    if (!b) return;
+    const spec = TOWERS.find((t) => t.key === key)!;
+    if (b.buildTower(slot, key)) {
+      spendTrack(`tower:${key}`, spec.cost);
+      if (isTut && guide === 3) setGuide(4);
+    }
+    setSlotMenu(null);
+  };
+
+  const upgradeTower = (slot: number) => {
+    const b = g.current.battle;
+    if (!b) return;
+    const tw = b.towers[slot];
+    if (tw && b.upgradeTower(slot)) spendTrack(`upgrade:${tw.key}`, TOWERS.find((t) => t.key === tw.key)!.upgradeCost);
+    setSlotMenu(null);
+  };
+
+  const spawnUnit = (key: 'intern' | 'analyst' | 'trader') => {
+    const b = g.current.battle;
+    if (!b) return;
+    const cost = b.unitCost(key);
+    if (b.spawnUnit(key)) {
+      spendTrack(`unit:${key}`, cost);
+      if (isTut && guide === 4) setGuide(5);
+    }
+  };
+
+  const useSkill = () => {
+    const b = g.current.battle;
+    if (b?.useSkill()) spendTrack('skill', BALANCE.SKILL_COST);
+  };
+
+  const onBattleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const b = g.current.battle;
+    const canvas = battleRef.current;
+    if (!b || !canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const fx = ((e.clientX - rect.left) / rect.width) * 1000;
+    let best = -1;
+    let bestD = 40;
+    for (let s = 0; s < b.towers.length; s++) {
+      const d = Math.abs(b.towerSlotX(s) - fx);
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    setSlotMenu(best >= 0 ? best : null);
+  };
+
+  // ─── 렌더 ───
+  if (phase === 'error') {
+    return (
+      <div className="screen center">
+        <p>{errMsg}</p>
+        <button onClick={() => location.reload()}>다시 시도</button>
+      </div>
+    );
+  }
+  if (phase === 'loading' || !g.current.start) {
+    return <div className="screen center"><p>차트 데이터 프리로드 중…</p></div>;
+  }
+
+  const s = g.current;
+  const p = s.start!.params;
+  const tags = s.bars!.tags;
+  const battle = s.battle!;
+  const progress = Math.min(hud.barF / hud.barCount, 1);
+  const remainBars = s.openMarker && s.openMarker.closeBarIdx > 0 ? Math.max(0, Math.ceil(s.openMarker.closeBarIdx - hud.barF)) : null;
+
+  return (
+    <div className={`screen stage ${tint}`}>
+      {/* 블라인드 태그 + 진행바 (FR-3.7, FR-4.2) */}
+      <div className="stage-top">
+        <span className="tags">[{tags.region} · {tags.sector} · {tags.capTier === 'large' ? '대형주' : '중형주'}]</span>
+        <div className="clockbar">
+          <span>09:00</span>
+          <div className="track"><div className="fill" style={{ width: `${progress * 100}%` }} /></div>
+          <span>15:30</span>
+          <b>{clockLabel(hud.barF, hud.barCount)}</b>
+        </div>
+        <button className="ghost small" onClick={() => (isTut ? onSkipTutorial() : confirm('이탈하면 패배 처리됩니다 (FR-6.11)') && finishStage(true))}>
+          {isTut ? '튜토리얼 스킵' : '이탈'}
+        </button>
+      </div>
+
+      <canvas ref={chartRef} width={860} height={240} className="chart" />
+
+      {/* FR-5.1 포지션 UI */}
+      <div className="position-bar">
+        <button className={`long ${isTut && guide === 1 ? 'pulse' : ''}`} disabled={!canOpen} onClick={() => openPosition('long')}>LONG ▲</button>
+        <button className="short" disabled={!canOpen || (isTut && guide <= 2)} onClick={() => openPosition('short')}>SHORT ▼</button>
+        <span className="lbl">투입</span>
+        {BALANCE.STAKE_PCTS.map((v) => (
+          <button key={v} className={`opt ${stakePct === v ? 'on' : ''}`} disabled={isTut && guide <= 2 && v !== 0.25} onClick={() => setStakePct(v)}>
+            {v === 1 ? 'ALL' : `${v * 100}%`}
+          </button>
+        ))}
+        <span className="lbl">만기</span>
+        {BALANCE.EXPIRY_BARS.map((v) => (
+          <button key={v} className={`opt ${expiry === v ? 'on' : ''}`} disabled={isTut && guide <= 2 && v !== 30} onClick={() => setExpiry(v)}>
+            {v}초({v}분봉)
+          </button>
+        ))}
+        {remainBars != null && <span className="remain">만기까지 {remainBars}초</span>}
+        <span className="poscnt">{hud.posCount}/{p.maxPositions}</span>
+      </div>
+
+      {/* 상태 바 */}
+      <div className="hud">
+        <span>HP <b className={hud.hp <= 30 ? 'danger' : ''}>{hud.hp}</b></span>
+        <span>골드 <b className="gold">{hud.gold.toLocaleString()}</b></span>
+        <span>AUM <b className="aum">{hud.aum.toLocaleString()}</b></span>
+        <span>W <b>{Math.min(hud.wave, hud.waveCount)}/{hud.waveCount}</b> {hud.prep ? '(준비)' : '(웨이브)'}</span>
+        <span>L={p.lossRate} · heat {p.heat.toFixed(2)}</span>
+      </div>
+
+      <div className="battle-wrap">
+        <canvas ref={battleRef} width={860} height={190} className="battle" onClick={onBattleClick} />
+        {banner && <div className={`banner ${banner.kind}`}>{banner.text}</div>}
+        {popup && (
+          <div className={`popup ${popup.outcome}`}>
+            {popup.outcome === 'win' ? `WIN +${popup.amount.toLocaleString()} G` : popup.outcome === 'lose' ? `LOSE +${popup.amount.toLocaleString()} G` : `DRAW 원금 ${popup.amount.toLocaleString()} G`}
+          </div>
+        )}
+        {slotMenu != null && (
+          <div className="slot-menu" style={{ left: `${(battle.towerSlotX(slotMenu) / 1000) * 100}%` }}>
+            {battle.towers[slotMenu] ? (
+              battle.towers[slotMenu]!.lv < 2 ? (
+                <button onClick={() => upgradeTower(slotMenu)}>
+                  업그레이드 {TOWERS.find((t) => t.key === battle.towers[slotMenu]!.key)!.upgradeCost} G
+                </button>
+              ) : (
+                <span className="small">최대 레벨</span>
+              )
+            ) : (
+              TOWERS.map((t) => (
+                <button key={t.key} disabled={hud.gold < t.cost} onClick={() => buildTower(slotMenu, t.key)}>
+                  {t.name} {t.cost} G
+                </button>
+              ))
+            )}
+            <button className="ghost" onClick={() => setSlotMenu(null)}>✕</button>
+          </div>
+        )}
+      </div>
+
+      {/* 하단 구매 바 (FR-6.5 / FR-6.6) */}
+      <div className="buy-bar">
+        {UNITS.map((u) => {
+          const cost = battle.unitCost(u.key);
+          return (
+            <button key={u.key} className={isTut && guide === 4 ? 'pulse' : ''} disabled={hud.gold < cost || phase !== 'playing'} onClick={() => spawnUnit(u.key)}>
+              {u.name} {cost} G
+            </button>
+          );
+        })}
+        <div className="spacer" />
+        <button disabled={hud.gold < BALANCE.SKILL_COST || hud.skillCd > 0} onClick={useSkill}>
+          공시폭탄 {BALANCE.SKILL_COST} G{hud.skillCd > 0 ? ` (${hud.skillCd}s)` : ''}
+        </button>
+      </div>
+
+      <p className="disclaimer">본 콘텐츠는 과거 데이터를 활용한 게임이며 투자 조언이 아닙니다.</p>
+
+      {/* FR-12 튜토리얼 가이드 */}
+      {isTut && guide < 5 && (
+        <div className="guide">
+          {guide === 0 && (
+            <>
+              <p>📈 위 차트는 <b>실제 과거 거래일</b>의 1분봉입니다. 어느 회사의 어느 날인지는 숨겨져 있습니다.<br />
+                Y축은 당일 시가 대비 %입니다. 차트가 오를 것 같으면 LONG, 내릴 것 같으면 SHORT.</p>
+              <button onClick={() => setGuide(1)}>다음</button>
+            </>
+          )}
+          {guide === 1 && <p>🎯 지금 상승 흐름입니다. <b>LONG ▲</b> 버튼을 눌러 첫 예측을 걸어보세요! {hud.barF < 22 ? `(${Math.ceil(22 - hud.barF)}초 후 활성화)` : ''}</p>}
+          {guide === 2 && <p>⏳ 30초 뒤 만기가 되면 서버가 실제 종가로 판정합니다. 기다려 보세요…</p>}
+          {guide === 3 && <p>💰 골드가 입금됐습니다! 이 돈으로 방어하세요. <b>전장의 빈 슬롯(점선)</b>을 눌러 타워를 지으세요.</p>}
+          {guide === 4 && <p>⚔ 이제 <b>유닛</b>을 소환해 전선을 미세요. 아래 인턴/애널리스트 버튼!</p>}
+        </div>
+      )}
+      {phase === 'settling' && <div className="overlay center"><p>정산 중…</p></div>}
+    </div>
+  );
+}

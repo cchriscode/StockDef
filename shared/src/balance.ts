@@ -118,10 +118,11 @@ function scaleWaves(base: WaveSpec[], countMult: number, hpMult: number): WaveSp
   }));
 }
 
+// 스케일 근거: §9.3 목표 지출 비율 (R2 2550/2000 ≈ ×1.28, R3 3100/2000 ≈ ×1.55) — 봇 시뮬레이터로 검증
 export const WAVE_TABLES: Record<RegionId, WaveSpec[]> = {
   R1: R1_WAVES,
-  R2: scaleWaves(R1_WAVES, 1.1, 1.35),
-  R3: scaleWaves(R1_WAVES, 1.2, 1.7),
+  R2: scaleWaves(R1_WAVES, 1.05, 1.25),
+  R3: scaleWaves(R1_WAVES, 1.05, 1.5),
   TUT: [
     { count: 2, hp: 40, speed: 0.9, air: false },
     { count: 3, hp: 45, speed: 0.9, air: false },

@@ -3,7 +3,7 @@ import { BALANCE } from './balance.js';
 import type { Grade, Outcome, RewardLine } from './types.js';
 
 // FR-6.8 기본 수입: 총액을 먼저 확정하고 분배한다 (웨이브당 내림 + 마지막 웨이브 나머지 보정)
-export function baseIncome(capturedCount: number, waveCount = BALANCE.WAVE_COUNT, financeRewards = 0) {
+export function baseIncome(capturedCount: number, waveCount: number = BALANCE.WAVE_COUNT, financeRewards = 0) {
   const upkeepPer = Math.max(0, BALANCE.UPKEEP_PER_TERRITORY - financeRewards * BALANCE.UPKEEP_FINANCE_DISCOUNT);
   const total = BALANCE.BASE_INCOME_PER_WAVE * waveCount - capturedCount * upkeepPer;
   const perWave = Math.floor(total / waveCount);
@@ -32,10 +32,11 @@ export function judge(
     return { outcome: 'draw', deltaPct, z, m, payout: stake };
   }
   const correct = direction === 'long' ? deltaPct > 0 : deltaPct < 0;
+  // 1e-6 가드: 부동소수점 오차로 정수 경계가 내려앉는 것 방지 (예: 1000×0.1 = 99.999…)
   if (correct) {
-    return { outcome: 'win', deltaPct, z, m, payout: Math.floor(stake * (1 + BALANCE.PAYOUT_BASE * m)) };
+    return { outcome: 'win', deltaPct, z, m, payout: Math.floor(stake * (1 + BALANCE.PAYOUT_BASE * m) + 1e-6) };
   }
-  return { outcome: 'lose', deltaPct, z, m, payout: Math.floor(stake * (1 - lossRate)) };
+  return { outcome: 'lose', deltaPct, z, m, payout: Math.floor(stake * (1 - lossRate) + 1e-6) };
 }
 
 // FR-8.1 / FR-8.2 정산

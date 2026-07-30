@@ -63,8 +63,8 @@ export class Battle {
   gold = 0;
   goldEarned = 0;
   goldSpent = 0;
-  baseHP = BALANCE.BASE_HP;
-  enemyBaseHP = BALANCE.ENEMY_BASE_HP;
+  baseHP: number = BALANCE.BASE_HP;
+  enemyBaseHP: number = BALANCE.ENEMY_BASE_HP;
   enemyBaseDestroyed = false;
   towers: (Tower | null)[];
   units: Unit[] = [];
