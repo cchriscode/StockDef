@@ -15,7 +15,10 @@ export function heatOf(capturedCount: number): number {
   return 1 + capturedCount * BALANCE.HEAT_PER_TERRITORY;
 }
 
-// FR-5.5 만기 판정
+// FR-5.5 청산 손익 수식 (선물식 연속 PnL, 비대칭 계수)
+// g = 방향 × (Δ%/σ30) — 부호 있는 정규화 수익.
+// 상방은 B×g (전 지역 0.9), 하방은 L×g (지역 난이도 노브) — 손실은 stake×MAX_LOSS_RATE에서 클램프.
+// outcome은 통계·등급용 분류일 뿐이며 손익은 연속이다 (|g| < DRAW_BAND → draw).
 export function judge(
   basePrice: number,
   closePrice: number,
@@ -23,20 +26,16 @@ export function judge(
   direction: 'long' | 'short',
   stake: number,
   lossRate: number,
-): { outcome: Outcome; deltaPct: number; z: number; m: number; payout: number } {
+): { outcome: Outcome; deltaPct: number; g: number; payout: number; pnl: number } {
   const deltaPct = ((closePrice - basePrice) / basePrice) * 100;
   const sig = Math.max(sigma, 1e-6);
-  const z = Math.abs(deltaPct) / sig;
-  const m = Math.min(Math.max(z, BALANCE.M_CLAMP[0]), BALANCE.M_CLAMP[1]);
-  if (z < BALANCE.DRAW_BAND) {
-    return { outcome: 'draw', deltaPct, z, m, payout: stake };
-  }
-  const correct = direction === 'long' ? deltaPct > 0 : deltaPct < 0;
+  const g = (direction === 'long' ? 1 : -1) * (deltaPct / sig);
+  const raw = g >= 0 ? BALANCE.PAYOUT_BASE * g : lossRate * g;
+  const capped = Math.min(Math.max(raw, -BALANCE.MAX_LOSS_RATE), BALANCE.PAYOUT_BASE * BALANCE.Z_CAP);
   // 1e-6 가드: 부동소수점 오차로 정수 경계가 내려앉는 것 방지 (예: 1000×0.1 = 99.999…)
-  if (correct) {
-    return { outcome: 'win', deltaPct, z, m, payout: Math.floor(stake * (1 + BALANCE.PAYOUT_BASE * m) + 1e-6) };
-  }
-  return { outcome: 'lose', deltaPct, z, m, payout: Math.floor(stake * (1 - lossRate) + 1e-6) };
+  const payout = Math.max(0, Math.floor(stake * (1 + capped) + 1e-6));
+  const outcome: Outcome = Math.abs(g) < BALANCE.DRAW_BAND ? 'draw' : g > 0 ? 'win' : 'lose';
+  return { outcome, deltaPct, g, payout, pnl: payout - stake };
 }
 
 // FR-8.1 / FR-8.2 정산

@@ -19,11 +19,13 @@ export class LiveSession {
   aum: number;
   payoutSum = 0;
   wins = 0; loses = 0; draws = 0;
-  openSeq: number | null = null;
+  open: { seq: number; direction: Direction; stake: number; openBarIdx: number; basePrice: number } | null = null;
+  closing = false;
   positionCount = 0;
   lastOpenAt = 0;
   ws: WebSocket | null = null;
   private timers: NodeJS.Timeout[] = [];
+  private endTimerSet = false;
 
   constructor(row: SessionRow, chartSet: ChartSetRow) {
     this.id = row.id;
@@ -49,6 +51,14 @@ export class LiveSession {
       this.t0 = Date.now();
       db.prepare('UPDATE stage_sessions SET t0_ms = ? WHERE id = ?').run(this.t0, this.id);
     }
+    // FR-5.11: 스테이지 종료(마지막 봉 마감) 시 미청산 포지션은 마지막 봉 종가로 강제 청산
+    if (!this.endTimerSet) {
+      this.endTimerSet = true;
+      const endAt = this.t0 + this.bars.barCount * this.barMs + 50;
+      this.timers.push(setTimeout(() => {
+        if (this.open && !this.closing) this.settleClose(this.bars.barCount - 1, true);
+      }, Math.max(0, endAt - Date.now())));
+    }
     this.send({ op: 'started', serverT0: this.t0 });
   }
 
@@ -65,64 +75,75 @@ export class LiveSession {
     return this.params.incomePerWave * started;
   }
 
-  openPosition(seq: number, direction: Direction, stake: number, expiryBars: number) {
+  openPosition(seq: number, direction: Direction, stake: number) {
     const now = Date.now();
     const err = (code: Parameters<typeof this.errMsg>[0]) => this.send(this.errMsg(code, seq));
     if (this.t0 == null) return err('SESSION_ENDED');
     // FR-5.10: 오픈 "요청" 기준 초당 1건 — 시도 자체에 타임스탬프를 찍는다
     if (now - this.lastOpenAt < BALANCE.OPEN_RATE_LIMIT_MS) return err('RATE_LIMITED');
     this.lastOpenAt = now;
-    if (this.openSeq != null) return err('POSITION_ALREADY_OPEN');
+    if (this.open != null) return err('POSITION_ALREADY_OPEN');
     if (this.positionCount >= this.params.maxPositions) return err('MAX_POSITIONS');
     if (!Number.isInteger(stake) || stake <= 0 || stake > this.aum) return err('INSUFFICIENT_AUM');
-    if (!BALANCE.EXPIRY_BARS.includes(expiryBars as 15 | 30)) return err('INVALID_SEQ');
     if (direction !== 'long' && direction !== 'short') return err('INVALID_SEQ');
     if (!Number.isInteger(seq) || seq !== this.positionCount + 1) return err('INVALID_SEQ');
 
     const i = this.serverBarIdx(now);
-    const openBarIdx = i + 1; // FR-5.4: 다음 1분봉의 종가가 기준가
-    const closeBarIdx = openBarIdx + expiryBars;
-    if (i < 0 || closeBarIdx >= this.bars.barCount) return err('SESSION_ENDED');
+    const openBarIdx = i + 1; // FR-5.4: 다음 1분봉의 종가로 체결 (시장가 주문 지연)
+    if (i < 0 || openBarIdx >= this.bars.barCount - 1) return err('SESSION_ENDED');
 
-    this.openSeq = seq;
+    const basePrice = this.bars.bars[openBarIdx].c;
+    this.open = { seq, direction, stake, openBarIdx, basePrice };
     this.positionCount += 1;
     this.aum -= stake;
-    const basePrice = this.bars.bars[openBarIdx].c;
 
     db.prepare(
-      `INSERT INTO positions (session_id, seq, direction, stake, expiry_bars, open_bar_idx, close_bar_idx, base_price)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(this.id, seq, direction, stake, expiryBars, openBarIdx, closeBarIdx, basePrice);
+      `INSERT INTO positions (session_id, seq, direction, stake, open_bar_idx, base_price)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(this.id, seq, direction, stake, openBarIdx, basePrice);
 
-    this.send({ op: 'position.opened', seq, openBarIdx, closeBarIdx, basePrice, aumLeft: this.aum });
-
-    // closeBarIdx 봉이 "닫히는" 실제 시각에 판정
-    const resolveAt = this.t0! + (closeBarIdx + 1) * this.barMs + 30;
-    const timer = setTimeout(() => this.resolve(seq, direction, stake, expiryBars, basePrice, closeBarIdx), Math.max(0, resolveAt - now));
-    this.timers.push(timer);
+    this.send({ op: 'position.opened', seq, openBarIdx, basePrice, aumLeft: this.aum });
   }
 
-  private resolve(seq: number, direction: Direction, stake: number, expiryBars: number, basePrice: number, closeBarIdx: number) {
-    const closePrice = this.bars.bars[closeBarIdx].c;
-    const sigma = expiryBars === 15 ? this.bars.sigma['15'] : this.bars.sigma['30'];
-    const r = judge(basePrice, closePrice, sigma, direction, stake, this.params.lossRate);
+  // FR-5.5: 청산 요청 → 다음 1분봉 종가로 체결 (진입 봉보다 이르게는 불가)
+  closePosition(seq: number) {
+    const err = (code: Parameters<typeof this.errMsg>[0]) => this.send(this.errMsg(code, seq));
+    if (this.t0 == null) return err('SESSION_ENDED');
+    if (!this.open || this.open.seq !== seq || this.closing) return err('NO_OPEN_POSITION');
+
+    const i = this.serverBarIdx();
+    const exitBarIdx = Math.min(Math.max(i + 1, this.open.openBarIdx), this.bars.barCount - 1);
+    this.closing = true;
+    this.send({ op: 'position.closing', seq, exitBarIdx });
+
+    // exitBarIdx 봉이 "닫히는" 실제 시각에 판정
+    const settleAt = this.t0 + (exitBarIdx + 1) * this.barMs + 30;
+    this.timers.push(setTimeout(() => this.settleClose(exitBarIdx, false), Math.max(0, settleAt - Date.now())));
+  }
+
+  private settleClose(exitBarIdx: number, forced: boolean) {
+    if (!this.open) return;
+    const { seq, direction, stake, basePrice } = this.open;
+    const closePrice = this.bars.bars[exitBarIdx].c;
+    const r = judge(basePrice, closePrice, this.bars.sigma['30'], direction, stake, this.params.lossRate);
 
     if (r.outcome === 'win') this.wins += 1;
     else if (r.outcome === 'lose') this.loses += 1;
     else this.draws += 1;
     this.payoutSum += r.payout;
-    this.openSeq = null;
+    this.open = null;
+    this.closing = false;
 
     db.prepare(
-      `UPDATE positions SET close_price = ?, delta_pct = ?, m_multiplier = ?, outcome = ?, payout = ?, resolved_at = datetime('now')
+      `UPDATE positions SET close_bar_idx = ?, close_price = ?, delta_pct = ?, z_norm = ?, outcome = ?, payout = ?, forced = ?, resolved_at = datetime('now')
        WHERE session_id = ? AND seq = ?`,
-    ).run(closePrice, r.deltaPct, r.m, r.outcome, r.payout, this.id, seq);
+    ).run(exitBarIdx, closePrice, r.deltaPct, r.g, r.outcome, r.payout, forced ? 1 : 0, this.id, seq);
 
     const earnedTotal = this.incomeSoFar(this.serverBarIdx()) + this.payoutSum;
     this.send({
-      op: 'position.resolved', seq, outcome: r.outcome,
-      deltaPct: Math.round(r.deltaPct * 100) / 100, m: Math.round(r.m * 1000) / 1000,
-      payout: r.payout, earnedTotal, aumLeft: this.aum,
+      op: 'position.closed', seq, outcome: r.outcome,
+      deltaPct: Math.round(r.deltaPct * 100) / 100, g: Math.round(r.g * 1000) / 1000,
+      payout: r.payout, pnl: r.pnl, exitBarIdx, forced, earnedTotal, aumLeft: this.aum,
     });
   }
 
@@ -133,22 +154,24 @@ export class LiveSession {
     }
   }
 
-  /** 정산 직전: 미해결 포지션 취소·환불, 타이머 해제 */
+  /** 정산 직전: 미청산 포지션 취소·환불, 타이머 해제 (정상 종료 시엔 강제 청산이 이미 처리) */
   teardown() {
     for (const t of this.timers) clearTimeout(t);
     this.timers = [];
-    if (this.openSeq != null) {
-      const row = db.prepare('SELECT stake FROM positions WHERE session_id = ? AND seq = ? AND outcome IS NULL').get(this.id, this.openSeq) as { stake: number } | undefined;
+    if (this.open != null) {
+      const { seq, stake } = this.open;
+      const row = db.prepare('SELECT stake FROM positions WHERE session_id = ? AND seq = ? AND outcome IS NULL').get(this.id, seq) as { stake: number } | undefined;
       if (row) {
-        this.aum += row.stake;
-        db.prepare('DELETE FROM positions WHERE session_id = ? AND seq = ? AND outcome IS NULL').run(this.id, this.openSeq);
+        this.aum += stake;
+        db.prepare('DELETE FROM positions WHERE session_id = ? AND seq = ? AND outcome IS NULL').run(this.id, seq);
         this.positionCount -= 1;
       }
-      this.openSeq = null;
+      this.open = null;
+      this.closing = false;
     }
   }
 
-  private errMsg(code: 'POSITION_ALREADY_OPEN' | 'RATE_LIMITED' | 'MAX_POSITIONS' | 'INSUFFICIENT_AUM' | 'SESSION_ENDED' | 'INVALID_SEQ', seq?: number): WsServerMsg {
+  private errMsg(code: 'POSITION_ALREADY_OPEN' | 'NO_OPEN_POSITION' | 'RATE_LIMITED' | 'MAX_POSITIONS' | 'INSUFFICIENT_AUM' | 'SESSION_ENDED' | 'INVALID_SEQ', seq?: number): WsServerMsg {
     return { op: 'error', code, seq };
   }
 }

@@ -36,8 +36,8 @@ function makeParams(region: RegionId): StageParams {
     // §9.3 전제: R1 AUM 2000 / R2 2400 / R3 2800 (데스크 업그레이드 진행 가정)
     aum: BALANCE.AUM_BY_DESK_LV[captured],
     totalBaseIncome: income.total, incomePerWave: income.perWave, incomeLastWave: income.lastWave,
-    heat: heatOf(captured), lossRate: BALANCE.LOSS_RATE[region], payoutBase: BALANCE.PAYOUT_BASE,
-    drawBand: BALANCE.DRAW_BAND, towerSlots: 6, maxPositions: 24, waveCount: 13,
+    heat: heatOf(captured), lossRate: BALANCE.LOSS_RATE[region], maxLossRate: BALANCE.MAX_LOSS_RATE, payoutBase: BALANCE.PAYOUT_BASE,
+    drawBand: BALANCE.DRAW_BAND, towerSlots: 6, maxPositions: BALANCE.MAX_POSITIONS, waveCount: 13,
     unitHpMult: 1, towerDmgMult: 1, unitCostMult: 1, hasInfoResearch: false,
     waveTable: WAVE_TABLES[region],
   };
@@ -67,7 +67,7 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
     if (b.phase === 'done') break;
     const bar = Math.floor(Math.min(t, 389));
 
-    // 포지션 판정 (만기 도달)
+    // 포지션 청산 (봇: 30봉 보유 후 청산 — 서버 판정과 동일한 judge 사용)
     if (pending && bar >= pending.closeIdx) {
       const sigma = bars.sigma['30'];
       const r = judge(bars.bars[pending.openIdx].c, bars.bars[pending.closeIdx].c, sigma, pending.dir, pending.stake, params.lossRate);
@@ -77,7 +77,7 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
       pending = null;
     }
 
-    // 포지션 오픈 (봇: 가능한 즉시, 25% 투입, 30봉 만기)
+    // 포지션 진입 (봇: 가능한 즉시, 25% 투입, 30봉 보유)
     if (usePositions && !pending && bar > openUntil && bar + 32 < 390 && aum >= 4 && positions < params.maxPositions) {
       const openIdx = bar + 1;
       const closeIdx = openIdx + 30;

@@ -193,7 +193,7 @@ MVP는 **기능을 많이 만드는 것이 목적이 아니라, 아래 두 가�
 
 **수용 기준**
 - Given 1x 배속 / When 스테이지 시작부터 종료까지 / Then 총 경과 시간이 390초 ± 2초다
-- Given 30초 만기 포지션 / When 판정 발생 / Then 서버 로그의 판정 가격이 해당 1분봉의 실제 종가와 정확히 일치한다
+- Given 포지션 진입 또는 청산 / When 체결 발생 / Then 서버 로그의 체결 가격이 해당 1분봉의 실제 종가와 정확히 일치한다
 - Given 동일 계정으로 R1을 3회 플레이 / Then 세 번 모두 다른 종목×날짜 조합이 배정된다
 
 ---
@@ -222,41 +222,49 @@ MVP는 **기능을 많이 만드는 것이 목적이 아니라, 아래 두 가�
 
 ### FR-5. 포지션 시스템 `[P0]` ★ 코어
 
+> 실제 선물거래처럼 **원할 때 진입하고 원할 때 청산**한다. 만기 개념은 없다.
+
 **FR-5.1 UI 구성** — 차트 패널 하단에 고정.
 ```
-[ LONG ▲ ]  [ SHORT ▼ ]
-투입:  10%   25%   50%   ALL
-만기:  15초(15분봉)   30초(30분봉)
+포지션 없음:  [ LONG ▲ ]  [ SHORT ▼ ]   투입:  10%   25%   50%   ALL
+포지션 보유:  ▲ +320 G (미실현 손익, 실시간)   [ 청산 ✕ ]
 ```
-**FR-5.2** 동시 보유 포지션은 **1개**로 제한한다 (MVP). 보유 중에는 신규 오픈 버튼이 비활성.
-**FR-5.3** 스테이지당 최대 포지션 수 **24개**.
-**FR-5.4 기준가 결정**: 서버가 오픈 요청을 받은 시각 이후 **다음 1분봉의 종가**를 기준가로 스냅샷한다. 요청 시점의 보간 가격을 쓰지 않는다.
-**FR-5.5 만기 판정 수식**
+**FR-5.2** 동시 보유 포지션은 **1개**로 제한한다 (MVP). 보유 중에는 신규 진입 버튼이 비활성이고 청산 버튼이 표시된다.
+**FR-5.3** 스테이지당 최대 포지션 수 **30개**.
+**FR-5.4 체결가 결정**: 진입·청산 모두 서버가 요청을 받은 시각 이후 **다음 1분봉의 종가**로 체결한다 (시장가 주문 체결 지연). 요청 시점의 보간 가격을 쓰지 않는다. 청산 체결 봉은 진입 체결 봉보다 이를 수 없다 (같으면 Δ=0).
+**FR-5.5 청산 손익 수식** — 연속 PnL, 비대칭 계수
 
 ```
-Δ%  = (만기가 − 기준가) / 기준가 × 100
-σ   = 해당 조합·해당 만기 구간의 사전 계산된 수익률 표준편차 (스테이지 데이터에 포함)
-z   = |Δ%| / σ
-M   = clamp(z, 0.5, 3.0)
+Δ%  = (청산가 − 진입가) / 진입가 × 100
+σ   = 해당 조합의 사전 계산된 30봉 수익률 표준편차 (스테이지 데이터 sigma.30 고정)
+g   = 방향 × (Δ% / σ)          방향: LONG=+1, SHORT=−1 (부호 있는 정규화 수익)
 
-z < 0.25            → DRAW   : payout = stake × 1.0
-방향 적중            → WIN    : payout = stake × (1 + B × M)
-방향 실패            → LOSE   : payout = stake × (1 − L)
+payout = stake × (1 + clamp(g ≥ 0 ? B×g : L×g,  −MAX_LOSS,  B × Z_CAP))
 
-B (배당 계수) = 0.90  — 전 지역 고정
-L (손실률)    = 지역 난이도 노브 (R1 0.60 / R2 0.75 / R3 0.90)
+B (상방 계수)   = 0.90  — 전 지역 고정
+L (하방 계수)   = 지역 난이도 노브 (R1 0.70 / R2 1.00 / R3 1.70)
+MAX_LOSS       = 0.95  — 포지션당 최대 손실 (stake 대비)
+Z_CAP          = 3.0   — 상방 클램프 (최대 배당 1 + 0.9×3 = 3.7배)
+
+outcome (통계·등급용 분류 — 손익은 위 수식으로 연속):
+  |g| < 0.25 → DRAW  /  g ≥ +0.25 → WIN  /  g ≤ −0.25 → LOSE
 ```
 
-**FR-5.6** `payout`은 **골드로 즉시 입금**되고, 투입한 `stake`는 AUM에서 즉시 차감된다.
+> σ를 보유 시간과 무관하게 30봉 기준으로 고정하는 이유: 짧은 보유는 |Δ%|가 작아 g가 작게 나온다 → **초단타 노이즈 스캘핑은 손익이 미미**해져 자연 억제되고, 긴 보유(추세 확신)일수록 배당이 커진다.
+
+**FR-5.6** 청산 시 `payout`은 **골드로 즉시 입금**되고, 투입한 `stake`는 진입 시 AUM에서 즉시 차감된다.
 **FR-5.7** AUM은 **포지션 투입 외의 용도로 사용할 수 없다.** 골드로 직접 전환하는 기능은 존재하지 않는다.
-**FR-5.8** 포지션 진행 중 차트 위에 **진입 지점 마커와 만기까지 남은 시간**을 표시한다.
-**FR-5.9** 만기 도달 시 결과 연출: WIN 초록 팝업 + 금액, LOSE 빨강, DRAW 회색. **연출은 0.8초 이내**로 짧게 (전투 흐름을 끊지 않아야 함).
-**FR-5.10** 초당 최대 1건의 오픈 요청만 허용한다 (봇 방지).
+**FR-5.8** 포지션 보유 중 차트 위에 **진입 지점 마커(가격 라인)**를, 포지션 바에 **미실현 손익을 실시간**으로 표시한다. 미실현 손익은 보간가 기준 표현 전용이며 확정 손익은 서버 판정이 권위다.
+**FR-5.9** 청산 확정 시 결과 연출: 이익 초록 팝업 + 손익 금액, 손실 빨강, 보합 회색. **연출은 0.8초 이내**로 짧게 (전투 흐름을 끊지 않아야 함).
+**FR-5.10** 초당 최대 1건의 진입 요청만 허용한다 (봇 방지).
+**FR-5.11 강제 청산**: 스테이지 종료(마지막 봉 마감) 시점에 미청산 포지션은 **마지막 봉 종가로 자동 청산**된다 (`forced` 플래그로 구분).
 
 **수용 기준**
-- Given AUM 2000, 25% 투입, WIN, M=1.0 / Then 골드 증가분 = 500 × (1+0.9×1.0) = 950, AUM = 1500
-- Given L=0.90 지역, LOSE / Then payout = stake × 0.10
+- Given AUM 2000, 25% 투입(500), LONG, 청산 시 g=+1.0 / Then 골드 증가분 = 500 × (1+0.9×1.0) = 950, AUM = 1500
+- Given L=1.70 지역(R3), 역방향 g=−0.5 / Then payout = stake × (1 − 0.85) = stake × 0.15
+- Given 어떤 하락에도 / Then 포지션당 손실은 stake × 0.95를 넘지 않는다
 - Given 포지션 보유 중 / When LONG 버튼 클릭 / Then 버튼이 비활성이고 아무 일도 일어나지 않는다
+- Given 스테이지 종료 시점에 미청산 포지션 / Then 마지막 봉 종가로 강제 청산되어 정산에 포함된다
 - Given 클라이언트가 조작된 판정 결과를 전송 / Then 서버가 무시하고 서버 판정값을 권위로 사용한다
 
 ---
@@ -270,7 +278,7 @@ L (손실률)    = 지역 난이도 노브 (R1 0.60 / R2 0.75 / R3 0.90)
 │ [아시아 · 금융 · 대형주]   09:00 ──●──── 15:30            │  ← 블라인드 태그 + 진행바
 │  ╭─ 차트 (당일 시가 0% 기준) ───────────────────╮ 거래량 2.4× │
 │  ╰──────────────────────────────────────────────╯          │
-│  [LONG ▲][SHORT ▼]  10% 25% 50% ALL   15s 30s              │
+│  [LONG ▲][SHORT ▼]  10% 25% 50% ALL   ▲+320G [청산 ✕]      │
 ├──────────────────────────────────────────────────────────┤
 │ HP ████████░░ 82   골드 1,240   AUM 1,500   W 4/13  ⏱ 00:14│
 ├──────────────────────────────────────────────────────────┤
@@ -467,8 +475,8 @@ heat (경계도 계수) = 1 + (점령 지역 수 × 0.02)
 ### FR-12. 튜토리얼 `[P0]`
 
 **FR-12.1** 실제 데이터를 쓰되 **5웨이브로 축약**(150초)한 전용 스테이지.
-**FR-12.2** 강제 가이드 순서: ① 차트 읽기 → ② LONG 걸기 (성공이 보장된 구간을 사전 선택) → ③ 골드 도착 확인 → ④ 타워 건설 → ⑤ 웨이브 방어 → ⑥ 클리어 → ⑦ 공개 연출
-**FR-12.3** ②단계는 **결과가 WIN이 되는 구간을 데이터에서 골라 배치**한다. 첫 예측은 반드시 성공해야 한다.
+**FR-12.2** 강제 가이드 순서: ① 차트 읽기 → ② LONG 진입 (성공이 보장된 구간을 사전 선택) → ③ 청산으로 이익 확정 + 골드 도착 확인 → ④ 타워 건설 → ⑤ 웨이브 방어 → ⑥ 클리어 → ⑦ 공개 연출
+**FR-12.3** ②단계는 **청산 시 WIN이 되는 상승 구간을 데이터에서 골라 배치**하고, ③단계의 청산 버튼은 해당 구간이 충분히 오른 뒤에만 활성화한다. 첫 예측은 반드시 성공해야 한다.
 **FR-12.4** 튜토리얼은 스킵 가능하나, 스킵 시 R1 진입 전 요약 카드 3장을 강제 노출한다.
 **FR-12.5** 튜토리얼 클리어 시 자본금 500을 지급한다.
 
@@ -569,18 +577,18 @@ CREATE TABLE stage_sessions (
 CREATE TABLE positions (
   id              BIGSERIAL PRIMARY KEY,
   session_id      UUID REFERENCES stage_sessions(id),
-  seq             SMALLINT NOT NULL,      -- 세션 내 순번 (최대 24)
+  seq             SMALLINT NOT NULL,      -- 세션 내 순번 (최대 30)
   direction       TEXT   NOT NULL,        -- long | short
   stake           INT    NOT NULL,
-  expiry_sec      SMALLINT NOT NULL,      -- 15 | 30
-  open_bar_idx    SMALLINT NOT NULL,      -- 기준 1분봉 인덱스
-  close_bar_idx   SMALLINT NOT NULL,
-  base_price      NUMERIC(14,4) NOT NULL,
+  open_bar_idx    SMALLINT NOT NULL,      -- 진입 체결 1분봉 인덱스
+  base_price      NUMERIC(14,4) NOT NULL, -- 진입가
+  close_bar_idx   SMALLINT,               -- 청산 체결 봉 (청산 전 NULL)
   close_price     NUMERIC(14,4),
   delta_pct       NUMERIC(8,4),
-  m_multiplier    NUMERIC(5,3),
-  outcome         TEXT,                   -- win | lose | draw
+  z_norm          NUMERIC(6,3),           -- g: 부호 있는 정규화 수익
+  outcome         TEXT,                   -- win | lose | draw (통계용)
   payout          INT,
+  forced          BOOLEAN,                -- 스테이지 종료 강제 청산 여부
   resolved_at     TIMESTAMPTZ
 );
 
@@ -670,47 +678,57 @@ tf.cache.progress 진행도 캐시 (서버가 권위, 오프라인 표시용)
 ```
 > `chartSetId`는 응답에 포함하지 않는다. 세션 ID로만 참조한다.
 
-### 7.2 WebSocket — 포지션 판정 전용
+### 7.2 WebSocket — 포지션 체결·판정 전용
 
 `wss://…/ws/stage?session={id}`
 
 **클라이언트 → 서버**
 
 ```json
-{ "op": "position.open", "seq": 5, "direction": "long", "stake": 600, "expirySec": 30 }
-{ "op": "clock.sync",   "clientBarIdx": 142 }
+{ "op": "position.open",  "seq": 5, "direction": "long", "stake": 600 }
+{ "op": "position.close", "seq": 5 }
+{ "op": "clock.sync",     "clientBarIdx": 142 }
 ```
 
 **서버 → 클라이언트**
 
 ```json
 { "op": "position.opened",
-  "seq": 5, "openBarIdx": 143, "closeBarIdx": 173, "basePrice": 14240 }
+  "seq": 5, "openBarIdx": 143, "basePrice": 14240, "aumLeft": 1800 }
 
-{ "op": "position.resolved",
-  "seq": 5, "outcome": "win", "deltaPct": 0.83, "m": 1.41,
-  "payout": 1361, "goldTotal": 2104, "aumLeft": 1800 }
+{ "op": "position.closing",
+  "seq": 5, "exitBarIdx": 168 }
 
-{ "op": "error", "code": "POSITION_ALREADY_OPEN" | "RATE_LIMITED" | "MAX_POSITIONS" }
+{ "op": "position.closed",
+  "seq": 5, "outcome": "win", "deltaPct": 0.83, "g": 1.41,
+  "payout": 1361, "pnl": 761, "exitBarIdx": 168, "forced": false,
+  "earnedTotal": 2104, "aumLeft": 1800 }
+
+{ "op": "error", "code": "POSITION_ALREADY_OPEN" | "NO_OPEN_POSITION" | "RATE_LIMITED" | "MAX_POSITIONS" }
 ```
 
-**에러 코드**: `POSITION_ALREADY_OPEN` / `RATE_LIMITED` / `MAX_POSITIONS` / `INSUFFICIENT_AUM` / `SESSION_ENDED` / `INVALID_SEQ`
+**에러 코드**: `POSITION_ALREADY_OPEN` / `NO_OPEN_POSITION` / `RATE_LIMITED` / `MAX_POSITIONS` / `INSUFFICIENT_AUM` / `SESSION_ENDED` / `INVALID_SEQ`
 
-### 7.3 판정 시퀀스
+### 7.3 체결·판정 시퀀스
 
 ```
 클라이언트                    서버
     │  position.open (seq=5) ──▶│
     │                           │ 현재 서버 기준 bar 인덱스 확인 (i)
     │                           │ openBarIdx = i + 1
-    │                           │ basePrice  = bars[i+1].close
-    │                           │ closeBarIdx = openBarIdx + expiry
+    │                           │ basePrice  = bars[i+1].close (진입 체결)
     │                           │ AUM 차감, DB insert
     │◀── position.opened ───────│
-    │                           │ (closeBarIdx 도달까지 대기)
-    │                           │ Δ%, z, M 계산 → outcome 결정
+    │        (자유 보유 — 미실현 손익은 클라이언트 표시 전용)
+    │  position.close (seq=5) ─▶│
+    │                           │ exitBarIdx = max(현재 i + 1, openBarIdx)
+    │◀── position.closing ──────│
+    │                           │ (exitBarIdx 봉이 닫히는 시각까지 대기)
+    │                           │ Δ%, g 계산 → payout 확정
     │                           │ payout 골드 입금, DB update
-    │◀── position.resolved ─────│
+    │◀── position.closed ───────│
+
+미청산 상태로 마지막 봉 마감 → 서버가 bars[last].close로 강제 청산 (forced=true)
 ```
 
 **서버 기준 bar 인덱스**: 세션 `started_at`과 `speed`로 서버가 독립 계산한다. 클라이언트가 보낸 인덱스는 **검증용으로만** 쓰고, 서버값과 3 bar 이상 벌어지면 `clock.resync`를 보내 클라이언트를 서버에 맞춘다.
@@ -747,15 +765,15 @@ tf.cache.progress 진행도 캐시 (서버가 권위, 오프라인 표시용)
 
 ```
   NONE ──open 요청──▶ PENDING ──서버 opened──▶ ACTIVE
-                         │                       │ closeBarIdx 도달
+                         │                       │ close 요청 (또는 스테이지 종료 강제 청산)
                          │ 에러                  ▼
-                         ▼                    RESOLVED (win|lose|draw)
-                       NONE                       │ 연출 0.8s
-                                                  ▼
-                                                NONE
+                         ▼                    CLOSING ──exitBar 마감──▶ CLOSED (win|lose|draw)
+                       NONE                                                │ 연출 0.8s
+                                                                           ▼
+                                                                         NONE
 ```
 
-동시 `ACTIVE` 포지션은 최대 1개 (FR-5.2).
+동시 `ACTIVE` 포지션은 최대 1개 (FR-5.2). `ACTIVE` 중 미실현 손익은 클라이언트 표시 전용.
 
 ---
 
@@ -767,27 +785,29 @@ tf.cache.progress 진행도 캐시 (서버가 권위, 오프라인 표시용)
 
 | 상수 | 값 | 설명 |
 |---|---|---|
-| `PAYOUT_BASE` (B) | **0.90** | 전 지역 고정 |
-| `LOSS_RATE` (L) | R1 **0.60** / R2 **0.75** / R3 **0.90** | **지역 난이도 노브** |
-| `DRAW_BAND` | 0.25 σ | 무승부 판정 |
-| `M_CLAMP` | [0.5, 3.0] | 배당 배수 상한/하한 |
-| `MAX_POSITIONS` | 24 | 스테이지당 |
+| `PAYOUT_BASE` (B) | **0.90** | 상방 계수, 전 지역 고정 |
+| `LOSS_RATE` (L) | R1 **0.70** / R2 **1.00** / R3 **1.70** | 하방 계수 — **지역 난이도 노브** |
+| `MAX_LOSS_RATE` | 0.95 | 포지션당 최대 손실 (stake 대비) |
+| `DRAW_BAND` | 0.25 σ | 통계상 무승부 분류 (손익은 연속) |
+| `Z_CAP` | 3.0 | g 상방 클램프 (최대 배당 3.7배) |
+| `MAX_POSITIONS` | 30 | 스테이지당 |
 | `MAX_CONCURRENT` | 1 | 동시 보유 |
 | `OPEN_RATE_LIMIT` | 1건/초 | 봇 방지 |
 
-**환율 검증** (40만 회 시뮬레이션, `B=0.90`)
+**환율 검증** (실데이터 30봉 보유 |g| 분포 3.1만 샘플, `B=0.90` — 30봉 보유 봇 기준)
 
-| 예측 승률 | L=0.60 (R1) | L=0.75 (R2) | L=0.90 (R3) |
+| 예측 승률 | L=0.70 (R1) | L=1.00 (R2) | L=1.70 (R3) |
 |---|---|---|---|
-| 40% | 1.00 | 0.93 | 0.85 |
-| 45% | 1.06 | 0.99 | 0.92 |
-| 50% | 1.12 | 1.06 | 1.00 |
-| 55% | 1.18 | 1.12 | 1.07 |
-| 60% | 1.24 | 1.19 | 1.14 |
-| 65% | 1.30 | 1.26 | 1.21 |
-| **손익분기 승률** | **40.3%** | **45.6%** | **50.2%** |
+| 40% | 0.99 | 0.93 | 0.85 |
+| 45% | 1.05 | 1.00 | 0.93 |
+| 50% | 1.11 | 1.06 | 1.00 |
+| 55% | 1.17 | 1.13 | 1.07 |
+| 60% | 1.23 | 1.19 | 1.14 |
+| 65% | 1.29 | 1.26 | 1.21 |
+| **손익분기 승률** | **40.5%** | **45.4%** | **50.2%** |
 
-→ 손실률 하나만 조절해 난이도 곡선이 매끄럽게 올라간다. **유저에게 보여줄 난이도 표기가 곧 이 값**이다.
+→ 하방 계수 하나만 조절해 난이도 곡선이 매끄럽게 올라간다. **유저에게 보여줄 난이도 표기가 곧 이 값**이다.
+→ 자유 청산 전환 시 하방을 "고정 −L"에서 "연속 L×g"로 바꾸면 손익분기가 무너지므로, L을 상방(0.9)보다 큰 **비대칭 계수**로 재캘리브레이션했다 (위 값). 보유 시간이 짧을수록 |g|가 작아 스캘핑 기대손익이 0에 수렴한다.
 
 ### 9.2 경제 파라미터
 
@@ -905,8 +925,8 @@ H1·H2 검증에 직결되는 이벤트만 최소로 심는다.
 |---|---|---|
 | `tutorial_step` | step, elapsed | 온보딩 이탈 지점 |
 | `stage_start` | regionId, isRetry, speed, aum | |
-| `position_open` | seq, direction, stakePct, expirySec, waveIdx, **phase(prep\|wave)** | **H1** — 전투 중 오픈 비율 |
-| `position_resolved` | outcome, m, payout, waveIdx | |
+| `position_open` | seq, direction, stakePct, waveIdx, **phase(prep\|wave)** | **H1** — 전투 중 오픈 비율 |
+| `position_closed` | outcome, g, payout, pnl, **holdBars**, forced | 보유 시간 분포 — 스캘핑/스윙 성향 |
 | `gold_spent` | item, cost, waveIdx, **msSincePayout** | **H1** — 자금 도착 후 몇 ms 안에 썼는가 |
 | `wave_end` | waveIdx, hpLeft, goldLeft | 난이도 곡선 |
 | `stage_end` | status, grade, accuracy, goldLeftPct, positions | |
@@ -980,7 +1000,8 @@ H1·H2 검증에 직결되는 이벤트만 최소로 심는다.
 | **O-3** | bars json에서 가격 절대값을 제거하고 정규화값만 내려보낼지 (§6.2 주석) | W2 |
 | **O-4** | 실패 시에도 공개 연출을 보여주는 것이 위로인지 조롱인지 | W7 플레이테스트 |
 | **O-5** | 아트 방향 — 픽셀 레트로 vs 플랫 벡터 | W3 (전투 에셋 착수 전) |
-| **O-6** | 30초 만기가 웨이브 1개와 정확히 같은 것이 좋은지, 살짝 어긋나게 해서 긴장을 만들지 | W3 |
+| ~~**O-6**~~ | ~~30초 만기가 웨이브 1개와 정확히 같은 것이 좋은지~~ — **종결**: 만기제를 폐지하고 자유 청산으로 전환 (FR-5 개정) | 해결됨 |
+| **O-7** | 자유 청산에서 이상적 보유 시간이 자연 형성되는지, 강제 최소 보유가 필요한지 (`holdBars` 텔레메트리로 판단) | W7 플레이테스트 |
 
 ---
 
@@ -991,7 +1012,7 @@ H1·H2 검증에 직결되는 이벤트만 최소로 심는다.
 | **AUM** | 운용자금. 스테이지 진입 시 지급되는 예측 전용 재화. 골드로 직접 전환 불가 |
 | **골드** | 전투 재화. 타워·유닛·스킬 구매에 사용. 기본 수입과 포지션 청산으로만 획득 |
 | **자본금** | 메타 재화. 스테이지 정산으로 획득, 부서 업그레이드에 사용 |
-| **포지션** | 예측 1건 (방향 + 투입액 + 만기) |
+| **포지션** | 예측 1건 (방향 + 투입액). 진입·청산 시점은 자유, 스테이지 종료 시 강제 청산 |
 | **환율** | 투입 AUM 대비 회수 골드의 기대 배수. 예측 승률의 함수 |
 | **경계도(heat)** | 점령 지역 수에 비례해 웨이브 강도를 올리는 계수 |
 | **운영비** | 점령 지역 수에 비례해 기본 수입에서 차감되는 비용 |

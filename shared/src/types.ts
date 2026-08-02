@@ -40,7 +40,8 @@ export interface StageParams {
   incomePerWave: number;
   incomeLastWave: number;
   heat: number;
-  lossRate: number;
+  lossRate: number; // L: 하방 계수 (지역 노브)
+  maxLossRate: number; // 포지션당 최대 손실률
   payoutBase: number;
   drawBand: number;
   towerSlots: number;
@@ -66,21 +67,27 @@ export interface StageStartRes {
   params: StageParams;
 }
 
-// WebSocket 메시지 (PRD §7.2)
+// WebSocket 메시지 (PRD §7.2) — 선물식 자유 진입·청산
 export type WsClientMsg =
   | { op: 'start' }
-  | { op: 'position.open'; seq: number; direction: Direction; stake: number; expirySec: number }
+  | { op: 'position.open'; seq: number; direction: Direction; stake: number }
+  | { op: 'position.close'; seq: number }
   | { op: 'clock.sync'; clientBarIdx: number };
 
 export type WsServerMsg =
   | { op: 'started'; serverT0: number }
-  | { op: 'position.opened'; seq: number; openBarIdx: number; closeBarIdx: number; basePrice: number; aumLeft: number }
-  | { op: 'position.resolved'; seq: number; outcome: Outcome; deltaPct: number; m: number; payout: number; earnedTotal: number; aumLeft: number }
+  | { op: 'position.opened'; seq: number; openBarIdx: number; basePrice: number; aumLeft: number }
+  | { op: 'position.closing'; seq: number; exitBarIdx: number }
+  | {
+      op: 'position.closed'; seq: number; outcome: Outcome; deltaPct: number; g: number;
+      payout: number; pnl: number; exitBarIdx: number; forced: boolean; earnedTotal: number; aumLeft: number;
+    }
   | { op: 'clock.resync'; serverBarIdx: number }
   | { op: 'error'; code: WsErrorCode; seq?: number };
 
 export type WsErrorCode =
   | 'POSITION_ALREADY_OPEN'
+  | 'NO_OPEN_POSITION'
   | 'RATE_LIMITED'
   | 'MAX_POSITIONS'
   | 'INSUFFICIENT_AUM'

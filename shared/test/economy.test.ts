@@ -20,27 +20,38 @@ describe('FR-6.8 기본 수입 — 총액 우선 분배', () => {
   });
 });
 
-describe('FR-5.5 만기 판정', () => {
-  it('수용 기준: AUM 2000 · 25% 투입 · WIN · M=1.0 → payout 950', () => {
-    // z=1.0이 되는 가격 구성: σ=1.0, Δ=+1.0%
+describe('FR-5.5 청산 손익 (선물식 연속 PnL)', () => {
+  it('수용 기준: 25% 투입 500 · long · g=+1.0 → payout 950 (500 × (1 + 0.9×1.0))', () => {
+    // g=1.0이 되는 가격 구성: σ=1.0, Δ=+1.0%
     const r = judge(10000, 10100, 1.0, 'long', 500, 0.6);
     expect(r.outcome).toBe('win');
-    expect(r.m).toBeCloseTo(1.0);
-    expect(r.payout).toBe(950); // 500 × (1 + 0.9×1.0)
+    expect(r.g).toBeCloseTo(1.0);
+    expect(r.payout).toBe(950);
+    expect(r.pnl).toBe(450);
   });
-  it('수용 기준: L=0.90 지역 LOSE → payout = stake × 0.10', () => {
-    const r = judge(10000, 10100, 1.0, 'short', 1000, 0.9);
+  it('수용 기준: 하방 계수 L=1.7 (R3) · 역방향 g=−0.5 → payout = 1000 × (1 − 0.85) = 150', () => {
+    const r = judge(10000, 10050, 1.0, 'short', 1000, 1.7);
     expect(r.outcome).toBe('lose');
-    expect(r.payout).toBe(100);
+    expect(r.payout).toBe(150);
   });
-  it('z < 0.25 → DRAW 원금 반환', () => {
-    const r = judge(10000, 10010, 1.0, 'short', 500, 0.6); // Δ=0.1% → z=0.1
+  it('작은 역방향 손실은 연속 반영: g=−0.5, L=0.7 (R1) → payout = 500 × (1 − 0.35) = 325', () => {
+    const r = judge(10000, 10050, 1.0, 'short', 500, 0.7);
+    expect(r.outcome).toBe('lose');
+    expect(r.payout).toBe(325);
+  });
+  it('|g| < 0.25 → 통계상 DRAW지만 손익은 연속 (g=+0.1 → payout 545)', () => {
+    const r = judge(10000, 10010, 1.0, 'long', 500, 0.6);
     expect(r.outcome).toBe('draw');
-    expect(r.payout).toBe(500);
+    expect(r.payout).toBe(545); // 500 × (1 + 0.9×0.1)
   });
-  it('M은 [0.5, 3.0]으로 클램프', () => {
-    expect(judge(10000, 10001, 1.0, 'long', 100, 0.6).m).toBe(0.5);
-    expect(judge(10000, 11000, 1.0, 'long', 100, 0.6).m).toBe(3.0);
+  it('상방은 Z_CAP=3.0에서 클램프: g=+10 → payout = stake × 3.7', () => {
+    const r = judge(10000, 11000, 1.0, 'long', 100, 0.6);
+    expect(r.payout).toBe(370);
+  });
+  it('하방은 MAX_LOSS_RATE=0.95에서 클램프: g=−50, L=1.7 → payout = stake × 0.05', () => {
+    const r = judge(10000, 15000, 1.0, 'short', 100, 1.7);
+    expect(r.outcome).toBe('lose');
+    expect(r.payout).toBe(5);
   });
 });
 

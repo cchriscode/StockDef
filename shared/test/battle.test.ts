@@ -7,7 +7,7 @@ function params(over: Partial<StageParams> = {}): StageParams {
   return {
     regionId: 'R1',
     aum: 2000, totalBaseIncome: 325, incomePerWave: 25, incomeLastWave: 25,
-    heat: 1, lossRate: 0.6, payoutBase: 0.9, drawBand: 0.25,
+    heat: 1, lossRate: 0.7, maxLossRate: 0.95, payoutBase: 0.9, drawBand: 0.25,
     towerSlots: 6, maxPositions: 24, waveCount: 13,
     unitHpMult: 1, towerDmgMult: 1, unitCostMult: 1, hasInfoResearch: false,
     waveTable: WAVE_TABLES.R1,

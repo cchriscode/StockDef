@@ -41,7 +41,8 @@ wss.on('connection', (ws, req) => {
       return;
     }
     if (msg.op === 'start') live.start();
-    else if (msg.op === 'position.open') live.openPosition(msg.seq, msg.direction, msg.stake, msg.expirySec);
+    else if (msg.op === 'position.open') live.openPosition(msg.seq, msg.direction, msg.stake);
+    else if (msg.op === 'position.close') live.closePosition(msg.seq);
     else if (msg.op === 'clock.sync') live.clockSync(msg.clientBarIdx);
   });
   ws.on('close', () => {

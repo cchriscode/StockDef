@@ -33,8 +33,12 @@ export class StageWs {
     this.send({ op: 'start' });
   }
 
-  openPosition(seq: number, direction: Direction, stake: number, expirySec: number) {
-    this.send({ op: 'position.open', seq, direction, stake, expirySec });
+  openPosition(seq: number, direction: Direction, stake: number) {
+    this.send({ op: 'position.open', seq, direction, stake });
+  }
+
+  closePosition(seq: number) {
+    this.send({ op: 'position.close', seq });
   }
 
   beginClockSync(getBarIdx: () => number) {

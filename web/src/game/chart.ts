@@ -4,7 +4,6 @@ import type { BarsFile } from '@tf/shared';
 
 export interface OpenMarker {
   openBarIdx: number;
-  closeBarIdx: number;
   basePricePct: number; // 시가 대비 %
   direction: 'long' | 'short';
 }

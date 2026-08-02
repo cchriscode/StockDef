@@ -42,6 +42,7 @@ export function buildStageParams(accountId: string, regionId: RegionId): StagePa
     incomeLastWave: income.lastWave,
     heat: regionId === 'TUT' ? 1 : heatOf(captured),
     lossRate: Math.round(lossRate * 100) / 100,
+    maxLossRate: BALANCE.MAX_LOSS_RATE,
     payoutBase: BALANCE.PAYOUT_BASE,
     drawBand: BALANCE.DRAW_BAND,
     towerSlots: Math.min(BALANCE.TOWER_SLOTS_BASE + defenseRewards, BALANCE.TOWER_SLOTS_MAX),

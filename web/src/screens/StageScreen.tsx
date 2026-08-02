@@ -38,8 +38,9 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     t0: number;
     barMs: number;
     seq: number;
-    openMarker: (OpenMarker & { stake: number }) | null;
+    openMarker: (OpenMarker & { stake: number; basePrice: number }) | null;
     pendingOpen: boolean;
+    closing: boolean;
     aum: number;
     finished: boolean;
     lastPayoutAt: number;
@@ -47,16 +48,15 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     shakeUntil: number;
   }>({
     start: null, bars: null, battle: null, ws: null, t0: 0, barMs: 1000,
-    seq: 0, openMarker: null, pendingOpen: false, aum: 0, finished: false,
+    seq: 0, openMarker: null, pendingOpen: false, closing: false, aum: 0, finished: false,
     lastPayoutAt: 0, lastEventKey: '', shakeUntil: 0,
   });
 
   const [phase, setPhase] = useState<'loading' | 'playing' | 'settling' | 'error'>('loading');
-  const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0 });
+  const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0, upnl: null as number | null });
   const [popup, setPopup] = useState<ResultPopup | null>(null);
   const [banner, setBanner] = useState<{ text: string; kind: 'panic' | 'fomo' } | null>(null);
   const [stakePct, setStakePct] = useState(0.25);
-  const [expiry, setExpiry] = useState(30);
   const [slotMenu, setSlotMenuState] = useState<number | null>(null);
   const slotMenuRef = useRef<number | null>(null); // 렌더 루프에서 사거리 원 표시용
   const setSlotMenu = (v: number | null) => { slotMenuRef.current = v; setSlotMenuState(v); };
@@ -128,19 +128,23 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         s.aum = m.aumLeft;
         s.openMarker = {
           openBarIdx: m.openBarIdx,
-          closeBarIdx: m.closeBarIdx,
           basePricePct: pctOf(m.basePrice, s.bars!.openPrice),
+          basePrice: m.basePrice,
           direction: s.openMarker?.direction ?? 'long',
           stake: s.openMarker?.stake ?? 0,
         };
-      } else if (m.op === 'position.resolved') {
+      } else if (m.op === 'position.closing') {
+        s.closing = true;
+      } else if (m.op === 'position.closed') {
         s.aum = m.aumLeft;
+        const holdBars = s.openMarker ? m.exitBarIdx - s.openMarker.openBarIdx : null;
         s.openMarker = null;
+        s.closing = false;
         s.battle?.addGold(m.payout);
         s.lastPayoutAt = Date.now();
-        setPopup({ outcome: m.outcome, amount: m.payout });
+        setPopup({ outcome: m.outcome, amount: m.pnl });
         setTimeout(() => setPopup(null), 800); // FR-5.9: 0.8초 이내
-        track('position_resolved', { outcome: m.outcome, m: m.m, payout: m.payout });
+        track('position_closed', { outcome: m.outcome, g: m.g, payout: m.payout, pnl: m.pnl, holdBars, forced: m.forced });
         if (isTut) setGuide((cur) => (cur === 2 ? 3 : cur));
       } else if (m.op === 'clock.resync') {
         s.t0 = Date.now() - m.serverBarIdx * s.barMs;
@@ -186,11 +190,22 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
       const b = s.battle;
       if (Date.now() - lastHud.current >= 100) {
         lastHud.current = Date.now();
+        // 미실현 손익 (보간가 기준, 표현 전용 — 확정 손익은 서버 판정)
+        let upnl: number | null = null;
+        const mk = s.openMarker;
+        if (mk && mk.basePrice > 0) {
+          const curPrice = s.bars.openPrice * (1 + interpPct(s.bars, barF) / 100);
+          const dPct = ((curPrice - mk.basePrice) / mk.basePrice) * 100;
+          const gNorm = (mk.direction === 'long' ? 1 : -1) * (dPct / Math.max(s.bars.sigma['30'], 1e-6));
+          const p = s.start!.params;
+          const raw = gNorm >= 0 ? p.payoutBase * gNorm : p.lossRate * gNorm;
+          upnl = Math.floor(mk.stake * Math.min(Math.max(raw, -p.maxLossRate), p.payoutBase * BALANCE.Z_CAP));
+        }
         setHud({
           gold: Math.floor(b.gold), aum: s.aum, hp: Math.max(0, Math.round(b.baseHP)),
           wave: b.waveIdx, waveCount: s.start!.params.waveCount,
           prep: b.phase === 'prep', barF, barCount: s.bars.barCount,
-          posCount: s.seq, skillCd: Math.max(0, Math.ceil(b.skillReadyAt - b.t)),
+          posCount: s.seq, skillCd: Math.max(0, Math.ceil(b.skillReadyAt - b.t)), upnl,
         });
       }
 
@@ -209,13 +224,13 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regionId]);
 
-  // ─── FR-5 포지션 오픈 ───
+  // ─── FR-5 포지션 진입·청산 ───
   const canOpen = (() => {
     const s = g.current;
     if (phase !== 'playing' || s.pendingOpen || s.openMarker || !s.start) return false;
     if (s.seq >= s.start.params.maxPositions) return false;
     if (s.aum < 1) return false;
-    if (hud.barF + expiry + 2 >= hud.barCount) return false;
+    if (hud.barF + 3 >= hud.barCount) return false; // 종료 직전엔 체결 불가
     if (isTut && guide < 1) return false;
     if (isTut && guide === 1 && (hud.barF < 22 || hud.barF > 34)) return false;
     if (isTut && guide === 2) return false;
@@ -228,10 +243,25 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     const stake = Math.max(1, Math.floor(s.aum * stakePct));
     s.seq += 1;
     s.pendingOpen = true;
-    s.openMarker = { openBarIdx: 0, closeBarIdx: 0, basePricePct: 0, direction, stake };
-    s.ws.openPosition(s.seq, direction, stake, expiry);
-    track('position_open', { seq: s.seq, direction, stakePct, expiry, waveIdx: hud.wave, phase: hud.prep ? 'prep' : 'wave' });
+    s.openMarker = { openBarIdx: 0, basePricePct: 0, basePrice: 0, direction, stake };
+    s.ws.openPosition(s.seq, direction, stake);
+    track('position_open', { seq: s.seq, direction, stakePct, waveIdx: hud.wave, phase: hud.prep ? 'prep' : 'wave' });
     if (isTut && guide === 1) setGuide(2);
+  };
+
+  // 튜토리얼 ③단계: WIN이 보장되는 상승 구간이 지난 뒤에만 청산 허용
+  const canClose = (() => {
+    const s = g.current;
+    if (phase !== 'playing' || !s.openMarker || s.openMarker.basePrice <= 0 || s.closing) return false;
+    if (isTut && guide === 2 && hud.barF < s.openMarker.openBarIdx + 26) return false;
+    return true;
+  })();
+
+  const closePosition = () => {
+    const s = g.current;
+    if (!canClose || !s.ws || !s.openMarker) return;
+    s.ws.closePosition(s.seq);
+    track('position_close_req', { seq: s.seq, holdBars: Math.floor(hud.barF - s.openMarker.openBarIdx) });
   };
 
   // ─── FR-6 전투 입력 ───
@@ -306,7 +336,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
   const tags = s.bars!.tags;
   const battle = s.battle!;
   const progress = Math.min(hud.barF / hud.barCount, 1);
-  const remainBars = s.openMarker && s.openMarker.closeBarIdx > 0 ? Math.max(0, Math.ceil(s.openMarker.closeBarIdx - hud.barF)) : null;
+  const hasPosition = !!s.openMarker && s.openMarker.basePrice > 0;
 
   return (
     <div className={`screen stage ${tint}`}>
@@ -326,7 +356,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
 
       <canvas ref={chartRef} width={860} height={240} className="chart" />
 
-      {/* FR-5.1 포지션 UI */}
+      {/* FR-5.1 포지션 UI — 자유 진입·청산 */}
       <div className="position-bar">
         <button className={`long ${isTut && guide === 1 ? 'pulse' : ''}`} disabled={!canOpen} onClick={() => openPosition('long')}>LONG ▲</button>
         <button className="short" disabled={!canOpen || (isTut && guide <= 2)} onClick={() => openPosition('short')}>SHORT ▼</button>
@@ -336,13 +366,16 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
             {v === 1 ? 'ALL' : `${v * 100}%`}
           </button>
         ))}
-        <span className="lbl">만기</span>
-        {BALANCE.EXPIRY_BARS.map((v) => (
-          <button key={v} className={`opt ${expiry === v ? 'on' : ''}`} disabled={isTut && guide <= 2 && v !== 30} onClick={() => setExpiry(v)}>
-            {v}초({v}분봉)
-          </button>
-        ))}
-        {remainBars != null && <span className="remain">만기까지 {remainBars}초</span>}
+        {hasPosition && (
+          <>
+            <span className={`upnl ${hud.upnl != null && hud.upnl < 0 ? 'neg' : 'pos'}`}>
+              {s.openMarker!.direction === 'long' ? '▲' : '▼'} {hud.upnl != null ? `${hud.upnl >= 0 ? '+' : ''}${hud.upnl.toLocaleString()} G` : '…'}
+            </span>
+            <button className={`close-pos ${isTut && guide === 2 && canClose ? 'pulse' : ''}`} disabled={!canClose} onClick={closePosition}>
+              {s.closing ? '청산 중…' : '청산 ✕'}
+            </button>
+          </>
+        )}
         <span className="poscnt">{hud.posCount}/{p.maxPositions}</span>
       </div>
 
@@ -360,7 +393,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         {banner && <div className={`banner ${banner.kind}`}>{banner.text}</div>}
         {popup && (
           <div className={`popup ${popup.outcome}`}>
-            {popup.outcome === 'win' ? `WIN +${popup.amount.toLocaleString()} G` : popup.outcome === 'lose' ? `LOSE +${popup.amount.toLocaleString()} G` : `DRAW 원금 ${popup.amount.toLocaleString()} G`}
+            {popup.outcome === 'win' ? `WIN +${popup.amount.toLocaleString()} G` : popup.outcome === 'lose' ? `LOSE ${popup.amount.toLocaleString()} G` : `DRAW ${popup.amount >= 0 ? '+' : ''}${popup.amount.toLocaleString()} G`}
           </div>
         )}
         {slotMenu != null && (
@@ -430,8 +463,8 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
               <button onClick={() => setGuide(1)}>다음</button>
             </>
           )}
-          {guide === 1 && <p>🎯 지금 상승 흐름입니다. <b>LONG ▲</b> 버튼을 눌러 첫 예측을 걸어보세요! {hud.barF < 22 ? `(${Math.ceil(22 - hud.barF)}초 후 활성화)` : ''}</p>}
-          {guide === 2 && <p>⏳ 30초 뒤 만기가 되면 서버가 실제 종가로 판정합니다. 기다려 보세요…</p>}
+          {guide === 1 && <p>🎯 지금 상승 흐름입니다. <b>LONG ▲</b> 버튼을 눌러 포지션에 진입해 보세요! {hud.barF < 22 ? `(${Math.ceil(22 - hud.barF)}초 후 활성화)` : ''}</p>}
+          {guide === 2 && <p>⏳ 진입했습니다! 가격이 오르는 동안 미실현 손익이 실시간으로 움직입니다. 충분히 오르면 <b>청산 ✕</b> 버튼으로 이익을 확정하세요.</p>}
           {guide === 3 && <p>💰 골드가 입금됐습니다! 이 돈으로 방어하세요. <b>전장의 빈 슬롯(점선)</b>을 눌러 타워를 지으세요.</p>}
           {guide === 4 && <p>⚔ 이제 <b>유닛</b>을 소환해 전선을 미세요. 아래 인턴/애널리스트 버튼!</p>}
         </div>

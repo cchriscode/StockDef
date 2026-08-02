@@ -82,7 +82,10 @@ canvas.battle { width: 100%; background: #171720; border: 1px solid #2a2a3e; bor
 .position-bar .lbl { color: #8888a0; font-size: 12px; margin-left: 6px; }
 .position-bar .long { background: #b33939; border-color: #d04545; font-weight: 700; }
 .position-bar .short { background: #2c5c9e; border-color: #3a74c4; font-weight: 700; }
-.position-bar .remain { color: #ffd54f; font-size: 12px; margin-left: 8px; }
+.position-bar .upnl { font-size: 13px; font-weight: 700; margin-left: 8px; font-variant-numeric: tabular-nums; }
+.position-bar .upnl.pos { color: #6fcf6f; }
+.position-bar .upnl.neg { color: #ef5350; }
+.position-bar .close-pos { background: #6a5a20; border-color: #ffd54f; font-weight: 700; }
 .position-bar .poscnt { margin-left: auto; color: #66667e; font-size: 12px; }
 .hud { display: flex; gap: 18px; background: #1c1c28; border-radius: 8px; padding: 7px 12px; font-size: 13px; flex-wrap: wrap; }
 .battle-wrap { position: relative; }

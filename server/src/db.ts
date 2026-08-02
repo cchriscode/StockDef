@@ -81,15 +81,15 @@ CREATE TABLE IF NOT EXISTS positions (
   seq           INTEGER NOT NULL,
   direction     TEXT NOT NULL,
   stake         INTEGER NOT NULL,
-  expiry_bars   INTEGER NOT NULL,
   open_bar_idx  INTEGER NOT NULL,
-  close_bar_idx INTEGER NOT NULL,
   base_price    REAL NOT NULL,
+  close_bar_idx INTEGER,
   close_price   REAL,
   delta_pct     REAL,
-  m_multiplier  REAL,
+  z_norm        REAL,
   outcome       TEXT,
   payout        INTEGER,
+  forced        INTEGER,
   resolved_at   TEXT
 );
 CREATE TABLE IF NOT EXISTS codex_entries (
@@ -108,6 +108,41 @@ CREATE TABLE IF NOT EXISTS telemetry (
   at         TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
+
+// 마이그레이션: 만기제 positions(expiry_bars) → 자유 청산 스키마
+const hasExpiry = db
+  .prepare("SELECT COUNT(*) AS n FROM pragma_table_info('positions') WHERE name = 'expiry_bars'")
+  .get() as { n: number };
+if (hasExpiry.n > 0) {
+  db.exec(`
+    BEGIN;
+    ALTER TABLE positions RENAME TO positions_old;
+    CREATE TABLE positions (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id    TEXT NOT NULL REFERENCES stage_sessions(id),
+      seq           INTEGER NOT NULL,
+      direction     TEXT NOT NULL,
+      stake         INTEGER NOT NULL,
+      open_bar_idx  INTEGER NOT NULL,
+      base_price    REAL NOT NULL,
+      close_bar_idx INTEGER,
+      close_price   REAL,
+      delta_pct     REAL,
+      z_norm        REAL,
+      outcome       TEXT,
+      payout        INTEGER,
+      forced        INTEGER,
+      resolved_at   TEXT
+    );
+    INSERT INTO positions (id, session_id, seq, direction, stake, open_bar_idx, base_price,
+                           close_bar_idx, close_price, delta_pct, z_norm, outcome, payout, resolved_at)
+      SELECT id, session_id, seq, direction, stake, open_bar_idx, base_price,
+             close_bar_idx, close_price, delta_pct, m_multiplier, outcome, payout, resolved_at
+      FROM positions_old;
+    DROP TABLE positions_old;
+    COMMIT;
+  `);
+}
 
 export interface ChartSetRow {
   id: string; ticker: string; company_name: string; trade_date: string;

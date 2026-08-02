@@ -30,6 +30,8 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
   const barMs = 500;
   let aum = params.aum;
   let openPending = false;
+  let active: { seq: number; closeTarget: number } | null = null;
+  let closeSent = false;
   let seq = 0;
   let nextOpenBar = regionId === 'TUT' ? 23 : 2; // 튜토리얼: WIN 보장 구간
   let resolvedCount = 0;
@@ -40,15 +42,19 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
   ws.on('message', (raw) => {
     const m = JSON.parse(String(raw));
     if (m.op === 'started') t0 = Date.now();
-    else if (m.op === 'position.opened') { aum = m.aumLeft; }
-    else if (m.op === 'position.resolved') {
+    else if (m.op === 'position.opened') {
+      aum = m.aumLeft;
+      openPending = false;
+      active = { seq: m.seq, closeTarget: m.openBarIdx + 30 }; // 봇: 30봉 보유 후 청산
+    } else if (m.op === 'position.closed') {
       aum = m.aumLeft;
       battle.addGold(m.payout);
-      openPending = false;
+      active = null;
+      closeSent = false;
       resolvedCount += 1;
-      nextOpenBar = Math.floor((Date.now() - t0) / barMs) + 3;
+      nextOpenBar = m.exitBarIdx + 3;
     } else if (m.op === 'clock.resync') t0 = Date.now() - m.serverBarIdx * barMs;
-    else if (m.op === 'error') openPending = false;
+    else if (m.op === 'error') { openPending = false; closeSent = false; }
   });
   ws.send(JSON.stringify({ op: 'start' }));
 
@@ -63,7 +69,7 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
     if (battle.phase === 'done') break;
     const bar = Math.floor(Math.min(elapsedBars, totalBars));
 
-    if (!openPending && bar >= nextOpenBar && bar + 32 < bars.barCount && aum >= 4) {
+    if (!openPending && !active && bar >= nextOpenBar && bar + 34 < bars.barCount && aum >= 4) {
       const openIdx = bar + 1;
       const closeIdx = openIdx + 30;
       const delta = bars.bars[closeIdx].c - bars.bars[openIdx].c; // 봇: 정답 방향을 확률 p로
@@ -71,8 +77,12 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
       const dir = Math.random() < p ? correct : correct === 'long' ? 'short' : 'long';
       seq += 1;
       openPending = true;
-      ws.send(JSON.stringify({ op: 'position.open', seq, direction: dir, stake: Math.max(1, Math.floor(aum * 0.25)), expirySec: 30 }));
-      nextOpenBar = closeIdx + 3;
+      ws.send(JSON.stringify({ op: 'position.open', seq, direction: dir, stake: Math.max(1, Math.floor(aum * 0.25)) }));
+    }
+    // 청산 요청: exitBar = 요청 시점 bar + 1 → closeTarget−1에 보내면 목표 봉에 체결
+    if (active && !closeSent && bar >= active.closeTarget - 1) {
+      closeSent = true;
+      ws.send(JSON.stringify({ op: 'position.close', seq: active.seq }));
     }
     if (built < Math.min(buildOrder.length, battle.towers.length)) {
       if (battle.buildTower(built, buildOrder[built])) built += 1;
