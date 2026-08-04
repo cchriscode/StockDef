@@ -185,20 +185,22 @@ export const WAVE_COMPS: Record<RegionId, CompRatio[]> = { R1: COMP_R1, R2: COMP
 export const BOSS_WAVES: Record<RegionId, number[]> = { R1: [13], R2: [7, 13], R3: [7, 13], TUT: [] };
 
 // §9.4 웨이브 테이블 — R1 원본, R2/R3는 배수 스케일
+// 지수형 곡선 (2026-08-05 개정): 초반은 가볍게 시작해 후반으로 갈수록 물량·HP가 가파르게 상승.
+// 앞 웨이브는 트레이딩·배치에 집중할 여유를 주고, W10+는 확실한 위협이 되도록.
 const R1_WAVES: WaveSpec[] = [
-  { count: 3, hp: 50, speed: 1.0, air: false },
-  { count: 4, hp: 55, speed: 1.0, air: false },
-  { count: 5, hp: 60, speed: 1.0, air: true },
-  { count: 5, hp: 70, speed: 1.0, air: false },
-  { count: 6, hp: 80, speed: 1.0, air: true },
-  { count: 7, hp: 90, speed: 1.0, air: false },
-  { count: 7, hp: 105, speed: 1.05, air: true },
-  { count: 8, hp: 120, speed: 1.05, air: true },
-  { count: 9, hp: 140, speed: 1.05, air: false },
-  { count: 10, hp: 160, speed: 1.1, air: true },
-  { count: 11, hp: 185, speed: 1.1, air: true },
-  { count: 12, hp: 215, speed: 1.1, air: true },
-  { count: 14, hp: 260, speed: 1.15, air: true },
+  { count: 2, hp: 45, speed: 1.0, air: false },
+  { count: 3, hp: 52, speed: 1.0, air: false },
+  { count: 3, hp: 62, speed: 1.0, air: true },
+  { count: 4, hp: 75, speed: 1.0, air: false },
+  { count: 5, hp: 92, speed: 1.0, air: true },
+  { count: 6, hp: 115, speed: 1.0, air: false },
+  { count: 7, hp: 145, speed: 1.05, air: true },
+  { count: 8, hp: 180, speed: 1.05, air: true },
+  { count: 10, hp: 225, speed: 1.05, air: false },
+  { count: 12, hp: 280, speed: 1.1, air: true },
+  { count: 14, hp: 330, speed: 1.1, air: true },
+  { count: 16, hp: 410, speed: 1.1, air: true },
+  { count: 18, hp: 510, speed: 1.15, air: true },
 ];
 
 function scaleWaves(base: WaveSpec[], countMult: number, hpMult: number): WaveSpec[] {

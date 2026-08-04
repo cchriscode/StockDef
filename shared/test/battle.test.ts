@@ -56,12 +56,12 @@ describe('Battle 엔진', () => {
   it('손절 방벽: 지상 적을 정지시키고 내구가 깎인다', () => {
     const b = new Battle(params(), []);
     b.addGold(70);
-    expect(b.buildTower(0, 'barrier')).toBe(true); // slot0 x=100
+    expect(b.buildTower(0, 'barrier')).toBe(true); // slot0 x=150
     const anyB = b as unknown as { enemies: unknown[] };
-    anyB.enemies.push({ id: 700, type: 'grunt', x: 112, hp: 500, maxHp: 500, baseSpeed: 30, dps: 10, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 10, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false } as never);
+    anyB.enemies.push({ id: 700, type: 'grunt', x: 162, hp: 500, maxHp: 500, baseSpeed: 30, dps: 10, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 10, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false } as never);
     const tw0 = b.towers[0]!;
     b.advanceTo(b.t + 2);
-    expect(b.enemies[0].x).toBeGreaterThan(100); // 방벽에 막혀 통과 못 함
+    expect(b.enemies[0].x).toBeGreaterThan(150); // 방벽에 막혀 통과 못 함
     expect(tw0.hp).toBeLessThan(tw0.maxHp); // 내구 감소
   });
   it('리스크 매니저: 사옥 체력을 회복시킨다 (BASE_HP 상한)', () => {
@@ -93,11 +93,11 @@ describe('Battle 엔진', () => {
   it('조합 분배: 총 수 보존 + 보스 웨이브(R1은 W13만)는 보스 +1 (미리보기 기준)', () => {
     const b = new Battle(params(), []);
     const w6 = b.previewWave(6).reduce((s, c) => s + c.count, 0);
-    expect(w6).toBe(7); // R1 W6 count=7, 보스 없음
+    expect(w6).toBe(6); // R1 W6 count=6, 보스 없음
     expect(b.previewWave(7).find((c) => c.type === 'boss')).toBeUndefined();
     const w13 = b.previewWave(13);
     expect(w13.find((c) => c.type === 'boss')?.count).toBe(1);
-    expect(w13.reduce((s, c) => s + c.count, 0)).toBe(14 + 1); // W13 count=14 + 보스
+    expect(w13.reduce((s, c) => s + c.count, 0)).toBe(18 + 1); // W13 count=18 + 보스
   });
   it('타겟팅 모드 순환: first → last → strong → close → first (Bloons)', () => {
     const b = new Battle(params(), []);
@@ -168,8 +168,8 @@ describe('Battle 엔진', () => {
   });
   it('heat 반영: 점령 2개(1.04) → 적 수 ceil(count×1.04)', () => {
     const b = new Battle(params({ heat: 1.04 }), []);
-    b.advanceTo(11); // 웨이브 1 (base 3) 스폰 직후
+    b.advanceTo(11); // 웨이브 1 (base 2) 스폰 직후
     const total = b.enemies.length + (b as unknown as { pending: unknown[] }).pending.length;
-    expect(total).toBe(Math.ceil(3 * 1.04)); // = 4
+    expect(total).toBe(Math.ceil(2 * 1.04)); // = 3
   });
 });
