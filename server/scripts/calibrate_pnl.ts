@@ -64,3 +64,28 @@ for (const [r, l] of LS) {
   const dn = Dn(l);
   console.log(`${r} L=${l} → 손익분기 p* = ${((dn / (U + dn)) * 100).toFixed(1)}%`);
 }
+
+// ─── FR-5.5b 골드 기댓값 (수익만 골드 환전) ───
+// 트레이드당 골드 전환 기대 = stake × p × U   (손실은 골드가 아니라 AUM에서 깎임)
+// 트레이드당 AUM 소모 기대  = stake × (1−p) × Dn(L)
+// 스테이지 추정: 30봉 보유 × 11회, 투입 25% (봇 전략과 동일) — AUM은 기대치로 축차 감소
+console.log('\n골드 기댓값: 트레이드당 골드 = stake × p × U (U는 지역 공통, L 무관)');
+console.log('스테이지 추정 (AUM 2000, 25% 투입 × 11회, 기본수입·배당·처치AUM 제외):');
+console.log(['p', ...LS.map(([r]) => `${r} 골드`), ...LS.map(([r]) => `${r} AUM잔여`)].join(' | '));
+for (const p of [0.45, 0.5, 0.55, 0.6, 0.65]) {
+  const golds: string[] = [];
+  const aums: string[] = [];
+  for (const [, l] of LS) {
+    let aum = 2000;
+    let gold = 0;
+    for (let i = 0; i < 11; i++) {
+      const stake = aum * 0.25;
+      gold += stake * p * U;
+      aum -= stake * (1 - p) * Dn(l);
+    }
+    golds.push(String(Math.round(gold)));
+    aums.push(String(Math.round(aum)));
+  }
+  console.log(`${(p * 100).toFixed(0)}% | ${golds.join(' | ')} | ${aums.join(' | ')}`);
+}
+console.log('※ §9.3 목표 지출(타워·유닛): R1 2,000 / R2 2,550 / R3 3,100 G — 기본수입(275~325)과 배당 파밍을 더해 비교할 것');

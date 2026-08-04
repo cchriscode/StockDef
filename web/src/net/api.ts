@@ -88,12 +88,13 @@ export interface Settings {
   speed: 0.5 | 1 | 2;
   colorBlind: boolean;
   reduceShake: boolean;
+  volume: number; // 마스터 볼륨 0~1 (FR-13.1)
 }
 export function getSettings(): Settings {
   try {
-    return { speed: 1, colorBlind: false, reduceShake: false, ...JSON.parse(localStorage.getItem('tf.settings') ?? '{}') };
+    return { speed: 1, colorBlind: false, reduceShake: false, volume: 0.5, ...JSON.parse(localStorage.getItem('tf.settings') ?? '{}') };
   } catch {
-    return { speed: 1, colorBlind: false, reduceShake: false };
+    return { speed: 1, colorBlind: false, reduceShake: false, volume: 0.5 };
   }
 }
 export function saveSettings(s: Settings) {

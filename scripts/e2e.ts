@@ -58,7 +58,7 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
   });
   ws.send(JSON.stringify({ op: 'start' }));
 
-  const buildOrder = ['basic', 'aa', 'basic', 'splash', 'aa', 'splash'] as const;
+  const buildOrder = ['limit', 'dividend', 'limit', 'barrier', 'limit', 'limit'] as const;
   let built = 0;
   const totalBars = params.waveCount * 30;
 

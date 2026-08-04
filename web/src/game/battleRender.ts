@@ -9,15 +9,14 @@ const ENEMY_COLORS: Record<Enemy['type'], string> = {
   grunt: '#E8654F', runner: '#FF9E86', tank: '#A83A2E', shield: '#C9A84A',
   healer: '#8FD8B0', air: '#E8A0B4', boss: '#C22A2A',
 };
-const UNIT_COLORS = { intern: '#7BD8A0', analyst: '#46A574', trader: '#3E8C68' };
-const TOWER_COLORS = { basic: '#4E7FB8', aa: '#9B6BFF', splash: '#F79B76' };
+const UNIT_COLORS = { intern: '#7BD8A0', analyst: '#46A574', trader: '#3E8C68', riskmgr: '#5EC0B0' };
+const TOWER_COLORS = { limit: '#4E7FB8', dividend: '#FFC53D', barrier: '#7C89A3' };
 const MODE_LABEL = { first: '선두', last: '후미', strong: '강적', close: '근접' };
 
 // ─── 유닛·타워·기지 SVG 스프라이트 (Units/Bases 컨셉 시트) ───
-// 시트 직군 매핑: 인턴(블로커)→밸류 홀더 / 애널리스트→애널리스트 / 트레이더(근접)→스캘퍼
-const UNIT_SPRITE: Record<string, string> = { intern: 'holder', analyst: 'analyst', trader: 'scalper' };
-// 타워: 기본(단일 저격)→지정가 포탑 / 대공(상향 요격)→배당 파밍(상향 분출) / 광역(슬로우)→손절 방벽
-const TOWER_SPRITE: Record<string, string> = { basic: 'limit', aa: 'dividend', splash: 'barrier' };
+// 시트 직군 매핑: 인턴(블로커)→밸류 홀더 / 애널리스트→애널리스트 / 트레이더(근접)→스캘퍼 / 리스크 매니저→리스크 매니저
+const UNIT_SPRITE: Record<string, string> = { intern: 'holder', analyst: 'analyst', trader: 'scalper', riskmgr: 'riskmgr' };
+const TOWER_SPRITE: Record<string, string> = { limit: 'limit', dividend: 'dividend', barrier: 'barrier' };
 const ENEMY_SPRITE: Record<Enemy['type'], string> = {
   grunt: 'broker', runner: 'ronin', tank: 'golem', shield: 'bureaucrat',
   healer: 'bureaucrat', air: 'algobot', boss: 'giant',
@@ -184,7 +183,12 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       continue;
     }
     const spec = TOWERS.find((t) => t.key === tw.key)!;
-    const active = tw.cooldown > (1 / spec.rate) * 0.55; // 발사 직후 → 작동 프레임
+    // 작동 프레임: 포탑=발사 직후 / 배당=지급 직후 / 방벽=손상 상태
+    const active = spec.rate > 0
+      ? tw.cooldown > (1 / spec.rate) * 0.55
+      : spec.incomeAmount > 0
+        ? tw.nextIncomeAt - b.t > spec.incomePeriod - 0.8
+        : tw.hp < tw.maxHp;
     const img = spr(`${TOWER_SPRITE[tw.key]}_${active ? 'active' : 'idle'}`);
     if (img) {
       const hh = 54;
@@ -198,11 +202,13 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.fillStyle = '#FFC53D';
       ctx.fillRect(tx - 12, groundTop - 60, 24, 4);
     }
-    // 타겟팅 모드 배지 (Bloons) — 지면 스트립 위
-    ctx.fillStyle = '#7C89A3';
-    ctx.font = '8px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(MODE_LABEL[tw.mode], tx, groundTop + 12);
+    if (tw.maxHp > 0) hpBar(ctx, tx - 12, groundTop - 62, 24, tw.hp / tw.maxHp, '#7C89A3'); // 방벽 내구
+    if (spec.dmg > 0) { // 타겟팅 모드 배지 (공격 타워만)
+      ctx.fillStyle = '#7C89A3';
+      ctx.font = '8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(MODE_LABEL[tw.mode], tx, groundTop + 12);
+    }
   }
 
   // 유닛 — 컨셉 시트 스프라이트 (IDLE/WALK 교대 + 사격 직후 ATK)
@@ -284,6 +290,11 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.fillStyle = '#C4A8FF';
       ctx.font = 'bold 11px monospace';
       ctx.fillText(`+${f.amount}`, sx(f.x), y - 10);
+    } else if (f.kind === 'gold' && f.amount > 0) { // 배당 파밍 지급 (골드)
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#FFC53D';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText(`+${f.amount}G`, sx(f.x), y - 24);
     } else if (f.kind === 'death') {
       ctx.globalAlpha = alpha * 0.7;
       ctx.strokeStyle = '#A9B6C4';

@@ -57,6 +57,9 @@ export interface Tower {
   cooldown: number;
   mode: TargetingMode;
   lastTargetX: number | null;
+  hp: number; // 손절 방벽 잔여 내구 (비방벽 0)
+  maxHp: number;
+  nextIncomeAt: number; // 배당 파밍 다음 지급 시각 (비파밍 Infinity)
 }
 
 export interface Projectile {
@@ -74,7 +77,7 @@ export interface Projectile {
 }
 
 export interface Fx {
-  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'skill' | 'aum';
+  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'skill' | 'aum' | 'gold';
   x: number;
   air: boolean;
   amount: number;
@@ -170,7 +173,11 @@ export class Battle {
     if (slot < 0 || slot >= this.towers.length || this.towers[slot]) return false;
     const spec = TOWERS.find((s) => s.key === key)!;
     if (!this.spend(spec.cost)) return false;
-    this.towers[slot] = { slot, key, lv: 1, cooldown: 0, mode: 'first', lastTargetX: null };
+    this.towers[slot] = {
+      slot, key, lv: 1, cooldown: 0, mode: 'first', lastTargetX: null,
+      hp: spec.barrierHP, maxHp: spec.barrierHP,
+      nextIncomeAt: spec.incomeAmount > 0 ? this.t + spec.incomePeriod : Infinity,
+    };
     return true;
   }
 
@@ -180,6 +187,10 @@ export class Battle {
     const spec = TOWERS.find((s) => s.key === tw.key)!;
     if (!this.spend(spec.upgradeCost)) return false;
     tw.lv = 2;
+    if (spec.barrierHP > 0) { // 방벽 업그레이드 = 내구 강화 + 완전 수리
+      tw.maxHp = Math.round(spec.barrierHP * spec.lv2Mult);
+      tw.hp = tw.maxHp;
+    }
     return true;
   }
 
@@ -222,7 +233,8 @@ export class Battle {
   }
 
   towerSlotX(slot: number): number {
-    return 100 + slot * 46;
+    // 기지 앞(150)부터 중원까지 분산 배치 — 방벽 전진 설치·사거리 커버 선택이 의미를 가진다
+    return 150 + slot * 90;
   }
 
   /** 준비 페이즈 UI용: 다음 웨이브 조합 미리보기 */
@@ -386,6 +398,23 @@ export class Battle {
 
     const atkMult = this.currentAllyAtkMult();
 
+    // 배당 파밍: 주기적 골드 생산 (비전투 타워)
+    for (const tw of this.towers) {
+      if (!tw) continue;
+      const spec = TOWERS.find((s) => s.key === tw.key)!;
+      if (spec.incomeAmount <= 0) continue;
+      while (t >= tw.nextIncomeAt) {
+        const amount = Math.round(spec.incomeAmount * (tw.lv === 2 ? spec.lv2Mult : 1));
+        this.addGold(amount);
+        this.pushFx('gold', this.towerSlotX(tw.slot), false, amount);
+        tw.nextIncomeAt += spec.incomePeriod;
+      }
+    }
+
+    // 리스크 매니저: 사옥 회복 (생존 중, 상한 BASE_HP)
+    const healSum = this.units.reduce((s2, u) => s2 + u.spec.baseHealPerSec, 0);
+    if (healSum > 0 && this.baseHP > 0) this.baseHP = Math.min(BALANCE.BASE_HP, this.baseHP + healSum * dt);
+
     // 힐러 오라 (Kingdom Rush 실드 사제 — strong 타겟팅으로 저격하는 카운터 플레이)
     for (const h of this.enemies) {
       if (h.healPerSec <= 0 || h.hp <= 0) continue;
@@ -412,9 +441,15 @@ export class Battle {
       }
     }
 
-    // 유닛 행동 (Age of War 역할: 블로커는 붙잡고, 원거리는 뒤에서, 브루저는 광역)
+    // 유닛 행동 (블로커는 붙잡고, 원거리는 뒤에서, 브루저는 광역, 서포터는 후열 유지)
     for (const u of this.units) {
       u.shotCd -= dt;
+      if (u.spec.dps <= 0) { // 서포터(리스크 매니저): 비공격 — 전열 뒤에서 따라간다
+        const ahead = this.units.some((o) => o !== u && o.spec.dps > 0 && o.x > u.x && o.x - u.x < 40);
+        const enemyNear = this.enemies.some((e) => !e.air && e.x - u.x >= -6 && e.x - u.x <= 30);
+        if (!ahead && !enemyNear && u.x < ENEMY_BASE_X - 80) u.x += u.spec.speed * dt;
+        continue;
+      }
       const inRange = this.enemies.filter((e) =>
         e.hp > 0 && e.x >= u.x - 6 && e.x - u.x <= u.spec.range && (!e.air || u.spec.antiAirPct > 0));
       const ground = inRange.filter((e) => !e.air).sort((a, b) => a.x - b.x);
@@ -446,9 +481,26 @@ export class Battle {
       if (this.t < e.stunUntil) continue; // 스턴: 이동·공격 불가
       const blocker = engagedBy.get(e.id);
       if (blocker) {
-        blocker.hp -= e.dps * dt; // 블로킹된 적은 유닛과 교전 (공중은 배정 자체가 안 됨)
+        // 리스크 매니저 가드: 근처 서포터가 있으면 아군이 받는 피해 감소
+        const guard = this.units.some((u) => u.spec.guardPct > 0 && Math.abs(u.x - blocker.x) <= u.spec.guardRadius)
+          ? 1 - UNITS.find((s) => s.key === 'riskmgr')!.guardPct : 1;
+        blocker.hp -= e.dps * guard * dt; // 블로킹된 적은 유닛과 교전 (공중은 배정 자체가 안 됨)
       } else {
-        e.x -= this.enemySpeed(e) * dt;
+        // 손절 방벽: 지상 적의 경로를 물리적으로 막는다 — 파괴될 때까지 정지·공격
+        const bar = this.towers.find((tw) => {
+          if (!tw || tw.hp <= 0) return false;
+          const dx = e.x - this.towerSlotX(tw.slot);
+          return dx > 0 && dx <= 16;
+        });
+        if (bar && !e.air) {
+          bar.hp -= e.dps * dt;
+          if (bar.hp <= 0) {
+            this.pushFx('death', this.towerSlotX(bar.slot), false, 0);
+            this.towers[bar.slot] = null;
+          }
+        } else {
+          e.x -= this.enemySpeed(e) * dt;
+        }
       }
       if (e.x <= PLAYER_BASE_X + 12) {
         this.baseHP -= e.baseDmg;
@@ -458,22 +510,24 @@ export class Battle {
       }
     }
 
-    // 타워 사격 (타겟팅 모드 적용)
+    // 타워 사격 (타겟팅 모드 적용 — 비공격 구조물은 제외)
     for (const tw of this.towers) {
       if (!tw) continue;
+      const spec = TOWERS.find((s) => s.key === tw.key)!;
+      if (spec.dmg <= 0) continue;
       tw.cooldown -= dt;
       if (tw.cooldown > 0) continue;
-      const spec = TOWERS.find((s) => s.key === tw.key)!;
       const tx = this.towerSlotX(tw.slot);
       const candidates = this.enemies.filter((e) =>
-        (spec.target === 'air' ? e.air : !e.air) && e.hp > 0 && Math.abs(e.x - tx) <= spec.range);
+        (spec.target === 'both' ? true : spec.target === 'air' ? e.air : !e.air) && e.hp > 0 && Math.abs(e.x - tx) <= spec.range);
       const target = this.pickTarget(candidates, tw.mode, tx);
       if (!target) { tw.lastTargetX = null; continue; }
       tw.cooldown = 1 / spec.rate;
       tw.lastTargetX = target.x;
       const dmg = spec.dmg * (tw.lv === 2 ? spec.lv2Mult : 1) * this.params.towerDmgMult * atkMult;
       const slowPct = tw.lv === 2 && spec.slowPct > 0 ? spec.slowPct + 0.1 : spec.slowPct;
-      this.fireProjectile(tx, target, dmg, { ...spec, slowPct }, true);
+      const dmgType = spec.lv2Pierce && tw.lv === 2 ? 'magic' as const : spec.dmgType; // Lv2 철갑탄 (armor 관통)
+      this.fireProjectile(tx, target, dmg, { ...spec, dmgType, slowPct }, true);
     }
 
     // 사옥 자동 포탑 (최후 방어선)

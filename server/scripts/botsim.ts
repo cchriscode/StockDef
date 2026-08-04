@@ -69,7 +69,8 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
   let positions = 0;
   let wins = 0;
   let loses = 0;
-  const buildOrder: ('basic' | 'aa' | 'basic' | 'splash' | 'aa' | 'splash')[] = ['basic', 'aa', 'basic', 'splash', 'aa', 'splash'];
+  // 신규 타워 3종: 지정가(지상+공중) 위주 + 초반 배당 파밍 1기 + 방벽 1기
+  const buildOrder: ('limit' | 'dividend' | 'barrier')[] = ['limit', 'limit', 'limit', 'dividend', 'barrier', 'limit'];
   let built = 0;
 
   for (let t = 0.5; t <= 390 + 45; t += 0.5) { // 오버타임 상한(+40) 너머까지 돌아야 done 판정에 도달
@@ -113,12 +114,13 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
     // 전투 지출 (그리디) — 3번 슬롯 기본 포탑은 강적 타겟팅(힐러·탱커 저격, 평균적 카운터 플레이 반영)
     if (built < buildOrder.length) {
       if (b.buildTower(built, buildOrder[built])) {
-        if (built === 2) { b.cycleTargeting(2); b.cycleTargeting(2); } // first → last → strong
+        if (built === 2) { b.cycleTargeting(2); b.cycleTargeting(2); } // first → last → strong (힐러·탱커 저격)
         built += 1;
       }
     } else {
       for (let s = 0; s < 6; s++) if (b.gold >= 400) b.upgradeTower(s);
-      if (b.gold >= 320) b.spawnUnit('trader');
+      if (b.gold >= 300 && !b.units.some((u) => u.key === 'riskmgr')) b.spawnUnit('riskmgr');
+      else if (b.gold >= 320) b.spawnUnit('trader');
       else if (b.gold >= 220) b.spawnUnit('analyst');
     }
     if (b.enemies.filter((e) => !e.air).length >= 6 && b.gold >= 380) b.useSkill();

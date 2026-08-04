@@ -22,6 +22,13 @@ export function SettingsOverlay({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         </label>
+        <label>효과음 볼륨 — {Math.round(settings.volume * 100)}%
+          <input
+            type="range" min={0} max={100} step={5}
+            value={Math.round(settings.volume * 100)}
+            onChange={(e) => apply({ volume: Number(e.target.value) / 100 })}
+          />
+        </label>
         <label>
           <input type="checkbox" checked={settings.colorBlind} onChange={(e) => apply({ colorBlind: e.target.checked })} />
           색약 모드 (상승/하락 → 황/청)

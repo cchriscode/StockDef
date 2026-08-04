@@ -37,13 +37,41 @@ describe('Battle 엔진', () => {
   });
   it('타워 건설: 골드 차감·슬롯 점유, 중복 건설 불가', () => {
     const b = new Battle(params(), []);
-    b.addGold(300);
-    expect(b.buildTower(0, 'basic')).toBe(true);
-    expect(b.gold).toBe(180);
-    expect(b.buildTower(0, 'aa')).toBe(false); // 점유된 슬롯
-    expect(b.buildTower(1, 'splash')).toBe(true);
+    b.addGold(200); // limit 110 + barrier 70 = 180
+    expect(b.buildTower(0, 'limit')).toBe(true);
+    expect(b.gold).toBe(90);
+    expect(b.buildTower(0, 'dividend')).toBe(false); // 점유된 슬롯
+    expect(b.buildTower(1, 'barrier')).toBe(true);
     expect(b.gold).toBe(20);
-    expect(b.buildTower(2, 'basic')).toBe(false); // 골드 부족
+    expect(b.buildTower(2, 'limit')).toBe(false); // 골드 부족
+  });
+  it('배당 파밍: 주기마다 골드 생산 (비공격)', () => {
+    const b = new Battle(params(), []);
+    b.addGold(130);
+    expect(b.buildTower(0, 'dividend')).toBe(true);
+    const g0 = b.gold;
+    advanceAlive(b, 21); // 10초 주기 × 2회
+    expect(b.gold).toBeGreaterThanOrEqual(g0 + 16);
+  });
+  it('손절 방벽: 지상 적을 정지시키고 내구가 깎인다', () => {
+    const b = new Battle(params(), []);
+    b.addGold(70);
+    expect(b.buildTower(0, 'barrier')).toBe(true); // slot0 x=100
+    const anyB = b as unknown as { enemies: unknown[] };
+    anyB.enemies.push({ id: 700, type: 'grunt', x: 112, hp: 500, maxHp: 500, baseSpeed: 30, dps: 10, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 10, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false } as never);
+    const tw0 = b.towers[0]!;
+    b.advanceTo(b.t + 2);
+    expect(b.enemies[0].x).toBeGreaterThan(100); // 방벽에 막혀 통과 못 함
+    expect(tw0.hp).toBeLessThan(tw0.maxHp); // 내구 감소
+  });
+  it('리스크 매니저: 사옥 체력을 회복시킨다 (BASE_HP 상한)', () => {
+    const b = new Battle(params(), []);
+    b.baseHP = 50;
+    b.addGold(90);
+    expect(b.spawnUnit('riskmgr')).toBe(true);
+    b.advanceTo(4); // 웨이브 시작 전 (스폰 없음)
+    expect(b.baseHP).toBeGreaterThan(51); // +0.5/s
+    expect(b.baseHP).toBeLessThanOrEqual(100);
   });
   it('패닉 셀 이벤트 → 다음 웨이브 적 수 1.3배 (FR-7 수용 기준)', () => {
     // t=200(웨이브 7 진행 중) 발동 → 웨이브 8에 적용. 웨이브 8 base count = 8
@@ -74,7 +102,7 @@ describe('Battle 엔진', () => {
   it('타겟팅 모드 순환: first → last → strong → close → first (Bloons)', () => {
     const b = new Battle(params(), []);
     b.addGold(200);
-    b.buildTower(0, 'basic');
+    b.buildTower(0, 'limit');
     expect(b.towers[0]!.mode).toBe('first');
     expect(b.cycleTargeting(0)).toBe('last');
     expect(b.cycleTargeting(0)).toBe('strong');

@@ -78,33 +78,37 @@ export type DmgType = 'physical' | 'magic'; // 물리는 armor에 감소, 마법
 export type TargetingMode = 'first' | 'last' | 'strong' | 'close';
 export const TARGETING_MODES: TargetingMode[] = ['first', 'last', 'strong', 'close'];
 
-// FR-6.4 타워 (세부 스펙은 PRD 미정 → 설계값, 봇 시뮬레이터로 검증)
+// FR-6.4 타워 — Units 컨셉 시트 3종 (지정가 포탑 / 배당 파밍 / 손절 방벽). 수치는 봇 시뮬레이터로 검증
 export interface TowerSpec {
-  key: 'basic' | 'aa' | 'splash';
+  key: 'limit' | 'dividend' | 'barrier';
   name: string;
   cost: number;
   upgradeCost: number;
-  target: 'ground' | 'air';
+  target: 'ground' | 'air' | 'both' | 'none'; // none = 비공격 구조물
   dmgType: DmgType;
-  dmg: number; // 발당
+  dmg: number; // 발당 (0 = 비공격)
   rate: number; // 초당 발사
   range: number;
   splashRadius: number; // 0이면 단일
   slowPct: number; // 명중 시 슬로우 (0이면 없음)
   slowDur: number;
   projSpeed: number; // 투사체 속도 px/s
-  lv2Mult: number; // 업그레이드 시 dmg 배수
+  lv2Mult: number; // 업그레이드 시 dmg·수입·내구 배수
+  lv2Pierce: boolean; // Lv2 철갑탄: 물리 → 마법(armor 관통) 전환
+  incomeAmount: number; // 배당 파밍: 주기당 골드 (0 = 없음)
+  incomePeriod: number; // 배당 파밍: 주기 (초)
+  barrierHP: number; // 손절 방벽: 내구도 (0 = 차단 없음)
 }
 
 export const TOWERS: TowerSpec[] = [
-  { key: 'basic', name: '기본 포탑', cost: 120, upgradeCost: 180, target: 'ground', dmgType: 'physical', dmg: 14, rate: 1.25, range: 420, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 640, lv2Mult: 1.8 },
-  { key: 'aa', name: '대공 포대', cost: 120, upgradeCost: 180, target: 'air', dmgType: 'physical', dmg: 20, rate: 1.2, range: 470, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 720, lv2Mult: 1.8 },
-  { key: 'splash', name: '광역 포탑', cost: 160, upgradeCost: 220, target: 'ground', dmgType: 'magic', dmg: 12, rate: 0.9, range: 330, splashRadius: 90, slowPct: 0.25, slowDur: 1.2, projSpeed: 460, lv2Mult: 1.8 },
+  { key: 'limit', name: '지정가 포탑', cost: 110, upgradeCost: 160, target: 'both', dmgType: 'physical', dmg: 20, rate: 1.4, range: 430, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0 },
+  { key: 'dividend', name: '배당 파밍', cost: 130, upgradeCost: 190, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 8, incomePeriod: 10, barrierHP: 0 },
+  { key: 'barrier', name: '손절 방벽', cost: 70, upgradeCost: 100, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 260 },
 ];
 
-// FR-6.5 유닛 — Age of War 역할 분담: 블로커 / 원거리 딜러 / 근접 브루저
+// FR-6.5 유닛 — 컨셉 시트 4직군: 블로커 / 원거리 / 근접 브루저 / 서포터
 export interface UnitSpec {
-  key: 'intern' | 'analyst' | 'trader';
+  key: 'intern' | 'analyst' | 'trader' | 'riskmgr';
   name: string;
   cost: number;
   hp: number;
@@ -114,12 +118,16 @@ export interface UnitSpec {
   cleave: number; // 동시 타격 수
   antiAirPct: number; // 공중 공격 배율 (0 = 불가)
   block: number; // 동시에 붙잡을 수 있는 적 수 (초과분은 통과)
+  baseHealPerSec: number; // 리스크 매니저: 사옥 회복/초 (생존 중, BASE_HP 상한)
+  guardPct: number; // 리스크 매니저: 주변 아군 피해 감소율
+  guardRadius: number;
 }
 
 export const UNITS: UnitSpec[] = [
-  { key: 'intern', name: '인턴', cost: 30, hp: 60, dps: 4, speed: 46, range: 26, cleave: 1, antiAirPct: 0, block: 3 },
-  { key: 'analyst', name: '애널리스트', cost: 60, hp: 70, dps: 15, speed: 42, range: 110, cleave: 1, antiAirPct: 0.5, block: 1 },
-  { key: 'trader', name: '트레이더', cost: 90, hp: 170, dps: 22, speed: 40, range: 26, cleave: 2, antiAirPct: 0, block: 2 },
+  { key: 'intern', name: '인턴', cost: 30, hp: 60, dps: 4, speed: 46, range: 26, cleave: 1, antiAirPct: 0, block: 3, baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'analyst', name: '애널리스트', cost: 60, hp: 70, dps: 15, speed: 42, range: 110, cleave: 1, antiAirPct: 0.5, block: 1, baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'trader', name: '트레이더', cost: 90, hp: 170, dps: 22, speed: 40, range: 26, cleave: 2, antiAirPct: 0, block: 2, baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'riskmgr', name: '리스크 매니저', cost: 90, hp: 80, dps: 0, speed: 40, range: 0, cleave: 0, antiAirPct: 0, block: 1, baseHealPerSec: 0.5, guardPct: 0.2, guardRadius: 120 },
 ];
 
 // 사옥 자동 포탑 (Age of War 본진 방어) — 최후 방어선

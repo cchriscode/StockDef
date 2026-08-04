@@ -7,6 +7,7 @@ import { api, getSettings, getToken, track } from '../net/api.js';
 import { StageWs } from '../net/stageWs.js';
 import { clockLabel, drawChart, interpPct, pctOf, type OpenMarker } from '../game/chart.js';
 import { drawBattle } from '../game/battleRender.js';
+import { sfx } from '../game/sfx.js';
 
 interface Props {
   regionId: RegionId;
@@ -44,6 +45,8 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     aum: number;
     aumReported: number;
     lastAumReportAt: number;
+    lastGoldEarned: number;
+    lastUnitCount: number;
     finished: boolean;
     lastPayoutAt: number;
     lastEventKey: string;
@@ -51,7 +54,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
   }>({
     start: null, bars: null, battle: null, ws: null, t0: 0, barMs: 1000,
     seq: 0, openMarker: null, pendingOpen: false, aum: 0,
-    aumReported: 0, lastAumReportAt: 0, finished: false,
+    aumReported: 0, lastAumReportAt: 0, lastGoldEarned: 0, lastUnitCount: 0, finished: false,
     lastPayoutAt: 0, lastEventKey: '', shakeUntil: 0,
   });
 
@@ -127,6 +130,8 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         setPhase('playing');
         loop();
       } else if (m.op === 'position.opened') {
+        if (s.openMarker?.direction === 'short') sfx.fillShort();
+        else sfx.fillLong();
         s.pendingOpen = false;
         s.aum = m.aumLeft;
         s.openMarker = {
@@ -141,6 +146,9 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         const holdBars = s.openMarker ? m.exitBarIdx - s.openMarker.openBarIdx : null;
         s.openMarker = null;
         s.battle?.addGold(m.goldGain); // FR-5.5b: 순수익만 골드로 자동 환전 (스테이크는 AUM 반환)
+        if (m.outcome === 'win') sfx.win();
+        else if (m.outcome === 'lose') sfx.lose();
+        else sfx.draw();
         s.lastPayoutAt = Date.now();
         setPopup({ outcome: m.outcome, amount: m.pnl, goldGain: m.goldGain });
         setTimeout(() => setPopup(null), 800); // FR-5.9: 0.8초 이내
@@ -187,6 +195,14 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
       if (battleRef.current) {
         drawBattle(battleRef.current, s.battle, Date.now() < s.shakeUntil ? 5 : 0, slotMenuRef.current);
       }
+
+      // 효과음: 골드 증가(수입·배당·환전) 코인음 / 아군 유닛 사망음
+      if (s.battle.goldEarned > s.lastGoldEarned) {
+        s.lastGoldEarned = s.battle.goldEarned;
+        sfx.coin();
+      }
+      if (s.battle.units.length < s.lastUnitCount) sfx.unitDeath();
+      s.lastUnitCount = s.battle.units.length;
 
       // 적 처치 AUM 보고 (1초 스로틀, 누적 단조 증가 — 서버가 상한 clamp 후 aum.update로 응답)
       const earned = Math.floor(s.battle.aumEarned);
@@ -288,7 +304,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     track('gold_spent', { item, cost, waveIdx: hud.wave, msSincePayout: g.current.lastPayoutAt ? Date.now() - g.current.lastPayoutAt : null });
   };
 
-  const buildTower = (slot: number, key: 'basic' | 'aa' | 'splash') => {
+  const buildTower = (slot: number, key: (typeof TOWERS)[number]['key']) => {
     const b = g.current.battle;
     if (!b) return;
     const spec = TOWERS.find((t) => t.key === key)!;
@@ -307,11 +323,13 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     setSlotMenu(null);
   };
 
-  const spawnUnit = (key: 'intern' | 'analyst' | 'trader') => {
+  const spawnUnit = (key: (typeof UNITS)[number]['key']) => {
     const b = g.current.battle;
     if (!b) return;
     const cost = b.unitCost(key);
     if (b.spawnUnit(key)) {
+      sfx.spawn();
+      g.current.lastUnitCount = b.units.length; // 소환 직후 사망음 오탐 방지
       spendTrack(`unit:${key}`, cost);
       if (isTut && guide === 4) setGuide(5);
     }
@@ -460,9 +478,11 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           <div className="slot-menu" style={{ left: `${(battle.towerSlotX(slotMenu) / 1000) * 100}%` }}>
             {battle.towers[slotMenu] ? (
               <>
-                <button onClick={() => { battle.cycleTargeting(slotMenu); forceUi((v) => v + 1); }}>
-                  타겟: {{ first: '선두', last: '후미', strong: '강적', close: '근접' }[battle.towers[slotMenu]!.mode]} ↻
-                </button>
+                {TOWERS.find((t) => t.key === battle.towers[slotMenu]!.key)!.dmg > 0 && (
+                  <button onClick={() => { battle.cycleTargeting(slotMenu); forceUi((v) => v + 1); }}>
+                    타겟: {{ first: '선두', last: '후미', strong: '강적', close: '근접' }[battle.towers[slotMenu]!.mode]} ↻
+                  </button>
+                )}
                 {battle.towers[slotMenu]!.lv < 2 ? (
                   <button onClick={() => upgradeTower(slotMenu)}>
                     업그레이드 {TOWERS.find((t) => t.key === battle.towers[slotMenu]!.key)!.upgradeCost} G
@@ -475,7 +495,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
               TOWERS.map((t) => (
                 <button key={t.key} disabled={hud.gold < t.cost} onClick={() => buildTower(slotMenu, t.key)}>
                   {t.name} {t.cost} G
-                  <span className="small dim"> {t.dmgType === 'magic' ? '마법·슬로우' : t.target === 'air' ? '대공 전용' : '물리'}</span>
+                  <span className="small dim"> {t.incomeAmount > 0 ? `골드 +${t.incomeAmount}/${t.incomePeriod}초` : t.barrierHP > 0 ? '경로 차단·내구' : '지상+공중 저격'}</span>
                 </button>
               ))
             )}
