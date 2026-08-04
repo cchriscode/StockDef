@@ -13,6 +13,27 @@ const UNIT_COLORS = { intern: '#7BD8A0', analyst: '#46A574', trader: '#3E8C68' }
 const TOWER_COLORS = { basic: '#4E7FB8', aa: '#9B6BFF', splash: '#F79B76' };
 const MODE_LABEL = { first: '선두', last: '후미', strong: '강적', close: '근접' };
 
+// ─── 유닛·타워·기지 SVG 스프라이트 (Units/Bases 컨셉 시트) ───
+// 시트 직군 매핑: 인턴(블로커)→밸류 홀더 / 애널리스트→애널리스트 / 트레이더(근접)→스캘퍼
+const UNIT_SPRITE: Record<string, string> = { intern: 'holder', analyst: 'analyst', trader: 'scalper' };
+// 타워: 기본(단일 저격)→지정가 포탑 / 대공(상향 요격)→배당 파밍(상향 분출) / 광역(슬로우)→손절 방벽
+const TOWER_SPRITE: Record<string, string> = { basic: 'limit', aa: 'dividend', splash: 'barrier' };
+const ENEMY_SPRITE: Record<Enemy['type'], string> = {
+  grunt: 'broker', runner: 'ronin', tank: 'golem', shield: 'bureaucrat',
+  healer: 'bureaucrat', air: 'algobot', boss: 'giant',
+};
+const sprCache = new Map<string, HTMLImageElement>();
+
+function spr(name: string): HTMLImageElement | null {
+  let img = sprCache.get(name);
+  if (!img) {
+    img = new Image();
+    img.src = `/assets/sprites/${name}.svg`;
+    sprCache.set(name, img);
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
+
 // ─── 도시별 전장 배경 (Backgrounds 목업 트레이스 세트) — 오프스크린 1회 렌더 후 재사용 ───
 const backdropCache = new Map<string, HTMLCanvasElement>();
 
@@ -123,97 +144,119 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   }
 
   // 본진 (사옥 + 자동 포탑) / 적 본진
-  drawBase(ctx, 8, GROUND_Y - 50, 40, 64, '#46A574', '#0C1A12', b.baseHP / 100, '사옥');
+  // 기지 — 체력 3상태 스프라이트 (정상 / 손상 59~25% / 위기 24~0%)
+  ctx.imageSmoothingEnabled = false;
+  const hpState = (rate: number) => (rate >= 0.6 ? '100' : rate >= 0.25 ? '59' : '24');
+  const hq = spr(`hq_${hpState(b.baseHP / 100)}`);
+  if (hq) {
+    const hh = 116;
+    const wwq = (hh * 112) / 160;
+    ctx.drawImage(hq, 4, groundTop - hh, wwq, hh);
+    hpBar(ctx, 8, groundTop - hh - 8, wwq - 8, b.baseHP / 100, '#46A574');
+  } else {
+    drawBase(ctx, 8, GROUND_Y - 50, 40, 64, '#46A574', '#0C1A12', b.baseHP / 100, '사옥');
+  }
   ctx.fillStyle = '#7BD8A0';
-  ctx.fillRect(44, GROUND_Y - 58, 8, 12); // 사옥 자동 포탑 총구
-  drawBase(ctx, W - 48, GROUND_Y - 50, 40, 64, '#A83A2E', '#FFE9C4', b.enemyBaseHP / 300, '베어');
+  ctx.fillRect(78, GROUND_Y - 46, 8, 8); // 사옥 자동 포탑 총구
+  const foe = spr(`foe_${hpState(b.enemyBaseHP / 300)}`);
+  if (foe) {
+    const hh = 88;
+    const wwf = (hh * 176) / 128;
+    ctx.drawImage(foe, W - wwf - 2, groundTop - hh, wwf, hh);
+    hpBar(ctx, W - wwf + 2, groundTop - hh - 8, wwf - 8, b.enemyBaseHP / 300, '#E8654F');
+  } else {
+    drawBase(ctx, W - 48, GROUND_Y - 50, 40, 64, '#A83A2E', '#FFE9C4', b.enemyBaseHP / 300, '베어');
+  }
 
-  // 타워
+  // 타워 — 대기/작동 2상태 스프라이트
   for (let s = 0; s < b.towers.length; s++) {
     const tx = sx(b.towerSlotX(s));
     const tw = b.towers[s];
     if (!tw) {
       ctx.strokeStyle = s === selectedSlot ? '#7BD8A0' : '#3E5570';
       ctx.setLineDash([3, 3]);
-      ctx.strokeRect(tx - 12, GROUND_Y - 24, 24, 36);
+      ctx.strokeRect(tx - 12, groundTop - 40, 24, 38);
       ctx.setLineDash([]);
       ctx.fillStyle = '#4E5B72';
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${s + 1}`, tx, GROUND_Y - 4);
+      ctx.fillText(`${s + 1}`, tx, groundTop - 18);
       continue;
     }
-    const col = TOWER_COLORS[tw.key];
-    ctx.fillStyle = col;
-    ctx.fillRect(tx - 11, GROUND_Y - 22, 22, 34);
+    const spec = TOWERS.find((t) => t.key === tw.key)!;
+    const active = tw.cooldown > (1 / spec.rate) * 0.55; // 발사 직후 → 작동 프레임
+    const img = spr(`${TOWER_SPRITE[tw.key]}_${active ? 'active' : 'idle'}`);
+    if (img) {
+      const hh = 54;
+      const wwt = (hh * 80) / 112;
+      ctx.drawImage(img, tx - wwt / 2, groundTop - hh, wwt, hh);
+    } else {
+      ctx.fillStyle = TOWER_COLORS[tw.key];
+      ctx.fillRect(tx - 11, groundTop - 36, 22, 34);
+    }
     if (tw.lv === 2) {
       ctx.fillStyle = '#FFC53D';
-      ctx.fillRect(tx - 11, GROUND_Y - 28, 22, 5);
+      ctx.fillRect(tx - 12, groundTop - 60, 24, 4);
     }
-    // 타겟팅 모드 배지 (Bloons)
-    ctx.fillStyle = '#0A0E14';
+    // 타겟팅 모드 배지 (Bloons) — 지면 스트립 위
+    ctx.fillStyle = '#7C89A3';
     ctx.font = '8px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(MODE_LABEL[tw.mode], tx, GROUND_Y - 8);
+    ctx.fillText(MODE_LABEL[tw.mode], tx, groundTop + 12);
   }
 
-  // 유닛
+  // 유닛 — 컨셉 시트 스프라이트 (IDLE/WALK 교대 + 사격 직후 ATK)
+  const walkFrame = Math.floor(b.t * 4) % 2 === 0;
   for (const u of b.units) {
     const ux = sx(u.x);
-    const col = UNIT_COLORS[u.key];
-    const r = u.key === 'trader' ? 9 : u.key === 'intern' ? 7 : 8;
-    ctx.fillStyle = col;
-    ctx.beginPath();
-    ctx.arc(ux, GROUND_Y, r, 0, Math.PI * 2);
-    ctx.fill();
-    if (u.key === 'analyst') { // 원거리 표시
-      ctx.strokeStyle = col;
-      ctx.beginPath(); ctx.moveTo(ux + r, GROUND_Y - 3); ctx.lineTo(ux + r + 6, GROUND_Y - 3); ctx.stroke();
+    const pose = u.shotCd > 0.45 ? 'atk' : walkFrame ? 'walk' : 'idle';
+    const img = spr(`${UNIT_SPRITE[u.key]}_${pose}`);
+    const hh = u.key === 'trader' ? 42 : u.key === 'intern' ? 46 : 44;
+    if (img) {
+      const wwu = (hh * 80) / 112;
+      ctx.drawImage(img, ux - wwu / 2, groundTop - hh, wwu, hh);
+    } else {
+      ctx.fillStyle = UNIT_COLORS[u.key];
+      ctx.beginPath();
+      ctx.arc(ux, groundTop - 10, 8, 0, Math.PI * 2);
+      ctx.fill();
     }
-    hpBar(ctx, ux - 9, GROUND_Y - 18, 18, u.hp / u.maxHp, '#7BD8A0');
+    hpBar(ctx, ux - 9, groundTop - hh - 8, 18, u.hp / u.maxHp, '#7BD8A0');
   }
 
-  // 적 (타입별 형태 + 상태 표시)
+  // 적 — 지역 컨셉 스프라이트 (걷기/공격 포즈, 슬로우·힐러는 필터 변주)
   for (const e of b.enemies) {
     const ex = sx(e.x);
-    const y = e.air ? AIR_Y : GROUND_Y;
     const col = ENEMY_COLORS[e.type];
     const slowed = b.t < e.slowUntil;
     const stunned = b.t < e.stunUntil;
-    ctx.fillStyle = slowed ? '#5E9AA0' : col;
-    if (e.air) {
-      ctx.beginPath();
-      ctx.moveTo(ex, y - e.size);
-      ctx.lineTo(ex - e.size, y + e.size * 0.7);
-      ctx.lineTo(ex + e.size, y + e.size * 0.7);
-      ctx.closePath();
-      ctx.fill();
-    } else if (e.type === 'tank' || e.type === 'shield' || e.type === 'boss') {
-      ctx.fillRect(ex - e.size, y - e.size, e.size * 2, e.size * 2); // 중장갑 = 사각
-      if (e.type === 'shield') { // 방패 테두리
-        ctx.strokeStyle = '#FFE9C4';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(ex - e.size, y - e.size, e.size * 2, e.size * 2);
-        ctx.lineWidth = 1;
-      }
+    const hh = e.air ? 34 : Math.min(30 + e.size * 2.4, 68);
+    const topY = e.air ? AIR_Y - hh / 2 : groundTop - hh;
+    const engaged = !e.air && b.units.some((u) => e.x - u.x >= -6 && e.x - u.x <= 30);
+    const pose = stunned ? 'idle' : engaged ? 'atk' : walkFrame ? 'walk' : 'idle';
+    const img = spr(`${ENEMY_SPRITE[e.type]}_${pose}`);
+    if (img) {
+      const wwe = (hh * 80) / 112;
+      const filters: string[] = [];
+      if (e.type === 'healer') filters.push('hue-rotate(130deg) saturate(1.1)'); // 관료 색 변주 = 리스크 헤지
+      if (slowed) filters.push('saturate(0.4) brightness(0.8)');
+      if (filters.length) ctx.filter = filters.join(' ');
+      ctx.drawImage(img, ex - wwe / 2, topY, wwe, hh);
+      ctx.filter = 'none';
     } else {
+      ctx.fillStyle = slowed ? '#5E9AA0' : col;
       ctx.beginPath();
-      ctx.arc(ex, y, e.size, 0, Math.PI * 2);
+      ctx.arc(ex, e.air ? AIR_Y : groundTop - e.size, e.size, 0, Math.PI * 2);
       ctx.fill();
-      if (e.type === 'healer') {
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(ex - 1.5, y - 5, 3, 10);
-        ctx.fillRect(ex - 5, y - 1.5, 10, 3);
-      }
     }
     if (stunned) {
       ctx.fillStyle = '#FFC53D';
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('✶', ex, y - e.size - 10);
+      ctx.fillText('✶', ex, topY - 10);
     }
     const bw = e.type === 'boss' ? 34 : 18;
-    hpBar(ctx, ex - bw / 2, y - e.size - 8, bw, e.hp / e.maxHp, col);
+    hpBar(ctx, ex - bw / 2, topY - 7, bw, e.hp / e.maxHp, col);
   }
 
   // 투사체 (마법=보라, 물리=밝은 점)
