@@ -165,34 +165,70 @@ b.danger { color: var(--red2); }
 .card.summary h3 { margin-bottom: 10px; color: var(--cream); font-size: 18px; }
 .card.summary p { line-height: 1.8; }
 
-/* ── 지도 공통 ── */
-.map-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-.map-head h1 { font-size: 22px; letter-spacing: 2px; }
-.map-head .sub { font-family: var(--fm); font-size: 11px; color: var(--mut); letter-spacing: 1px; }
+/* ── 지도: 전략 상황실 (목업 03번 — 홀로그램 톤) ── */
+.map-room {
+  position: relative; min-height: 100vh; overflow: hidden; background: #070A12;
+  padding: 24px 24px 40px; display: flex; flex-direction: column; gap: 14px;
+}
+.map-room::before { /* 상황실 대형 격자 */
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to right, transparent 0 60px, #0E1626 60px 62px),
+    repeating-linear-gradient(to bottom, transparent 0 60px, #0E1626 60px 62px);
+}
+.map-room::after { /* 스캔라인 */
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 4px);
+}
+.map-room > * { position: relative; z-index: 1; }
+.mr-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.mr-head h1 { font-size: 24px; letter-spacing: 1px; }
+.mr-head .sub { font-family: var(--fm); font-size: 11px; color: var(--mut); letter-spacing: 1px; margin-top: 8px; }
 .map-stats { display: flex; gap: 14px; font-size: 12px; flex-wrap: wrap; color: var(--mut); }
 .map-stats b { color: var(--text); }
-.map-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.map-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.mr-cols { display: flex; gap: 24px; align-items: flex-start; flex: 1; }
+.mr-mid { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; align-items: center; }
+.mr-glow {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 800px; height: 800px; max-width: 100%; pointer-events: none;
+  background: radial-gradient(circle, rgba(70, 165, 116, 0.11), transparent 62%);
+}
 
-/* 픽셀 지도 캔버스 영역 */
-.pixmap { position: relative; margin: 0 auto; }
+/* 픽셀 지도 */
+.pixmap { position: relative; }
 .pixmap .cell { position: absolute; }
 .pixmap .grid-overlay {
   position: absolute; inset: 0; pointer-events: none;
-  background: repeating-linear-gradient(to right, rgba(7,10,18,.3) 0 1px, transparent 1px 8px),
-    repeating-linear-gradient(to bottom, rgba(7,10,18,.3) 0 1px, transparent 1px 8px);
+  background: repeating-linear-gradient(to right, rgba(7,10,18,.34) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(to bottom, rgba(7,10,18,.34) 0 1px, transparent 1px 8px);
 }
 .map-caption { font-family: var(--fm); font-size: 10px; color: var(--dim); }
-
-/* 세계지도 국가 리스트 */
-.country-list { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; align-content: start; }
-.country-row {
-  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
-  background: var(--panel2); border: none; min-height: 44px; text-align: left; cursor: pointer;
+.pixmap .lat { position: absolute; left: 0; width: 100%; pointer-events: none; background: rgba(124, 137, 163, 0.14); height: 1px; }
+.pixmap .lat.eq { height: 2px; background: rgba(124, 137, 163, 0.28); }
+.pixmap .meridian { position: absolute; top: 0; height: 100%; width: 1px; pointer-events: none; background: rgba(124, 137, 163, 0.14); }
+.lon-labels {
+  display: flex; justify-content: space-between; width: 100%;
+  font-family: var(--fm); font-size: 11px; color: var(--dim); margin-top: 8px;
 }
+/* 지도 위 콜아웃 (한국 하이라이트 등) */
+.callout { position: absolute; pointer-events: none; }
+.callout .frame { position: absolute; border: 4px solid var(--green2); }
+.callout .tick { position: absolute; height: 4px; }
+.callout .clabel { position: absolute; font-size: 13px; white-space: nowrap; text-shadow: 0 2px 0 var(--bg1); }
+
+/* 국가 리스트 (좌측 세로 1열) */
+.country-col { width: 264px; flex: none; display: flex; flex-direction: column; gap: 5px; }
+.country-row {
+  display: flex; align-items: center; gap: 10px; padding: 11px 12px;
+  background: var(--panel2); border: none; min-height: 52px; text-align: left; cursor: pointer;
+}
+.country-row.locked { background: #0D1420; }
 .country-row.sel { background: var(--sel); }
 .country-row .swatch { width: 14px; height: 14px; flex: none; }
-.country-row .cname { flex: 1; font-size: 13px; color: var(--text); }
+.country-row .cmain { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.country-row .cname { font-size: 13px; color: var(--text); }
 .country-row.locked .cname { color: var(--dim); }
+.country-row .cstages { font-family: var(--fm); font-size: 10px; color: var(--dim); }
 .country-row .cstat { font-size: 11px; }
 
 /* 지역(전선) 리스트 — 한국 상세 */
@@ -232,9 +268,8 @@ b.danger { color: var(--red2); }
 }
 .briefing .cta:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 var(--green-dk); }
 .briefing .cta:disabled { background: var(--head); color: var(--dim); box-shadow: none; opacity: 1; }
-.map-layout { display: flex; gap: 20px; align-items: stretch; }
-.map-layout > .side { width: 300px; flex: none; display: flex; flex-direction: column; gap: 12px; }
-.map-layout > .mid { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; justify-content: center; }
+.briefing.next-lock .cta:disabled { background: var(--head); border: 2px solid #B85C7A; color: #E8A0B4; }
+.mr-brief { width: 400px; flex: none; }
 
 /* 한국 지도 위 거점 마커 */
 .kmark { position: absolute; display: flex; align-items: center; gap: 8px; cursor: pointer; z-index: 2; }
@@ -475,8 +510,7 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 @media (max-width: 860px) {
   .chart-band { flex-direction: column; }
   .trade-panel { width: 100%; }
-  .map-layout { flex-direction: column; }
-  .map-layout > .side { width: 100%; }
+  .mr-cols { flex-direction: column; align-items: stretch; }
+  .country-col, .mr-brief { width: 100%; }
   .hp-overlay .track { width: 100px; }
-  .country-list { grid-template-columns: 1fr; }
 }

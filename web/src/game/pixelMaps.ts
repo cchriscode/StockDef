@@ -22,7 +22,7 @@ export interface Country {
 // 국가 메타 (목업 순서 유지 — MVP는 한국만 open)
 export const COUNTRIES: Country[] = [
   { key: 'k', name: '한국', en: 'KOREA', color: '#46A574', status: 'open', stages: 3, desc: '홈 그라운드. 개인 투자자의 전장.' },
-  { key: 'j', name: '일본', en: 'JAPAN', color: '#B85C7A', status: 'locked', stages: 6, desc: '저금리 장기전. 엔 캐리의 나라.' },
+  { key: 'j', name: '일본', en: 'JAPAN', color: '#B85C7A', status: 'next', stages: 6, desc: '저금리 장기전. 엔 캐리의 나라.' },
   { key: 'c', name: '중국', en: 'CHINA', color: '#B04A55', status: 'locked', stages: 11, desc: '국영 자본. 정책 한 줄에 시장이 뒤집힌다.' },
   { key: 'i', name: '인도', en: 'INDIA', color: '#3E8C8C', status: 'locked', stages: 9, desc: '신흥 성장. 젊고 거칠다.' },
   { key: 'e', name: '유럽', en: 'EUROPE', color: '#7A6BC4', status: 'locked', stages: 14, desc: '규제와 국채. 느리지만 무거운 전선.' },

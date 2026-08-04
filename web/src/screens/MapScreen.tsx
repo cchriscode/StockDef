@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MapRes, RegionId } from '@tf/shared';
 import { api, getSettings, saveSettings, type Settings } from '../net/api.js';
 import { COUNTRIES, KR_COLS, KR_ROWS, WORLD_COLS, WORLD_ROWS, krSegs, worldSegs } from '../game/pixelMaps.js';
 
-// FR-2 세계지도 — Dead Cat Bounce Flow 목업 03번: 세계지도 → 국가 진입 → 전선(스테이지) 목록 → 작전 개시
+// FR-2 세계지도 — 목업 03번: 전략 상황실 홀로그램 톤. 세계지도 → 한국 → 전선 목록 → 작전 개시
 interface Props {
   onEnterStage: (regionId: RegionId) => void;
   onCompany: () => void;
@@ -12,14 +12,33 @@ interface Props {
   onTitle: () => void;
 }
 
-const WORLD_CELL = 5;
-const KR_CELL = 6;
+const WORLD_CELL = 8; // 목업 원본 스케일 (144×57 셀 = 1152×456)
+const KR_CELL = 8;    // 41×74 셀 = 328×592
+const WORLD_W = WORLD_COLS * WORLD_CELL;
+const WORLD_H = WORLD_ROWS * WORLD_CELL;
 // 한반도 지도 위 거점 좌표 (KR_CELL 기준 px)
 const KR_MARKS: Record<string, { x: number; y: number }> = {
-  R1: { x: 84, y: 108 },
-  R2: { x: 100, y: 132 },
-  R3: { x: 160, y: 278 },
+  R1: { x: 118, y: 148 },
+  R2: { x: 134, y: 176 },
+  R3: { x: 218, y: 378 },
 };
+
+const STATUS_LABEL = { open: '진행 중', next: '해금', locked: '잠김' } as const;
+const STATUS_COLOR = { open: '#7BD8A0', next: '#FF9E86', locked: '#4E5B72' } as const;
+
+/** 중앙 컬럼 폭에 맞춰 고정 크기 지도를 축소 (상황실 레이아웃 유지) */
+function useFitScale(natural: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setScale(Math.min(1, el.clientWidth / natural)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [natural]);
+  return { ref, scale };
+}
 
 export function MapScreen({ onEnterStage, onCompany, onCodex, onTutorial, onTitle }: Props) {
   const [map, setMap] = useState<MapRes | null>(null);
@@ -29,6 +48,7 @@ export function MapScreen({ onEnterStage, onCompany, onCodex, onTutorial, onTitl
   const [notice, setNotice] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState<Settings>(getSettings());
+  const { ref: midRef, scale } = useFitScale(WORLD_W + 8);
 
   useEffect(() => {
     api.map().then(setMap).catch((e) => setNotice(String(e.message)));
@@ -68,14 +88,14 @@ export function MapScreen({ onEnterStage, onCompany, onCodex, onTutorial, onTitl
   };
 
   return (
-    <div className="screen map">
-      <header className="map-head">
+    <div className="map-room">
+      <header className="mr-head">
         <div>
           <h1>{view === 'world' ? '세계지도' : '전선 선택'}</h1>
           <div className="sub">{view === 'world' ? 'GLOBAL THEATER · 10 REGIONS' : 'CHAPTER 1 — 국내 시장'}</div>
         </div>
         {/* FR-2.5 상시 표시 */}
-        <div className="map-stats">
+        <div className="map-stats mono">
           <span>자본금 <b className="gold">{map.capital.toLocaleString()}</b></span>
           <span>점령 <b>{map.capturedCount}/3</b></span>
           <span>운영비 <b>{map.upkeepTotal} G</b></span>
@@ -84,70 +104,95 @@ export function MapScreen({ onEnterStage, onCompany, onCodex, onTutorial, onTitl
       </header>
 
       {view === 'world' ? (
-        <>
-          <div className="mid" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <div className="pixmap" style={{ width: WORLD_COLS * WORLD_CELL, height: WORLD_ROWS * WORLD_CELL, maxWidth: '100%' }}>
-              {wSegs.map((s, i) => {
-                const c = COUNTRIES.find((cc) => cc.key === s.k)!;
-                const opacity = c.status === 'open' ? 1 : c.status === 'next' ? 0.85 : 0.36;
-                return (
-                  <div
-                    key={i}
-                    className="cell"
-                    style={{ left: s.x, top: s.y, width: s.w, height: s.h, background: c.color, opacity, cursor: 'pointer' }}
-                    onClick={() => pickCountry(s.k)}
-                  />
-                );
-              })}
-              <div className="grid-overlay" />
-              {/* 한국 하이라이트 프레임 */}
-              <div style={{ position: 'absolute', left: 121 * WORLD_CELL - 14, top: 18 * WORLD_CELL - 14, width: 40, height: 40, border: '3px solid #7BD8A0', pointerEvents: 'none' }} />
-            </div>
-            <div className="map-caption">EQUIRECTANGULAR · 2.5° / CELL</div>
+        <div className="mr-cols">
+          <div className="country-col">
+            {COUNTRIES.map((c) => (
+              <button
+                key={c.key}
+                className={`country-row ${c.status === 'locked' ? 'locked' : ''} ${selCountry === c.key ? 'sel' : ''}`}
+                style={selCountry === c.key ? { boxShadow: `0 0 0 2px ${c.color}` } : undefined}
+                onClick={() => pickCountry(c.key)}
+              >
+                <span className="swatch" style={{ background: c.color }} />
+                <span className="cmain">
+                  <span className="cname">{c.name}</span>
+                  <span className="cstages">{c.stages} STAGES</span>
+                </span>
+                <span className="cstat" style={{ color: STATUS_COLOR[c.status] }}>{STATUS_LABEL[c.status]}</span>
+              </button>
+            ))}
           </div>
 
-          <div className="map-layout">
-            <div className="side country-list" style={{ width: 440, flex: 'none' }}>
-              {COUNTRIES.map((c) => (
-                <button
-                  key={c.key}
-                  className={`country-row ${c.status === 'locked' ? 'locked' : ''} ${selCountry === c.key ? 'sel' : ''}`}
-                  style={selCountry === c.key ? { boxShadow: `0 0 0 2px ${c.color}` } : undefined}
-                  onClick={() => pickCountry(c.key)}
-                >
-                  <span className="swatch" style={{ background: c.color }} />
-                  <span className="cname">{c.name}</span>
-                  <span className="cstat" style={{ color: c.status === 'open' ? '#7BD8A0' : '#4E5B72' }}>
-                    {c.status === 'open' ? '진행 중' : '잠김'}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <div className="briefing" style={{ flex: 1 }}>
-              <div className="bhead"><span>REGION</span><span style={{ color: country.color }}>{country.en}</span></div>
-              <div className="bbody">
-                <div className="bname" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ width: 22, height: 22, background: country.color, display: 'inline-block' }} />
-                  {country.name}
+          <div className="mr-mid" ref={midRef}>
+            <div className="mr-glow" />
+            <div style={{ width: WORLD_W * scale, height: (WORLD_H + 46) * scale }}>
+              <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: WORLD_W }}>
+                <div className="map-caption" style={{ marginBottom: 6 }}>EQUIRECTANGULAR · 2.5° / CELL · 8px</div>
+                <div className="pixmap" style={{ width: WORLD_W, height: WORLD_H }}>
+                  {wSegs.map((s, i) => {
+                    const c = COUNTRIES.find((cc) => cc.key === s.k)!;
+                    const opacity = c.status === 'open' ? 1 : c.status === 'next' ? 0.85 : 0.36;
+                    return (
+                      <div
+                        key={i}
+                        className="cell"
+                        style={{ left: s.x, top: s.y, width: s.w, height: s.h, background: c.color, opacity, cursor: 'pointer' }}
+                        onClick={() => pickCountry(s.k)}
+                      />
+                    );
+                  })}
+                  <div className="grid-overlay" />
+                  {/* 위선·경선 (목업 장식) */}
+                  <div className="lat eq" style={{ top: 268 }} />
+                  <div className="lat" style={{ top: 188 }} />
+                  <div className="lat" style={{ top: 348 }} />
+                  <div className="meridian" style={{ left: 576 }} />
+                  {/* 한국 하이라이트 + 콜아웃 */}
+                  <div className="callout">
+                    <div className="frame" style={{ left: 956, top: 124, width: 56, height: 56 }} />
+                    <div className="tick" style={{ left: 1012, top: 150, width: 48, background: '#7BD8A0' }} />
+                    <div className="clabel" style={{ left: 1066, top: 141, color: '#7BD8A0' }}>한국 · 진행 중</div>
+                    <div className="tick" style={{ left: 1040, top: 202, width: 24, background: '#B85C7A' }} />
+                    <div className="clabel" style={{ left: 1070, top: 193, color: '#E8A0B4' }}>일본 · 해금</div>
+                  </div>
+                  {/* 한국 클릭 히트박스 (셀이 작아 프레임 영역 전체를 클릭 가능하게) */}
+                  <div
+                    style={{ position: 'absolute', left: 956, top: 124, width: 56, height: 56, cursor: 'pointer', background: 'rgba(255,255,255,0.02)' }}
+                    onClick={() => pickCountry('k')}
+                  />
                 </div>
-                <div className="bdesc">{country.desc}</div>
-                <div className="bline" />
-                <div className="bstat"><span>스테이지</span><span>{country.key === 'k' ? `${regions.length} 전선` : `${country.stages} 스테이지`}</span></div>
-                <div className="bstat"><span>상태</span><span>{country.status === 'open' ? '진행 중' : '잠김'}</span></div>
-                <button
-                  className="cta"
-                  disabled={country.status !== 'open'}
-                  onClick={() => country.status === 'open' && setView('kr')}
-                >
-                  {country.status === 'open' ? '진 입' : '해금 조건 미충족'}
-                </button>
+                <div className="lon-labels">
+                  <span>180°W</span><span>90°W</span><span>0°</span><span>90°E</span><span>180°E</span>
+                </div>
               </div>
             </div>
           </div>
-        </>
+
+          <div className={`briefing mr-brief ${country.status === 'next' ? 'next-lock' : ''}`}>
+            <div className="bhead"><span>REGION</span><span style={{ color: country.color }}>{country.en}</span></div>
+            <div className="bbody">
+              <div className="bname" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ width: 26, height: 26, background: country.color, display: 'inline-block' }} />
+                {country.name}
+              </div>
+              <div className="bdesc">{country.desc}</div>
+              <div className="bline" />
+              <div className="bstat"><span>스테이지</span><span>{country.key === 'k' ? `${regions.length} 스테이지` : `${country.stages} 스테이지`}</span></div>
+              <div className="bstat"><span>지도 톤</span><span className="dim">홀로그램 · 상황실</span></div>
+              <div className="bstat"><span>셀 그리드</span><span className="dim">8px · {WORLD_COLS}×{WORLD_ROWS}</span></div>
+              <button
+                className="cta"
+                disabled={country.status !== 'open'}
+                onClick={() => country.status === 'open' && setView('kr')}
+              >
+                {country.status === 'open' ? '진 입' : country.status === 'next' ? '한국 점령 후 해금' : '해금 조건 미충족'}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : (
-        <div className="map-layout">
-          <div className="side">
+        <div className="mr-cols">
+          <div className="country-col" style={{ width: 300 }}>
             <div className="front-list">
               <button
                 className={`front-row ${map.tutorialDone ? 'captured' : 'open'}`}
@@ -171,17 +216,20 @@ export function MapScreen({ onEnterStage, onCompany, onCodex, onTutorial, onTitl
                 </button>
               ))}
             </div>
-            <button className="ghost" onClick={() => setView('world')}>← 세계지도</button>
+            <button className="ghost" style={{ marginTop: 12 }} onClick={() => setView('world')}>← 세계지도</button>
           </div>
 
-          <div className="mid">
+          <div className="mr-mid">
+            <div className="mr-glow" />
             <div className="pixmap" style={{ width: KR_COLS * KR_CELL, height: KR_ROWS * KR_CELL }}>
               {kSegs.map((s, i) => (
                 <div key={i} className="cell" style={{ left: s.x, top: s.y, width: s.w, height: s.h, background: s.y < 38 * KR_CELL ? '#1C3140' : '#22394A' }} />
               ))}
               <div className="grid-overlay" />
+              {/* DMZ 점선 (목업 장식) */}
+              <div style={{ position: 'absolute', left: 32, top: 302, width: 216, height: 4, background: 'repeating-linear-gradient(to right, #7C89A3 0 8px, transparent 8px 16px)', opacity: 0.5, pointerEvents: 'none' }} />
               {regions.map((r, i) => {
-                const pos = KR_MARKS[`R${i + 1}`] ?? { x: 100, y: 150 + i * 60 };
+                const pos = KR_MARKS[`R${i + 1}`] ?? { x: 120, y: 180 + i * 70 };
                 return (
                   <div
                     key={r.regionId}
@@ -195,10 +243,10 @@ export function MapScreen({ onEnterStage, onCompany, onCodex, onTutorial, onTitl
                 );
               })}
             </div>
-            <div className="map-caption">KOREAN PENINSULA · 0.14° / CELL · DMZ 38°N</div>
+            <div className="map-caption" style={{ marginTop: 8 }}>KOREAN PENINSULA · 0.14° / CELL · 8px · DMZ 38°N</div>
           </div>
 
-          <div className="side">
+          <div className="mr-brief" style={{ display: 'flex' }}>
             {sel && (
               <div className="briefing" style={{ flex: 1 }}>
                 <div className="bhead">
