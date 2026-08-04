@@ -23,6 +23,49 @@ const ENEMY_SPRITE: Record<Enemy['type'], string> = {
 };
 const sprCache = new Map<string, HTMLImageElement>();
 
+// ─── 공격·피격 이펙트 오버레이 (시트 11종 × 3프레임, 유닛 위 별도 레이어) ───
+const FX_FRAME_DUR = 0.09; // 프레임당 초 (배틀 시계 기준)
+const FX_TOTAL = FX_FRAME_DUR * 3;
+
+interface FxAnim { name: string; x: number; y: number; t0: number; size: number }
+interface RenderFxState {
+  anims: FxAnim[];
+  lastFxT: number; // 엔진 fx 이벤트 처리 커서
+  prevProj: Map<number, { x: number; air: boolean; fromTower: boolean }>;
+}
+const fxStates = new WeakMap<Battle, RenderFxState>();
+
+function fxStateOf(b: Battle): RenderFxState {
+  let st = fxStates.get(b);
+  if (!st) {
+    st = { anims: [], lastFxT: 0, prevProj: new Map() };
+    fxStates.set(b, st);
+  }
+  return st;
+}
+
+function pushAnim(st: RenderFxState, name: string, x: number, y: number, size: number, t: number) {
+  st.anims.push({ name, x, y, t0: t, size });
+  if (st.anims.length > 60) st.anims.splice(0, st.anims.length - 60);
+}
+
+/** 진행 중 애니메이션 프레임 이미지 (0~2), 만료 시 null */
+function fxFrame(name: string, elapsed: number): HTMLImageElement | null {
+  if (elapsed < 0 || elapsed >= FX_TOTAL) return null;
+  return spr(`${name}_${Math.min(Math.floor(elapsed / FX_FRAME_DUR), 2) + 1}`);
+}
+
+/** 주기 루프 연출 (교전 검격·헤지 오라 등): period마다 3프레임 재생 */
+function drawCycleFx(ctx: CanvasRenderingContext2D, name: string, x: number, y: number, size: number, t: number, period: number, phase: number) {
+  const local = (t + phase) % period;
+  const img = fxFrame(name, local);
+  if (img) ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
+}
+
+function unitEngaged(b: Battle, x: number): boolean {
+  return b.enemies.some((e) => !e.air && e.x - x >= -6 && e.x - x <= 30);
+}
+
 function spr(name: string): HTMLImageElement | null {
   let img = sprCache.get(name);
   if (!img) {
@@ -115,6 +158,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   const W = canvas.width;
   const H = canvas.height;
   const sx = (x: number) => (x / 1000) * W;
+  const st = fxStateOf(b);
   ctx.save();
   if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
   ctx.clearRect(-8, -8, W + 16, H + 16);
@@ -211,7 +255,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     }
   }
 
-  // 유닛 — 컨셉 시트 스프라이트 (IDLE/WALK 교대 + 사격 직후 ATK)
+  // 유닛 — 컨셉 시트 스프라이트 (IDLE/WALK 교대 + 사격 직후 ATK) + 직군별 이펙트
   const walkFrame = Math.floor(b.t * 4) % 2 === 0;
   for (const u of b.units) {
     const ux = sx(u.x);
@@ -226,6 +270,17 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.beginPath();
       ctx.arc(ux, groundTop - 10, 8, 0, Math.PI * 2);
       ctx.fill();
+    }
+    const midY = groundTop - hh * 0.55;
+    if ((u.key === 'trader' || u.key === 'intern') && u.shotCd > 0) { // 근접 검격 (발사 후 경과로 프레임)
+      const fimg = fxFrame('fx_slash', 0.8 - u.shotCd);
+      if (fimg) ctx.drawImage(fimg, ux + 6, midY - 16, 32, 32);
+    }
+    if (u.key === 'intern' && unitEngaged(b, u.x)) { // 탱커 방어 임팩트 (피격 중)
+      drawCycleFx(ctx, 'fx_guard', ux, midY, 30, b.t, 1.3, u.id * 0.31);
+    }
+    if (u.key === 'riskmgr') { // 헤지 오라 펄스
+      drawCycleFx(ctx, 'fx_hedge', ux, groundTop - hh - 16, 28, b.t, 2.4, u.id * 0.5);
     }
     hpBar(ctx, ux - 9, groundTop - hh - 8, 18, u.hp / u.maxHp, '#7BD8A0');
   }
@@ -255,6 +310,10 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.arc(ex, e.air ? AIR_Y : groundTop - e.size, e.size, 0, Math.PI * 2);
       ctx.fill();
     }
+    if (engaged && !stunned) { // 적 근접 타격 이펙트 (중장갑·보스는 충격파)
+      const fxName = e.type === 'tank' || e.type === 'boss' ? 'fx_shock' : 'fx_slash_foe';
+      drawCycleFx(ctx, fxName, ex - 24, groundTop - hh * 0.5, e.type === 'boss' ? 40 : 30, b.t, 1.1, e.id * 0.37);
+    }
     if (stunned) {
       ctx.fillStyle = '#FFC53D';
       ctx.font = '10px sans-serif';
@@ -265,14 +324,43 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     hpBar(ctx, ex - bw / 2, topY - 7, bw, e.hp / e.maxHp, col);
   }
 
-  // 투사체 (마법=보라, 물리=밝은 점)
+  // 투사체 — 타워=레일 트레이서 / 애널리스트=지표 오브 (프레임 순환)
+  const liveProj = new Set<number>();
   for (const p of b.projectiles) {
-    const y = (p.air ? AIR_Y : GROUND_Y) - (p.fromTower ? 14 : 4);
-    ctx.fillStyle = p.dmgType === 'magic' ? '#C4A8FF' : '#FFE9C4';
-    ctx.beginPath();
-    ctx.arc(sx(p.x), y + Math.sin(p.x * 0.15) * 2, p.splashRadius > 0 ? 4 : 2.5, 0, Math.PI * 2);
-    ctx.fill();
+    liveProj.add(p.id);
+    const y = (p.air ? AIR_Y : GROUND_Y) - (p.fromTower ? 14 : 4) + Math.sin(p.x * 0.15) * 2;
+    const name = p.fromTower ? 'fx_rail' : 'fx_orb';
+    const img = spr(`${name}_${(Math.floor(b.t / FX_FRAME_DUR) + p.id) % 3 + 1}`);
+    if (img) {
+      const size = p.fromTower ? 26 : 20;
+      ctx.drawImage(img, sx(p.x) - size / 2, y - size / 2, size, size);
+    } else {
+      ctx.fillStyle = p.dmgType === 'magic' ? '#C4A8FF' : '#FFE9C4';
+      ctx.beginPath();
+      ctx.arc(sx(p.x), y, p.splashRadius > 0 ? 4 : 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    st.prevProj.set(p.id, { x: p.x, air: p.air, fromTower: p.fromTower });
   }
+  // 소멸한 애널리스트 투사체 → 광역 리포트 착탄 연출
+  for (const [id, info] of st.prevProj) {
+    if (liveProj.has(id)) continue;
+    st.prevProj.delete(id);
+    if (!info.fromTower) {
+      pushAnim(st, 'fx_report', info.x, info.air ? AIR_Y : GROUND_Y - 12, 34, b.t);
+    }
+  }
+
+  // 엔진 fx 이벤트 → 오버레이 애니메이션 (피격 스파크 / 배당 획득)
+  for (const f of b.fx) {
+    if (f.t <= st.lastFxT) continue;
+    if (f.kind === 'dmg' && f.amount > 0) {
+      pushAnim(st, 'fx_spark', f.x, (f.air ? AIR_Y : GROUND_Y) - 14, 22, f.t);
+    } else if (f.kind === 'gold' && f.amount > 0) {
+      pushAnim(st, 'fx_dividend', f.x, GROUND_Y - 40, 30, f.t);
+    }
+  }
+  st.lastFxT = b.t;
 
   // 이펙트: 데미지 숫자 · 사망 · 힐 · 스킬
   ctx.textAlign = 'center';
@@ -309,6 +397,14 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     }
     ctx.globalAlpha = 1;
   }
+
+  // 오버레이 이펙트 애니메이션 재생 (피격 스파크·광역 리포트·배당 획득 — 최상단 레이어)
+  st.anims = st.anims.filter((a) => {
+    const img = fxFrame(a.name, b.t - a.t0);
+    if (!img) return b.t - a.t0 < 0; // 만료 제거
+    ctx.drawImage(img, sx(a.x) - a.size / 2, a.y - a.size / 2, a.size, a.size);
+    return true;
+  });
   ctx.restore();
 }
 

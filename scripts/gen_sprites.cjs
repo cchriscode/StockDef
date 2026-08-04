@@ -55,11 +55,16 @@ function saveAll(bundleFile, names) {
 }
 
 const poses4 = (k, last) => [`${k}_idle`, `${k}_walk`, `${k}_atk`, `${k}_${last}`];
+const fx3 = (k) => [`${k}_1`, `${k}_2`, `${k}_3`];
 const UNIT_NAMES = [
   ...poses4('scalper', 'hit'), ...poses4('analyst', 'hit'), ...poses4('holder', 'hit'), ...poses4('riskmgr', 'hit'),
   'limit_idle', 'limit_active', 'dividend_idle', 'dividend_active', 'barrier_idle', 'barrier_active',
   ...poses4('broker', 'down'), ...poses4('algobot', 'down'), ...poses4('golem', 'down'),
   ...poses4('bureaucrat', 'down'), ...poses4('ronin', 'down'), ...poses4('giant', 'down'),
+  // 공격·피격 이펙트 11종 × 3프레임 (64×64 오버레이 — 시트 하단 섹션 순서)
+  ...fx3('fx_slash'), ...fx3('fx_slash_foe'), ...fx3('fx_orb'), ...fx3('fx_report'),
+  ...fx3('fx_hedge'), ...fx3('fx_guard'), ...fx3('fx_bolt'), ...fx3('fx_shock'),
+  ...fx3('fx_rail'), ...fx3('fx_spark'), ...fx3('fx_dividend'),
 ];
 const BASE_NAMES = ['hq_100', 'hq_59', 'hq_24', 'foe_100', 'foe_59', 'foe_24'];
 
