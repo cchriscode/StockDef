@@ -186,8 +186,9 @@ b.danger { color: var(--red2); }
 .map-stats { display: flex; gap: 14px; font-size: 12px; flex-wrap: wrap; color: var(--mut); }
 .map-stats b { color: var(--text); }
 .map-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.mr-cols { display: flex; gap: 16px; align-items: flex-start; flex: 1; }
-.mr-mid { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; align-items: center; }
+.mr-cols { display: flex; gap: 16px; align-items: stretch; flex: 1; }
+.mr-cols > .country-col, .mr-cols > .mr-brief { align-self: flex-start; } /* 패널은 상단 고정 */
+.mr-mid { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; } /* 지도는 세로 중앙 */
 .mr-glow {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: 800px; height: 800px; max-width: 100%; pointer-events: none;
