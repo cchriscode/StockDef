@@ -166,8 +166,9 @@ router.post('/stage/finish', (req, res) => {
   const cleared = hpLeft > 0;
 
   // 클리어 주장인데 시간이 안 됐으면 무효 (시간 조작 방지).
-  // FR-6.10 조기 승리(적 본진 파괴)는 예외적으로 이르게 끝날 수 있으나, 최소 25%는 지나야 물리적으로 가능하다.
-  if (cleared && elapsed < stageMs * (enemyBaseDestroyed ? 0.25 : 0.95)) {
+  // FR-6.10 조기 승리(적 본진 파괴)는 러시로 매우 이르게 끝날 수 있다 — 실측상 스테이지의 ~24%도 가능.
+  // 최소 10%(웨이브 1~2 진행분)만 요구해 즉시 클리어 조작만 차단한다.
+  if (cleared && elapsed < stageMs * (enemyBaseDestroyed ? 0.1 : 0.95)) {
     db.prepare("UPDATE stage_sessions SET status = 'abandoned', ended_at = datetime('now') WHERE id = ?").run(sessionId);
     dropLive(sessionId);
     return res.json({ status: 'invalid', grade: null, accuracy: 0, goldLeftRate: 0, capitalAwarded: 0, eligibleLines: [], alreadyOwnedLines: [], isRetry: !!row.is_retry, capitalTotal: accountRow(accountId).capital } satisfies FinishRes);
@@ -255,12 +256,12 @@ router.get('/stage/:id/reveal', (req, res) => {
   const positions = db.prepare(
     'SELECT seq, direction, stake, open_bar_idx, close_bar_idx, outcome, payout FROM positions WHERE session_id = ? ORDER BY seq',
   ).all(row.id) as { seq: number; direction: string; stake: number; open_bar_idx: number; close_bar_idx: number; outcome: string; payout: number }[];
-  const ohlcv = JSON.parse(cs.ohlcv_day) as { around: unknown[]; dayIndex: number };
+  const ohlcv = JSON.parse(cs.ohlcv_day) as { around: unknown[]; dayIndex: number; windowLen?: number; dateStart?: string };
   res.json({
-    ticker: cs.ticker, companyName: cs.company_name, tradeDate: cs.trade_date,
+    ticker: cs.ticker, companyName: cs.company_name, tradeDate: cs.trade_date, tradeStart: ohlcv.dateStart,
     sector: cs.sector, dayChangePct: cs.day_change_pct, rarity: cs.rarity,
     news: JSON.parse(cs.news),
-    dailyAround: ohlcv.around, dayIndex: ohlcv.dayIndex,
+    dailyAround: ohlcv.around, dayIndex: ohlcv.dayIndex, windowLen: ohlcv.windowLen ?? 0,
     positions: positions.map((p) => ({
       seq: p.seq, direction: p.direction, stake: p.stake,
       openBarIdx: p.open_bar_idx, closeBarIdx: p.close_bar_idx, outcome: p.outcome, payout: p.payout,

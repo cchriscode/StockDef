@@ -367,9 +367,9 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
       <div className="stage-top">
         <span className="tags">{tags.region} · {tags.sector} · {tags.capTier === 'large' ? '대형주' : '중형주'} · ???</span>
         <div className="clockbar">
-          <span>09:00</span>
+          <span>D+0</span>
           <div className="track"><div className="fill" style={{ width: `${progress * 100}%` }} /></div>
-          <span>15:30</span>
+          <span>D+{hud.barCount}</span>
           <b>{clockLabel(hud.barF, hud.barCount)}</b>
         </div>
         <button className="ghost small" onClick={() => (isTut ? onSkipTutorial() : confirm('이탈하면 패배 처리됩니다 (FR-6.11)') && finishStage(true))}>
@@ -530,8 +530,8 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         <div className="guide">
           {guide === 0 && (
             <>
-              <p>📈 위 차트는 <b>실제 과거 거래일</b>의 1분봉입니다. 어느 회사의 어느 날인지는 숨겨져 있습니다.<br />
-                Y축은 당일 시가 대비 %입니다. 차트가 오를 것 같으면 LONG, 내릴 것 같으면 SHORT.</p>
+              <p>📈 차트는 <b>일봉</b>입니다 — 1봉 = 1거래일, 1초에 하루씩 흐릅니다. 실전에서는 실제 과거 장세가 나오며 어느 회사의 어느 시기인지는 숨겨져 있습니다.<br />
+                Y축은 시작 시점 대비 %입니다. 오를 것 같으면 LONG, 내릴 것 같으면 SHORT.</p>
               <button onClick={() => setGuide(1)}>다음</button>
             </>
           )}

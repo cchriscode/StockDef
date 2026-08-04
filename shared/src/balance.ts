@@ -6,7 +6,7 @@ export const BALANCE = {
   PAYOUT_BASE: 0.9, // B: 상방 계수 (전 지역 고정)
   // L: 지역별 하방 계수 (난이도 노브). 실데이터 30봉 |g| 분포로 손익분기 승률을
   // R1 40.5% / R2 45.4% / R3 50.2%에 맞춰 역산 — 재계산: npx tsx server/scripts/calibrate_pnl.ts
-  LOSS_RATE: { R1: 0.7, R2: 1.0, R3: 1.7, TUT: 0.5 } as Record<RegionId, number>,
+  LOSS_RATE: { R1: 0.7, R2: 1.05, R3: 1.7, TUT: 0.5 } as Record<RegionId, number>,
   MAX_LOSS_RATE: 0.95, // 포지션당 최대 손실 (stake 대비) — 하방 클램프
   DRAW_BAND: 0.25, // |g| < 0.25 → 통계상 DRAW (손익은 연속)
   Z_CAP: 3.0, // 정규화 수익 g의 상방 클램프 → 최대 배당 1 + B×3

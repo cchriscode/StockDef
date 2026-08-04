@@ -10,6 +10,11 @@ if (!fs.existsSync(setsPath)) {
 }
 const sets = JSON.parse(fs.readFileSync(setsPath, 'utf-8')) as Record<string, unknown>[];
 
+// 데이터셋 교체 시드: 차트를 FK로 참조하는 플레이 기록(포지션·세션·도감)을 함께 정리한다.
+// 계정 자본금·부서·점령 상태(accounts/territories)는 유지된다.
+db.prepare('DELETE FROM positions').run();
+db.prepare('DELETE FROM codex_entries').run();
+db.prepare('DELETE FROM stage_sessions').run();
 db.prepare('DELETE FROM chart_sets').run();
 const ins = db.prepare(`
   INSERT INTO chart_sets (id, ticker, company_name, trade_date, market, sector, cap_tier, region_id,

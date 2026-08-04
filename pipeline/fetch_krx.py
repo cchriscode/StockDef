@@ -1,19 +1,23 @@
 # -*- coding: utf-8 -*-
 """
 TICKER FRONT 데이터 파이프라인 ① 수집 (PRD §10)
-yfinance로 국내 주식 30종목의 최근 30일 1분봉 + 1년 일봉을 수집해
+yfinance로 국내 주식 30종목의 최근 10년 일봉을 수집해
 pipeline/out/raw/{symbol}.json 으로 저장한다. 네트워크는 이 스크립트만 사용한다.
+
+(2026-08-04 개정: 1분봉 → 일봉. 게임은 1일봉 = 1초로 리플레이하므로
+ 스테이지 하나 = 390거래일(약 1년 7개월)의 실제 장세가 된다. 야후 일봉은
+ 수십 년치가 무료라 30일 제약이 사라지고 역사적 장세가 전부 풀에 들어온다.)
 """
 import json
-import sys
 import time
-from datetime import date, timedelta
 from pathlib import Path
 
 import yfinance as yf
 
 OUT = Path(__file__).parent / "out" / "raw"
 OUT.mkdir(parents=True, exist_ok=True)
+
+DAILY_PERIOD = "10y"
 
 # 지역별 10종목 (PRD FR-2.1 섹터 매핑)
 TICKERS = {
@@ -38,53 +42,25 @@ TICKERS = {
 }
 
 
-def fetch_1m(symbol: str):
-    """야후 1m 제한(요청당 7일, 총 30일)에 맞춰 7일 단위 5회로 나눠 수집."""
-    bars = []
-    today = date.today()
-    for back in range(4, -1, -1):
-        end = today - timedelta(days=back * 7 - 1)
-        start = end - timedelta(days=7)
-        if (today - start).days > 29:
-            start = today - timedelta(days=29)
-        if start >= end:
-            continue
-        for attempt in range(3):
-            try:
-                df = yf.Ticker(symbol).history(start=str(start), end=str(end), interval="1m")
-                break
-            except Exception as e:
-                print(f"    retry {attempt+1} {symbol} {start}~{end}: {e}", flush=True)
-                time.sleep(2 * (attempt + 1))
-        else:
-            continue
-        for ts, row in df.iterrows():
-            bars.append({
-                "ts": ts.isoformat(),
+def fetch_daily(symbol: str):
+    for attempt in range(3):
+        try:
+            df = yf.Ticker(symbol).history(period=DAILY_PERIOD, interval="1d")
+            break
+        except Exception as e:
+            print(f"    retry {attempt+1} {symbol}: {e}", flush=True)
+            time.sleep(2 * (attempt + 1))
+    else:
+        return []
+    out = []
+    for ts, row in df.iterrows():
+        if row["Close"] > 0 and row["Open"] > 0:
+            out.append({
+                "d": str(ts.date()),
                 "o": float(row["Open"]), "h": float(row["High"]),
                 "l": float(row["Low"]), "c": float(row["Close"]),
                 "v": float(row["Volume"]),
             })
-        time.sleep(0.4)
-    # 중복 제거(청크 경계) + 정렬
-    seen, uniq = set(), []
-    for b in sorted(bars, key=lambda x: x["ts"]):
-        if b["ts"] not in seen:
-            seen.add(b["ts"])
-            uniq.append(b)
-    return uniq
-
-
-def fetch_daily(symbol: str):
-    df = yf.Ticker(symbol).history(period="1y", interval="1d")
-    out = []
-    for ts, row in df.iterrows():
-        out.append({
-            "d": str(ts.date()),
-            "o": float(row["Open"]), "h": float(row["High"]),
-            "l": float(row["Low"]), "c": float(row["Close"]),
-            "v": float(row["Volume"]),
-        })
     return out
 
 
@@ -100,15 +76,14 @@ def main():
                 continue
             print(f"[{n}/{total}] {symbol} {name} ({region}) 수집 중...", flush=True)
             try:
-                m1 = fetch_1m(symbol)
                 daily = fetch_daily(symbol)
-                if len(m1) < 1000:
-                    print(f"    경고: 1분봉 {len(m1)}개뿐 — 저장은 하되 build에서 QC", flush=True)
+                if len(daily) < 500:
+                    print(f"    경고: 일봉 {len(daily)}개뿐 — 저장은 하되 build에서 QC", flush=True)
                 out_file.write_text(json.dumps({
                     "symbol": symbol, "name": name, "region": region,
-                    "market": "KRX", "bars1m": m1, "daily": daily,
+                    "market": "KRX", "daily": daily,
                 }, ensure_ascii=False), encoding="utf-8")
-                print(f"    완료: 1분봉 {len(m1)}개, 일봉 {len(daily)}개", flush=True)
+                print(f"    완료: 일봉 {len(daily)}개", flush=True)
             except Exception as e:
                 print(f"    실패: {e}", flush=True)
             time.sleep(0.6)

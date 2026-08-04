@@ -56,12 +56,13 @@ export function RevealScreen({ sessionId, finish, regionId, onDone }: Props) {
     }
   }, [step]);
 
-  // 2단계: 종목명+날짜 타이핑 연출
+  // 2단계: 종목명+기간 타이핑 연출 (일봉 윈도우: 시작~종료)
   useEffect(() => {
     if (!data || step !== 1) return;
-    const d = new Date(data.tradeDate + 'T00:00:00');
-    const days = ['일', '월', '화', '수', '목', '금', '토'];
-    const full = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]}) · ${data.companyName}`;
+    const fmt = (s: string) => s.replaceAll('-', '.');
+    const full = data.tradeStart
+      ? `${fmt(data.tradeStart)} ~ ${fmt(data.tradeDate)} · ${data.companyName}`
+      : `${fmt(data.tradeDate)} · ${data.companyName}`;
     let i = 0;
     const t = setInterval(() => {
       i += 1;
@@ -94,16 +95,18 @@ export function RevealScreen({ sessionId, finish, regionId, onDone }: Props) {
       ctx.beginPath(); ctx.moveTo(cx, y(b.h)); ctx.lineTo(cx, y(b.l)); ctx.stroke();
       ctx.fillRect(cx - bw * 0.3, y(Math.max(b.o, b.c)), bw * 0.6, Math.max(Math.abs(y(b.o) - y(b.c)), 1));
     });
-    // 플레이한 날 하이라이트
+    // 플레이한 구간 하이라이트 (일봉 윈도우 — windowLen 만큼의 범위)
+    const span = Math.max(data.windowLen ?? 1, 1);
     const dx = data.dayIndex * bw;
+    const dw = Math.min(span * bw, cv.width - dx);
     ctx.strokeStyle = '#FFC53D';
     ctx.lineWidth = 2;
-    ctx.strokeRect(dx, 4, bw, cv.height - 8);
+    ctx.strokeRect(dx, 4, dw, cv.height - 8);
     ctx.lineWidth = 1;
     ctx.fillStyle = '#FFC53D';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('이 날', Math.min(Math.max(dx + bw / 2, 14), cv.width - 14), 14);
+    ctx.fillText('이 구간', Math.min(Math.max(dx + dw / 2, 22), cv.width - 22), 14);
   }, [data, step]);
 
   // 4단계: 포지션 마커 (○ WIN / ✕ LOSE / − DRAW)
@@ -118,8 +121,8 @@ export function RevealScreen({ sessionId, finish, regionId, onDone }: Props) {
     ctx.textAlign = 'center';
     const bx = (bar: number) => (bar / 390) * (cv.width - 20) + 10;
     ctx.fillStyle = '#4E5B72';
-    ctx.fillText('09:00', 24, cv.height - 6);
-    ctx.fillText('15:30', cv.width - 26, cv.height - 6);
+    ctx.fillText('D+0', 24, cv.height - 6);
+    ctx.fillText('D+390', cv.width - 30, cv.height - 6);
     data.positions.forEach((p) => {
       const x = bx(p.openBarIdx);
       const col = p.outcome === 'win' ? '#7BD8A0' : p.outcome === 'lose' ? '#FF9E86' : '#7C89A3';
@@ -191,14 +194,14 @@ export function RevealScreen({ sessionId, finish, regionId, onDone }: Props) {
 
       <div className="disclosure-card">
         <div className="dhead">
-          <span>{step >= 1 ? data.tradeDate : '????.??.??'} · KRX</span>
-          <span>장 마감 공시</span>
+          <span>{step >= 1 ? `${data.tradeStart ? data.tradeStart + ' ~ ' : ''}${data.tradeDate}` : '????.??.?? ~ ????.??.??'} · KRX</span>
+          <span>기간 공시</span>
         </div>
         <div className="dbody">
           {step >= 0 && (
             <div className="reveal-step">
               <canvas ref={dailyRef} width={560} height={140} />
-              <p className="small dim">전후 60거래일 속 그 하루</p>
+              <p className="small dim">긴 흐름 속 그 구간 (주봉 근사)</p>
             </div>
           )}
           {step >= 1 && <h1 className="typing">{typed}<span className="cursor">|</span></h1>}
@@ -216,8 +219,8 @@ export function RevealScreen({ sessionId, finish, regionId, onDone }: Props) {
           {step >= 4 && (
             <p className="reveal-summary">
               {failed
-                ? `${data.hits + data.misses}번 중 ${data.hits}번 적중. 이날 실제 종가는 ${data.dayChangePct > 0 ? '+' : ''}${data.dayChangePct.toFixed(1)}%였습니다.`
-                : `당신은 ${data.hits + data.misses}번 중 ${data.hits}번 적중. 이날 실제 종가는 ${data.dayChangePct > 0 ? '+' : ''}${data.dayChangePct.toFixed(1)}%였습니다.`}
+                ? `${data.hits + data.misses}번 중 ${data.hits}번 적중. 이 기간 실제 등락은 ${data.dayChangePct > 0 ? '+' : ''}${data.dayChangePct.toFixed(1)}%였습니다.`
+                : `당신은 ${data.hits + data.misses}번 중 ${data.hits}번 적중. 이 기간 실제 등락은 ${data.dayChangePct > 0 ? '+' : ''}${data.dayChangePct.toFixed(1)}%였습니다.`}
             </p>
           )}
         </div>

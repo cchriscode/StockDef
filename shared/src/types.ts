@@ -118,13 +118,15 @@ export interface FinishRes {
 export interface RevealRes {
   ticker: string;
   companyName: string;
-  tradeDate: string; // YYYY-MM-DD
+  tradeDate: string; // 기간 종료일 YYYY-MM-DD
+  tradeStart?: string; // 기간 시작일 YYYY-MM-DD (일봉 윈도우)
   sector: string;
-  dayChangePct: number;
+  dayChangePct: number; // 기간 전체 등락률
   rarity: string;
   news: { headline: string; source?: string }[];
-  dailyAround: { d: string; o: number; h: number; l: number; c: number }[];
-  dayIndex: number; // dailyAround 내 당일 위치
+  dailyAround: { d: string; o: number; h: number; l: number; c: number }[]; // 다운샘플 문맥 차트
+  dayIndex: number; // dailyAround 내 윈도우 시작 위치
+  windowLen?: number; // dailyAround 단위의 윈도우 길이
   positions: {
     seq: number; direction: Direction; stake: number;
     openBarIdx: number; closeBarIdx: number; outcome: Outcome; payout: number;

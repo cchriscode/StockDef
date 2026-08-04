@@ -163,10 +163,7 @@ function niceStep(raw: number): number {
   return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * pow;
 }
 
-/** FR-3.7 진행 표시: 09:00 기준 분 → HH:MM (시각만, 날짜 은닉) */
+/** FR-3.7 진행 표시: 1봉 = 1거래일 → 상대 표기 D+n (실제 날짜 은닉, FR-4) */
 export function clockLabel(barF: number, barCount: number): string {
-  const mins = Math.min(Math.floor(barF), barCount);
-  const h = Math.floor((540 + mins) / 60);
-  const m = (540 + mins) % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  return `D+${Math.min(Math.floor(barF), barCount)}`;
 }
