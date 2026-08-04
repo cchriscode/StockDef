@@ -130,6 +130,14 @@ describe('Battle 엔진', () => {
     expect(b.baseHP).toBeLessThan(hp0);
     expect(b.aumEarned).toBe(0);
   });
+  it('적 본진 HP 0 → 즉시 승리 (FR-6.10 조기 승리)', () => {
+    const b = new Battle(params(), []);
+    (b as unknown as { enemyBaseHP: number }).enemyBaseHP = 0;
+    b.advanceTo(0.5);
+    expect(b.phase).toBe('done');
+    expect(b.victory).toBe(true);
+    expect(b.enemyBaseDestroyed).toBe(true);
+  });
   it('heat 반영: 점령 2개(1.04) → 적 수 ceil(count×1.04)', () => {
     const b = new Battle(params({ heat: 1.04 }), []);
     b.advanceTo(11); // 웨이브 1 (base 3) 스폰 직후

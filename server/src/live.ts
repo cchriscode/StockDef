@@ -18,6 +18,7 @@ export class LiveSession {
   t0: number | null = null;
   aum: number;
   payoutSum = 0;
+  goldSum = 0; // 골드로 환전된 순수익 누적 (payout − 반환 스테이크)
   wins = 0; loses = 0; draws = 0;
   open: { seq: number; direction: Direction; stake: number; openBarIdx: number; basePrice: number } | null = null;
   closing = false;
@@ -132,6 +133,11 @@ export class LiveSession {
     else if (r.outcome === 'lose') this.loses += 1;
     else this.draws += 1;
     this.payoutSum += r.payout;
+    // FR-5.5b 정산 분해: 스테이크(−손실)는 AUM으로 반환, 순수익만 골드로 자동 환전 (1:1)
+    const returnToAum = Math.min(r.payout, stake);
+    const goldGain = r.payout - returnToAum;
+    this.aum += returnToAum;
+    this.goldSum += goldGain;
     this.open = null;
     this.closing = false;
 
@@ -140,11 +146,11 @@ export class LiveSession {
        WHERE session_id = ? AND seq = ?`,
     ).run(exitBarIdx, closePrice, r.deltaPct, r.g, r.outcome, r.payout, forced ? 1 : 0, this.id, seq);
 
-    const earnedTotal = this.incomeSoFar(this.serverBarIdx()) + this.payoutSum;
+    const earnedTotal = this.incomeSoFar(this.serverBarIdx()) + this.goldSum;
     this.send({
       op: 'position.closed', seq, outcome: r.outcome,
       deltaPct: Math.round(r.deltaPct * 100) / 100, g: Math.round(r.g * 1000) / 1000,
-      payout: r.payout, pnl: r.pnl, exitBarIdx, forced, earnedTotal, aumLeft: this.aum,
+      payout: r.payout, pnl: r.pnl, goldGain, exitBarIdx, forced, earnedTotal, aumLeft: this.aum,
     });
   }
 

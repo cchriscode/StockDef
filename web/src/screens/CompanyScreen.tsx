@@ -26,7 +26,7 @@ export function CompanyScreen({ onBack }: { onBack: () => void }) {
   return (
     <div className="screen company">
       <header className="row">
-        <button className="ghost" onClick={onBack}>← 지도</button>
+        <button className="ghost" onClick={onBack}>← 타이틀</button>
         <h2>1인 투자회사</h2>
         <span>자본금 <b className="gold">{me.capital.toLocaleString()}</b></span>
       </header>

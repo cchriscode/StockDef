@@ -1,12 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MapRes, RegionId } from '@tf/shared';
-import { api, getSettings, saveSettings, type Settings } from '../net/api.js';
+import { api } from '../net/api.js';
 import { COUNTRIES, KR_COLS, KR_ROWS, WORLD_COLS, WORLD_ROWS, krSegs, worldSegs } from '../game/pixelMaps.js';
 
 // FR-2 세계지도 — 목업 03번: 전략 상황실 홀로그램 톤. 세계지도 → 한국 → 전선 목록 → 작전 개시
 interface Props {
   onEnterStage: (regionId: RegionId) => void;
-  onCompany: () => void;
   onCodex: () => void;
   onTutorial: () => void;
   onTitle: () => void;
@@ -40,14 +39,12 @@ function useFitScale(natural: number) {
   return { ref, scale };
 }
 
-export function MapScreen({ onEnterStage, onCompany, onCodex, onTutorial, onTitle }: Props) {
+export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props) {
   const [map, setMap] = useState<MapRes | null>(null);
   const [view, setView] = useState<'world' | 'kr'>('world');
   const [selCountry, setSelCountry] = useState('k');
   const [selRegion, setSelRegion] = useState<RegionId | null>(null);
   const [notice, setNotice] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
-  const [settings, setSettings] = useState<Settings>(getSettings());
   const { ref: midRef, scale } = useFitScale(WORLD_W + 8);
 
   useEffect(() => {
@@ -58,12 +55,6 @@ export function MapScreen({ onEnterStage, onCompany, onCodex, onTutorial, onTitl
   const kSegs = useMemo(() => krSegs(KR_CELL), []);
 
   if (!map) return <div className="screen center"><p className="dim">지도 로딩…</p></div>;
-
-  const applySettings = (patch: Partial<Settings>) => {
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    saveSettings(next);
-  };
 
   const flash = (msg: string) => {
     setNotice(msg);
@@ -278,34 +269,8 @@ export function MapScreen({ onEnterStage, onCompany, onCodex, onTutorial, onTitl
 
       <div className="map-actions">
         <button className="ghost" onClick={onTitle}>◀ 타이틀</button>
-        <button onClick={onCompany}>회사</button>
         <button onClick={onCodex}>도감</button>
-        <button onClick={() => setShowSettings(true)}>설정</button>
       </div>
-
-      {showSettings && (
-        <div className="overlay center" onClick={() => setShowSettings(false)}>
-          <div className="card settings" onClick={(e) => e.stopPropagation()}>
-            <h3>설정 (FR-13)</h3>
-            <label>배속 (스테이지 시작 전에만 적용)
-              <div>
-                {([0.5, 1, 2] as const).map((v) => (
-                  <button key={v} className={`opt ${settings.speed === v ? 'on' : ''}`} onClick={() => applySettings({ speed: v })}>{v}x</button>
-                ))}
-              </div>
-            </label>
-            <label>
-              <input type="checkbox" checked={settings.colorBlind} onChange={(e) => applySettings({ colorBlind: e.target.checked })} />
-              색약 모드 (상승/하락 → 황/청)
-            </label>
-            <label>
-              <input type="checkbox" checked={settings.reduceShake} onChange={(e) => applySettings({ reduceShake: e.target.checked })} />
-              화면 흔들림 감소
-            </label>
-            <button className="primary" onClick={() => setShowSettings(false)}>닫기</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

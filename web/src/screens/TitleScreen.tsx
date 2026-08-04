@@ -1,7 +1,11 @@
 // 타이틀 화면 — Dead Cat Bounce Flow 목업 19번(저녁판) 기반
+import { useState } from 'react';
+import { SettingsOverlay } from '../ui/SettingsOverlay.js';
+
 interface Props {
   onStart: () => void;
   onCodex: () => void;
+  onCompany: () => void;
 }
 
 const STICKS = [
@@ -9,7 +13,8 @@ const STICKS = [
   { h: 12, g: false }, { h: 24, g: true }, { h: 16, g: false },
 ];
 
-export function TitleScreen({ onStart, onCodex }: Props) {
+export function TitleScreen({ onStart, onCodex, onCompany }: Props) {
+  const [showSettings, setShowSettings] = useState(false);
   return (
     <div className="title-screen">
       <div className="title-bg" />
@@ -31,8 +36,11 @@ export function TitleScreen({ onStart, onCodex }: Props) {
         <button className="primary" onClick={onStart}>출  전</button>
         <div className="title-sub">
           <button className="ghost" onClick={onCodex}>도  감</button>
+          <button className="ghost" onClick={onCompany}>회  사</button>
+          <button className="ghost" onClick={() => setShowSettings(true)}>설  정</button>
         </div>
       </div>
+      {showSettings && <SettingsOverlay onClose={() => setShowSettings(false)} />}
       <div className="title-foot">
         <span>v0.1.0 · MVP BUILD</span>
         <span>TICKER FRONT · DUSK TRACE</span>

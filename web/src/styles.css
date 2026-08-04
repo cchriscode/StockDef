@@ -179,7 +179,7 @@ b.danger { color: var(--red2); }
   content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
   background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 4px);
 }
-.map-room > * { position: relative; z-index: 1; }
+.map-room > :not(.overlay) { position: relative; z-index: 1; } /* .overlay는 fixed 유지 (설정 등 화면 위 모달) */
 .mr-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .mr-head h1 { font-size: 24px; letter-spacing: 1px; }
 .mr-head .sub { font-family: var(--fm); font-size: 11px; color: var(--mut); letter-spacing: 1px; margin-top: 8px; }

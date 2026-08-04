@@ -47,8 +47,8 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
       openPending = false;
       active = { seq: m.seq, closeTarget: m.openBarIdx + 30 }; // 봇: 30봉 보유 후 청산
     } else if (m.op === 'position.closed') {
-      aum = m.aumLeft;
-      battle.addGold(m.payout);
+      aum = m.aumLeft; // 스테이크(−손실)는 이미 서버에서 AUM 반환됨
+      battle.addGold(m.goldGain); // 순수익만 골드 환전 (FR-5.5b)
       active = null;
       closeSent = false;
       resolvedCount += 1;

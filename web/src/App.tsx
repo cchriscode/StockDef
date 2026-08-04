@@ -44,7 +44,7 @@ export function App() {
     case 'boot':
       return <div className="screen center"><p className="dim">TICKER FRONT</p></div>;
     case 'title':
-      return <TitleScreen onStart={sortie} onCodex={() => setScreen({ name: 'codex' })} />;
+      return <TitleScreen onStart={sortie} onCodex={() => setScreen({ name: 'codex' })} onCompany={() => setScreen({ name: 'company' })} />;
     case 'intro':
       return <IntroScreen onStart={() => { track('tutorial_step', { step: 'intro_done' }); setScreen({ name: 'stage', regionId: 'TUT' }); }} />;
     case 'tutorialSummary':
@@ -53,7 +53,6 @@ export function App() {
       return (
         <MapScreen
           onEnterStage={(regionId) => setScreen({ name: 'stage', regionId })}
-          onCompany={() => setScreen({ name: 'company' })}
           onCodex={() => setScreen({ name: 'codex' })}
           onTutorial={() => setScreen({ name: 'stage', regionId: 'TUT' })}
           onTitle={() => setScreen({ name: 'title' })}
@@ -77,7 +76,7 @@ export function App() {
         />
       );
     case 'company':
-      return <CompanyScreen onBack={() => setScreen({ name: 'map' })} />;
+      return <CompanyScreen onBack={() => setScreen({ name: 'title' })} />;
     case 'codex':
       return <CodexScreen onBack={() => setScreen({ name: 'map' })} />;
   }

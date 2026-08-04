@@ -77,12 +77,14 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
     }
 
     // 포지션 청산 (봇: 30봉 보유 후 청산 — 서버 판정과 동일한 judge 사용)
+    // FR-5.5b: 스테이크(−손실)는 AUM 반환, 순수익만 골드 환전
     if (pending && bar >= pending.closeIdx) {
       const sigma = bars.sigma['30'];
       const r = judge(bars.bars[pending.openIdx].c, bars.bars[pending.closeIdx].c, sigma, pending.dir, pending.stake, params.lossRate);
       if (r.outcome === 'win') wins += 1;
       else if (r.outcome === 'lose') loses += 1;
-      b.addGold(r.payout);
+      aum += Math.min(r.payout, pending.stake);
+      b.addGold(Math.max(0, r.payout - pending.stake));
       pending = null;
     }
 
@@ -112,6 +114,9 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
       else if (b.gold >= 220) b.spawnUnit('analyst');
     }
     if (b.enemies.filter((e) => !e.air).length >= 6 && b.gold >= 380) b.useSkill();
+
+    // FR-6.9 파산 패배 (봇은 25% 투입이라 사실상 도달하지 않음)
+    if (aum < 1 && !pending) return { victory: false, goldLeft: Math.floor(b.gold), positions, wins, loses };
   }
   return { victory: b.victory, goldLeft: Math.floor(b.gold), positions, wins, loses };
 }

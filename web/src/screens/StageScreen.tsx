@@ -16,7 +16,8 @@ interface Props {
 
 interface ResultPopup {
   outcome: 'win' | 'lose' | 'draw';
-  amount: number;
+  amount: number;   // pnl (AUM)
+  goldGain: number; // 골드 환전액 (수익 × PROFIT_TO_GOLD)
 }
 
 type GuideStep = 0 | 1 | 2 | 3 | 4 | 5; // FR-12.2 강제 가이드
@@ -56,7 +57,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
   });
 
   const [phase, setPhase] = useState<'loading' | 'playing' | 'settling' | 'error'>('loading');
-  const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, ebhp: 300, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0, upnl: null as number | null });
+  const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, ebhp: 300, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0, upnl: null as number | null, udelta: null as number | null });
   const [popup, setPopup] = useState<ResultPopup | null>(null);
   const [banner, setBanner] = useState<{ text: string; kind: 'panic' | 'fomo' } | null>(null);
   const [stakePct, setStakePct] = useState(0.25);
@@ -143,11 +144,11 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         const holdBars = s.openMarker ? m.exitBarIdx - s.openMarker.openBarIdx : null;
         s.openMarker = null;
         s.closing = false;
-        s.battle?.addGold(m.payout);
+        s.battle?.addGold(m.goldGain); // FR-5.5b: 순수익만 골드로 자동 환전 (스테이크는 AUM 반환)
         s.lastPayoutAt = Date.now();
-        setPopup({ outcome: m.outcome, amount: m.pnl });
+        setPopup({ outcome: m.outcome, amount: m.pnl, goldGain: m.goldGain });
         setTimeout(() => setPopup(null), 800); // FR-5.9: 0.8초 이내
-        track('position_closed', { outcome: m.outcome, g: m.g, payout: m.payout, pnl: m.pnl, holdBars, forced: m.forced });
+        track('position_closed', { outcome: m.outcome, g: m.g, payout: m.payout, pnl: m.pnl, goldGain: m.goldGain, holdBars, forced: m.forced });
         if (isTut) setGuide((cur) => (cur === 2 ? 3 : cur));
       } else if (m.op === 'aum.update') {
         s.aum = m.aumLeft; // 전투 처치 AUM 크레딧 (서버 clamp 결과)
@@ -205,10 +206,12 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         lastHud.current = Date.now();
         // 미실현 손익 (보간가 기준, 표현 전용 — 확정 손익은 서버 판정)
         let upnl: number | null = null;
+        let udelta: number | null = null;
         const mk = s.openMarker;
         if (mk && mk.basePrice > 0) {
           const curPrice = s.bars.openPrice * (1 + interpPct(s.bars, barF) / 100);
           const dPct = ((curPrice - mk.basePrice) / mk.basePrice) * 100;
+          udelta = dPct;
           const gNorm = (mk.direction === 'long' ? 1 : -1) * (dPct / Math.max(s.bars.sigma['30'], 1e-6));
           const p = s.start!.params;
           const raw = gNorm >= 0 ? p.payoutBase * gNorm : p.lossRate * gNorm;
@@ -218,12 +221,19 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           gold: Math.floor(b.gold), aum: s.aum, hp: Math.max(0, Math.round(b.baseHP)), ebhp: Math.max(0, Math.round(b.enemyBaseHP)),
           wave: b.waveIdx, waveCount: s.start!.params.waveCount,
           prep: b.phase === 'prep', barF, barCount: s.bars.barCount,
-          posCount: s.seq, skillCd: Math.max(0, Math.ceil(b.skillReadyAt - b.t)), upnl,
+          posCount: s.seq, skillCd: Math.max(0, Math.ceil(b.skillReadyAt - b.t)), upnl, udelta,
         });
       }
 
       if (b.phase === 'done') {
         void finishStage();
+        return;
+      }
+      // FR-6.9 파산 패배: AUM 전량 소진 + 무포지션 (미보고 처치 AUM까지 포함해 판정)
+      const effAum = s.aum + Math.max(0, Math.floor(s.battle.aumEarned) - s.aumReported);
+      if (effAum < 1 && !s.openMarker && !s.pendingOpen) {
+        track('bankrupt', { region: regionId, barF });
+        void finishStage(true);
         return;
       }
       raf = requestAnimationFrame(loop);
@@ -399,11 +409,17 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
                     {s.openMarker!.direction === 'long' ? '▲ LONG' : '▼ SHORT'}
                   </span>
                 </div>
-                <div className="pr"><span>투입</span><span>{s.openMarker!.stake.toLocaleString()} G</span></div>
+                <div className="pr"><span>투입</span><span>{s.openMarker!.stake.toLocaleString()} AUM</span></div>
+                <div className="pr">
+                  <span>진입 대비</span>
+                  <span className={`upnl ${hud.udelta != null && hud.udelta < 0 ? 'neg' : 'pos'}`}>
+                    {hud.udelta != null ? `${hud.udelta >= 0 ? '+' : ''}${hud.udelta.toFixed(2)}%` : '…'}
+                  </span>
+                </div>
                 <div className="pr">
                   <span>P&amp;L</span>
                   <span className={`upnl ${hud.upnl != null && hud.upnl < 0 ? 'neg' : 'pos'}`}>
-                    {hud.upnl != null ? `${hud.upnl >= 0 ? '+' : ''}${hud.upnl.toLocaleString()} G` : '…'}
+                    {hud.upnl != null ? `${hud.upnl >= 0 ? '+' : ''}${hud.upnl.toLocaleString()} AUM` : '…'}
                   </span>
                 </div>
                 <button className={`close-pos ${isTut && guide === 2 && canClose ? 'pulse' : ''}`} disabled={!canClose} onClick={closePosition}>
@@ -437,7 +453,11 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         {banner && <div className={`banner ${banner.kind}`}>{banner.text}</div>}
         {popup && (
           <div className={`popup ${popup.outcome}`}>
-            {popup.outcome === 'win' ? `WIN +${popup.amount.toLocaleString()} G` : popup.outcome === 'lose' ? `LOSE ${popup.amount.toLocaleString()} G` : `DRAW ${popup.amount >= 0 ? '+' : ''}${popup.amount.toLocaleString()} G`}
+            {popup.outcome === 'win'
+              ? `WIN +${popup.goldGain.toLocaleString()} G 입금`
+              : popup.outcome === 'lose'
+                ? `LOSE ${popup.amount.toLocaleString()} AUM`
+                : `DRAW ${popup.goldGain > 0 ? `+${popup.goldGain.toLocaleString()} G` : `${popup.amount.toLocaleString()} AUM`}`}
           </div>
         )}
         {slotMenu != null && (

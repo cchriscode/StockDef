@@ -43,6 +43,7 @@ export interface SettlementInput {
   goldLeft: number;
   goldEarnedTotal: number;
   aumLeft: number;
+  aumInitial: number; // 초기 AUM — 자본금은 초과분(운용 성과)만 인정 (스테이크 반환 구조에서 원금 이중 보상 방지)
   hpLeft: number; // 0~100
   wins: number;
   loses: number;
@@ -73,8 +74,8 @@ export function settle(inp: SettlementInput): SettlementResult {
   pts += inp.enemyBaseDestroyed ? 1 : 0;
   const grade: Grade = pts >= 6 ? 'S' : pts >= 4 ? 'A' : pts >= 2 ? 'B' : 'C';
 
-  // 자본금 (FR-8.1) — 보너스는 전부 합연산
-  const base = inp.goldLeft * 1.0 + inp.aumLeft * 0.5;
+  // 자본금 (FR-8.1) — 보너스는 전부 합연산. AUM은 초기치 초과분만 (원금은 데스크 자산이지 스테이지 수익이 아님)
+  const base = inp.goldLeft * 1.0 + Math.max(0, inp.aumLeft - inp.aumInitial) * 0.5;
   let bonus = 1.0 + inp.irBonus;
   if (inp.hpLeft >= 100) bonus += BALANCE.BONUS_HP_FULL;
   if (accuracy >= 0.7) bonus += BALANCE.BONUS_ACC_70;

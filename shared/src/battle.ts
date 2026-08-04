@@ -521,14 +521,17 @@ export class Battle {
     this.enemies = this.enemies.filter((e) => this.aliveOrDeathFx(e));
     this.fx = this.fx.filter((f) => this.t - f.t < 1.4);
 
-    if (this.enemyBaseHP <= 0) {
-      this.enemyBaseDestroyed = true;
-      this.enemyBaseHP = 0;
-    }
-    if (this.baseHP <= 0) {
+    if (this.baseHP <= 0) { // 패배 우선 (같은 틱에 둘 다 0이면 패배)
       this.baseHP = 0;
       this.phase = 'done';
       this.victory = false;
+      return;
+    }
+    if (this.enemyBaseHP <= 0) { // FR-6.10: 적 본진 파괴 = 즉시 승리 (남은 웨이브 생략)
+      this.enemyBaseDestroyed = true;
+      this.enemyBaseHP = 0;
+      this.phase = 'done';
+      this.victory = true;
     }
   }
 }

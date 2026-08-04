@@ -157,16 +157,18 @@ router.post('/stage/finish', (req, res) => {
   const elapsed = Date.now() - live.t0;
   const cleared = hpLeft > 0;
 
-  // 클리어 주장인데 시간이 안 됐으면 무효 (시간 조작 방지)
-  if (cleared && elapsed < stageMs * 0.95) {
+  // 클리어 주장인데 시간이 안 됐으면 무효 (시간 조작 방지).
+  // FR-6.10 조기 승리(적 본진 파괴)는 예외적으로 이르게 끝날 수 있으나, 최소 25%는 지나야 물리적으로 가능하다.
+  if (cleared && elapsed < stageMs * (enemyBaseDestroyed ? 0.25 : 0.95)) {
     db.prepare("UPDATE stage_sessions SET status = 'abandoned', ended_at = datetime('now') WHERE id = ?").run(sessionId);
     dropLive(sessionId);
     return res.json({ status: 'invalid', grade: null, accuracy: 0, goldLeftRate: 0, capitalAwarded: 0, eligibleLines: [], alreadyOwnedLines: [], isRetry: !!row.is_retry, capitalTotal: accountRow(accountId).capital } satisfies FinishRes);
   }
 
-  // 골드 독립 재계산 검증 (§11): 총 획득 = 기본 수입(시계 기준) + 포지션 payout 합
+  // 골드 독립 재계산 검증 (§11): 총 획득 = 기본 수입(시계 기준) + 골드 환전 순수익 합 (FR-5.5b)
+  // 조기 승리(FR-6.10) 시엔 시작된 웨이브까지만 수입이 지급되므로 항상 시계 기준으로 계산한다.
   const barIdxAtEnd = live.serverBarIdx();
-  const serverEarned = (cleared ? params.totalBaseIncome : live.incomeSoFar(barIdxAtEnd)) + live.payoutSum;
+  const serverEarned = live.incomeSoFar(barIdxAtEnd) + live.goldSum;
   const claimed = Math.round(goldLeft + goldSpent);
   const tolerance = Math.max(serverEarned * 0.05, 15);
   const valid = Math.abs(claimed - serverEarned) <= tolerance && goldLeft >= 0 && goldSpent >= 0;
@@ -181,6 +183,7 @@ router.post('/stage/finish', (req, res) => {
     goldLeft: Math.round(goldLeft),
     goldEarnedTotal: serverEarned,
     aumLeft: live.aum,
+    aumInitial: params.aum,
     hpLeft,
     wins: live.wins,
     loses: live.loses,
