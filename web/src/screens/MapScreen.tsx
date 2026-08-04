@@ -25,14 +25,14 @@ const KR_MARKS: Record<string, { x: number; y: number }> = {
 const STATUS_LABEL = { open: '진행 중', next: '해금', locked: '잠김' } as const;
 const STATUS_COLOR = { open: '#7BD8A0', next: '#FF9E86', locked: '#4E5B72' } as const;
 
-/** 중앙 컬럼 폭에 맞춰 고정 크기 지도를 축소 (상황실 레이아웃 유지) */
+/** 중앙 컬럼 폭에 맞춰 고정 크기 지도를 확대·축소 (상황실 레이아웃 유지, 최대 1.6배) */
 function useFitScale(natural: number) {
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setScale(Math.min(1, el.clientWidth / natural)));
+    const ro = new ResizeObserver(() => setScale(Math.min(1.6, el.clientWidth / natural)));
     ro.observe(el);
     return () => ro.disconnect();
   }, [natural]);

@@ -186,7 +186,9 @@ b.danger { color: var(--red2); }
 .map-stats { display: flex; gap: 14px; font-size: 12px; flex-wrap: wrap; color: var(--mut); }
 .map-stats b { color: var(--text); }
 .map-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.mr-cols { display: flex; gap: 24px; align-items: flex-start; flex: 1; }
+.mr-cols { position: relative; display: flex; gap: 24px; align-items: flex-start; flex: 1; }
+/* 국가 리스트는 지도 위 오버레이 (목업 03번) — 지도가 리스트 밑까지 넓게 깔린다 */
+.mr-cols > .country-col { position: absolute; left: 0; top: 0; z-index: 2; }
 .mr-mid { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; align-items: center; }
 .mr-glow {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -511,6 +513,7 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
   .chart-band { flex-direction: column; }
   .trade-panel { width: 100%; }
   .mr-cols { flex-direction: column; align-items: stretch; }
+  .mr-cols > .country-col { position: static; }
   .country-col, .mr-brief { width: 100%; }
   .hp-overlay .track { width: 100px; }
 }
