@@ -36,8 +36,8 @@ export function drawChart(
   const priceH = H - volH - 6;
   ctx.clearRect(0, 0, W, H);
 
-  const up = opts.colorBlind ? '#e8c34a' : '#ef5350';   // 국내 관례: 상승 적색 (색약: 황)
-  const down = opts.colorBlind ? '#4aa8e8' : '#42a5f5'; // 하락 청색
+  const up = opts.colorBlind ? '#e8c34a' : '#46A574';   // 디자인 팔레트: 상승 녹 (색약: 황)
+  const down = opts.colorBlind ? '#4aa8e8' : '#E8654F'; // 하락 적
 
   const iNow = Math.min(Math.floor(barF), data.barCount - 1);
   const start = Math.max(0, iNow - VISIBLE + 8);
@@ -67,9 +67,9 @@ export function drawChart(
   const stepPct = niceStep((hi - lo) / 4);
   for (let g = Math.ceil(lo / stepPct) * stepPct; g <= hi; g += stepPct) {
     const gy = y(g);
-    ctx.strokeStyle = Math.abs(g) < stepPct / 2 ? '#5a5a72' : '#2a2a38';
+    ctx.strokeStyle = Math.abs(g) < stepPct / 2 ? '#3E5570' : '#161F31';
     ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
-    ctx.fillStyle = '#8888a0';
+    ctx.fillStyle = '#7C89A3';
     ctx.fillText(`${g > 0 ? '+' : ''}${g.toFixed(1)}%`, W - 4, gy - 3);
   }
 
@@ -114,11 +114,11 @@ export function drawChart(
   if (opts.marker) {
     const m = opts.marker;
     const my = y(m.basePricePct);
-    ctx.strokeStyle = '#ffd54f';
+    ctx.strokeStyle = '#FFC53D';
     ctx.setLineDash([6, 4]);
     ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(W, my); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = '#ffd54f';
+    ctx.fillStyle = '#FFC53D';
     ctx.textAlign = 'left';
     ctx.fillText(m.direction === 'long' ? '▲ LONG' : '▼ SHORT', 4, my + 12);
     if (m.openBarIdx >= start && m.openBarIdx <= end) {
@@ -147,11 +147,11 @@ export function drawChart(
   for (let i = start; i <= Math.min(iNow, end - 1); i++) {
     const b = data.bars[i];
     const h2 = (b.v / maxV) * volH;
-    ctx.fillStyle = i === iNow ? '#9a9ab8' : '#55556a';
+    ctx.fillStyle = i === iNow ? '#7C89A3' : '#3E5570';
     ctx.fillRect(x(i) - bw * 0.3, volTop + volH - h2, bw * 0.6, h2);
   }
   const curMult = data.bars[iNow].v / Math.max(data.volumeAvg20d, 1);
-  ctx.fillStyle = curMult >= 2 ? '#ffd54f' : '#8888a0';
+  ctx.fillStyle = curMult >= 2 ? '#FFC53D' : '#7C89A3';
   ctx.textAlign = 'right';
   ctx.font = '11px monospace';
   ctx.fillText(`거래량 ${curMult.toFixed(1)}×`, W - 4, volTop + 11);

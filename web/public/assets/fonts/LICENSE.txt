@@ -1,0 +1,12 @@
+This directory contains fonts licensed under the SIL Open Font License, Version 1.1
+(https://scripts.sil.org/OFL):
+
+- Galmuri14 / Galmuri11 / Galmuri9
+  Copyright (c) 2019-2025 Lee Minseo (quiple@quiple.dev),
+  with Reserved Font Name "Galmuri".
+
+- IBM Plex Mono
+  Copyright (c) 2017 IBM Corp. (https://github.com/IBM/plex),
+  with Reserved Font Name "Plex".
+
+These fonts are used unmodified (woff2 subsets) for the game UI.

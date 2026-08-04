@@ -53,7 +53,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
   });
 
   const [phase, setPhase] = useState<'loading' | 'playing' | 'settling' | 'error'>('loading');
-  const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0, upnl: null as number | null });
+  const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, ebhp: 300, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0, upnl: null as number | null });
   const [popup, setPopup] = useState<ResultPopup | null>(null);
   const [banner, setBanner] = useState<{ text: string; kind: 'panic' | 'fomo' } | null>(null);
   const [stakePct, setStakePct] = useState(0.25);
@@ -202,7 +202,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           upnl = Math.floor(mk.stake * Math.min(Math.max(raw, -p.maxLossRate), p.payoutBase * BALANCE.Z_CAP));
         }
         setHud({
-          gold: Math.floor(b.gold), aum: s.aum, hp: Math.max(0, Math.round(b.baseHP)),
+          gold: Math.floor(b.gold), aum: s.aum, hp: Math.max(0, Math.round(b.baseHP)), ebhp: Math.max(0, Math.round(b.enemyBaseHP)),
           wave: b.waveIdx, waveCount: s.start!.params.waveCount,
           prep: b.phase === 'prep', barF, barCount: s.bars.barCount,
           posCount: s.seq, skillCd: Math.max(0, Math.ceil(b.skillReadyAt - b.t)), upnl,
@@ -342,7 +342,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     <div className={`screen stage ${tint}`}>
       {/* 블라인드 태그 + 진행바 (FR-3.7, FR-4.2) */}
       <div className="stage-top">
-        <span className="tags">[{tags.region} · {tags.sector} · {tags.capTier === 'large' ? '대형주' : '중형주'}]</span>
+        <span className="tags">{tags.region} · {tags.sector} · {tags.capTier === 'large' ? '대형주' : '중형주'} · ???</span>
         <div className="clockbar">
           <span>09:00</span>
           <div className="track"><div className="fill" style={{ width: `${progress * 100}%` }} /></div>
@@ -354,42 +354,73 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         </button>
       </div>
 
-      <canvas ref={chartRef} width={860} height={240} className="chart" />
-
-      {/* FR-5.1 포지션 UI — 자유 진입·청산 */}
-      <div className="position-bar">
-        <button className={`long ${isTut && guide === 1 ? 'pulse' : ''}`} disabled={!canOpen} onClick={() => openPosition('long')}>LONG ▲</button>
-        <button className="short" disabled={!canOpen || (isTut && guide <= 2)} onClick={() => openPosition('short')}>SHORT ▼</button>
-        <span className="lbl">투입</span>
-        {BALANCE.STAKE_PCTS.map((v) => (
-          <button key={v} className={`opt ${stakePct === v ? 'on' : ''}`} disabled={isTut && guide <= 2 && v !== 0.25} onClick={() => setStakePct(v)}>
-            {v === 1 ? 'ALL' : `${v * 100}%`}
-          </button>
-        ))}
-        {hasPosition && (
-          <>
-            <span className={`upnl ${hud.upnl != null && hud.upnl < 0 ? 'neg' : 'pos'}`}>
-              {s.openMarker!.direction === 'long' ? '▲' : '▼'} {hud.upnl != null ? `${hud.upnl >= 0 ? '+' : ''}${hud.upnl.toLocaleString()} G` : '…'}
-            </span>
-            <button className={`close-pos ${isTut && guide === 2 && canClose ? 'pulse' : ''}`} disabled={!canClose} onClick={closePosition}>
-              {s.closing ? '청산 중…' : '청산 ✕'}
+      {/* 차트 밴드: 좌 차트 + 우 트레이드 패널 (FR-5.1 자유 진입·청산) */}
+      <div className="chart-band">
+        <div className="chart-area">
+          <canvas ref={chartRef} width={700} height={252} className="chart" />
+        </div>
+        <div className="trade-panel">
+          <div className="ls-row">
+            <button className={`long ${isTut && guide === 1 ? 'pulse' : ''}`} disabled={!canOpen} onClick={() => openPosition('long')}>
+              <span className="arrow">▲</span>LONG<span className="hint">상승에 베팅</span>
             </button>
-          </>
-        )}
-        <span className="poscnt">{hud.posCount}/{p.maxPositions}</span>
-      </div>
-
-      {/* 상태 바 */}
-      <div className="hud">
-        <span>HP <b className={hud.hp <= 30 ? 'danger' : ''}>{hud.hp}</b></span>
-        <span>골드 <b className="gold">{hud.gold.toLocaleString()}</b></span>
-        <span>AUM <b className="aum">{hud.aum.toLocaleString()}</b></span>
-        <span>W <b>{Math.min(hud.wave, hud.waveCount)}/{hud.waveCount}</b> {hud.prep ? '(준비)' : '(웨이브)'}</span>
-        <span>L={p.lossRate} · heat {p.heat.toFixed(2)}</span>
+            <button className="short" disabled={!canOpen || (isTut && guide <= 2)} onClick={() => openPosition('short')}>
+              <span className="arrow">▼</span>SHORT<span className="hint">하락에 베팅</span>
+            </button>
+          </div>
+          <div className="stake-row">
+            <span className="lbl">투입</span>
+            {BALANCE.STAKE_PCTS.map((v) => (
+              <button key={v} className={`opt ${stakePct === v ? 'on' : ''}`} disabled={isTut && guide <= 2 && v !== 0.25} onClick={() => setStakePct(v)}>
+                {v === 1 ? 'ALL' : `${v * 100}%`}
+              </button>
+            ))}
+          </div>
+          <div className="pos-box">
+            <div className="pr"><span>POSITION</span><span>{hud.posCount}/{p.maxPositions}</span></div>
+            {hasPosition ? (
+              <>
+                <div className="pr">
+                  <span>방향</span>
+                  <span className={s.openMarker!.direction === 'long' ? 'dir-long' : 'dir-short'}>
+                    {s.openMarker!.direction === 'long' ? '▲ LONG' : '▼ SHORT'}
+                  </span>
+                </div>
+                <div className="pr"><span>투입</span><span>{s.openMarker!.stake.toLocaleString()} G</span></div>
+                <div className="pr">
+                  <span>P&amp;L</span>
+                  <span className={`upnl ${hud.upnl != null && hud.upnl < 0 ? 'neg' : 'pos'}`}>
+                    {hud.upnl != null ? `${hud.upnl >= 0 ? '+' : ''}${hud.upnl.toLocaleString()} G` : '…'}
+                  </span>
+                </div>
+                <button className={`close-pos ${isTut && guide === 2 && canClose ? 'pulse' : ''}`} disabled={!canClose} onClick={closePosition}>
+                  {s.closing ? '청산 중…' : '청산 ✕'}
+                </button>
+              </>
+            ) : (
+              <span className="none">무포지션<br />LONG / SHORT로 진입</span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="battle-wrap">
         <canvas ref={battleRef} width={860} height={190} className="battle" onClick={onBattleClick} />
+        {/* 양측 HP + 웨이브 (목업 04번 오버레이) */}
+        <div className="hp-overlay left">
+          <div className="who"><i />우리 사옥</div>
+          <div className="track"><div className="fillbar" style={{ width: `${hud.hp}%` }} /></div>
+          <div className="num">{hud.hp} / 100</div>
+        </div>
+        <div className="hp-overlay right">
+          <div className="who">베어 요새<i /></div>
+          <div className="track"><div className="fillbar" style={{ width: `${(hud.ebhp / 300) * 100}%` }} /></div>
+          <div className="num">{hud.ebhp} / 300</div>
+        </div>
+        <div className="wave-pill">
+          <div className="w">WAVE {Math.min(Math.max(hud.wave, 1), hud.waveCount)} / {hud.waveCount}</div>
+          <div className="n">{hud.prep ? 'PREP' : 'ENGAGED'}</div>
+        </div>
         {banner && <div className={`banner ${banner.kind}`}>{banner.text}</div>}
         {popup && (
           <div className={`popup ${popup.outcome}`}>
@@ -435,20 +466,28 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         )}
       </div>
 
-      {/* 하단 구매 바 (FR-6.5 / FR-6.6) */}
-      <div className="buy-bar">
-        {UNITS.map((u) => {
-          const cost = battle.unitCost(u.key);
-          return (
-            <button key={u.key} className={isTut && guide === 4 ? 'pulse' : ''} disabled={hud.gold < cost || phase !== 'playing'} onClick={() => spawnUnit(u.key)}>
-              {u.name} {cost} G
-            </button>
-          );
-        })}
-        <div className="spacer" />
-        <button disabled={hud.gold < BALANCE.SKILL_COST || hud.skillCd > 0} onClick={useSkill}>
-          공시폭탄 {BALANCE.SKILL_COST} G{hud.skillCd > 0 ? ` (${hud.skillCd}s)` : ''}
-        </button>
+      {/* 하단 커맨드 바 (FR-6.5 / FR-6.6) */}
+      <div className="cmd-bar">
+        <div className="cmd-funds">
+          <div className="f g"><i />{hud.gold.toLocaleString()}</div>
+          <div className="f a"><i />{hud.aum.toLocaleString()}</div>
+        </div>
+        <div className="cmd-units">
+          {UNITS.map((u) => {
+            const cost = battle.unitCost(u.key);
+            return (
+              <button key={u.key} className={isTut && guide === 4 ? 'pulse' : ''} disabled={hud.gold < cost || phase !== 'playing'} onClick={() => spawnUnit(u.key)}>
+                {u.name}<span className="cost">{cost} G</span>
+              </button>
+            );
+          })}
+          <button className="skill" disabled={hud.gold < BALANCE.SKILL_COST || hud.skillCd > 0} onClick={useSkill}>
+            공시폭탄<span className="cost">{hud.skillCd > 0 ? `${hud.skillCd}s` : `${BALANCE.SKILL_COST} G`}</span>
+          </button>
+        </div>
+        <div className="cmd-right">
+          <span className="small dim mono">L={p.lossRate} · heat {p.heat.toFixed(2)}</span>
+        </div>
       </div>
 
       <p className="disclaimer">본 콘텐츠는 과거 데이터를 활용한 게임이며 투자 조언이 아닙니다.</p>
