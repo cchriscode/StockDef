@@ -17,27 +17,27 @@ const WORLD_W = WORLD_COLS * WORLD_CELL;
 const WORLD_H = WORLD_ROWS * WORLD_CELL;
 // 한반도 지도 위 거점 좌표 (KR_CELL 기준 px)
 const KR_MARKS: Record<string, { x: number; y: number }> = {
-  R1: { x: 118, y: 148 },
-  R2: { x: 134, y: 176 },
-  R3: { x: 218, y: 378 },
+  R1: { x: 106, y: 312 }, // 여의도 — DMZ(y≈302) 바로 남쪽 서울 서측
+  R2: { x: 124, y: 338 }, // 판교 — 서울 남동
+  R3: { x: 218, y: 448 }, // 울산 — 남동 해안
 };
 
 const STATUS_LABEL = { open: '진행 중', next: '해금', locked: '잠김' } as const;
 const STATUS_COLOR = { open: '#7BD8A0', next: '#FF9E86', locked: '#4E5B72' } as const;
 
-/** 중앙 컬럼 폭에 맞춰 고정 크기 지도를 확대·축소 (양옆 패널과 겹치지 않게 딱 맞춤, 최대 1.6배)
+/** 가용 폭·높이에 맞춰 고정 크기 지도를 확대·축소 (양옆 패널과 겹치지 않게 딱 맞춤)
  *  콜백 ref 사용: 로딩 화면 뒤에 늦게 마운트되어도 관측이 확실히 붙는다. */
-function useFitScale(natural: number) {
+function useFitScale(naturalW: number, naturalH: number, cap: number) {
   const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
   useLayoutEffect(() => {
     if (!el) return;
-    const measure = () => setScale(Math.min(1.6, el.clientWidth / natural));
+    const measure = () => setScale(Math.min(cap, el.clientWidth / naturalW, el.clientHeight > 40 ? el.clientHeight / naturalH : cap));
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [el, natural]);
+  }, [el, naturalW, naturalH, cap]);
   return { ref: setEl, scale };
 }
 
@@ -47,7 +47,8 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
   const [selCountry, setSelCountry] = useState('k');
   const [selRegion, setSelRegion] = useState<RegionId | null>(null);
   const [notice, setNotice] = useState('');
-  const { ref: midRef, scale } = useFitScale(WORLD_W + 8);
+  const { ref: midRef, scale } = useFitScale(WORLD_W + 8, WORLD_H + 60, 1.6);
+  const { ref: krRef, scale: krScale } = useFitScale(KR_COLS * KR_CELL + 16, KR_ROWS * KR_CELL + 44, 1.5);
 
   useEffect(() => {
     api.map().then(setMap).catch((e) => setNotice(String(e.message)));
@@ -236,31 +237,35 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
             <button className="ghost" style={{ marginTop: 12 }} onClick={() => setView('world')}>← 세계지도</button>
           </div>
 
-          <div className="mr-mid">
+          <div className="mr-mid" ref={krRef}>
             <div className="mr-glow" />
-            <div className="pixmap" style={{ width: KR_COLS * KR_CELL, height: KR_ROWS * KR_CELL }}>
-              {kSegs.map((s, i) => (
-                <div key={i} className="cell" style={{ left: s.x, top: s.y, width: s.w, height: s.h, background: s.y < 38 * KR_CELL ? '#1C3140' : '#22394A' }} />
-              ))}
-              <div className="grid-overlay" />
-              {/* DMZ 점선 (목업 장식) */}
-              <div style={{ position: 'absolute', left: 32, top: 302, width: 216, height: 4, background: 'repeating-linear-gradient(to right, #7C89A3 0 8px, transparent 8px 16px)', opacity: 0.5, pointerEvents: 'none' }} />
-              {regions.map((r, i) => {
-                const pos = KR_MARKS[`R${i + 1}`] ?? { x: 120, y: 180 + i * 70 };
-                return (
-                  <div
-                    key={r.regionId}
-                    className={`kmark ${r.state}`}
-                    style={{ left: pos.x, top: pos.y }}
-                    onClick={() => setSelRegion(r.regionId)}
-                  >
-                    <span className="box" />
-                    <span className="klabel">R{i + 1} {r.name}</span>
-                  </div>
-                );
-              })}
+            <div style={{ width: KR_COLS * KR_CELL * krScale, height: (KR_ROWS * KR_CELL + 40) * krScale }}>
+              <div style={{ transform: `scale(${krScale})`, transformOrigin: 'top left', width: KR_COLS * KR_CELL }}>
+                <div className="pixmap" style={{ width: KR_COLS * KR_CELL, height: KR_ROWS * KR_CELL }}>
+                  {kSegs.map((s, i) => (
+                    <div key={i} className="cell" style={{ left: s.x, top: s.y, width: s.w, height: s.h, background: s.y < 38 * KR_CELL ? '#1C3140' : '#22394A' }} />
+                  ))}
+                  <div className="grid-overlay" />
+                  {/* DMZ 점선 (목업 장식) */}
+                  <div style={{ position: 'absolute', left: 32, top: 302, width: 216, height: 4, background: 'repeating-linear-gradient(to right, #7C89A3 0 8px, transparent 8px 16px)', opacity: 0.5, pointerEvents: 'none' }} />
+                  {regions.map((r, i) => {
+                    const pos = KR_MARKS[`R${i + 1}`] ?? { x: 120, y: 320 + i * 60 };
+                    return (
+                      <div
+                        key={r.regionId}
+                        className={`kmark ${r.state}`}
+                        style={{ left: pos.x, top: pos.y }}
+                        onClick={() => setSelRegion(r.regionId)}
+                      >
+                        <span className="box" />
+                        <span className="klabel">R{i + 1} {r.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="map-caption" style={{ marginTop: 8 }}>KOREAN PENINSULA · 0.14° / CELL · 8px · DMZ 38°N</div>
+              </div>
             </div>
-            <div className="map-caption" style={{ marginTop: 8 }}>KOREAN PENINSULA · 0.14° / CELL · 8px · DMZ 38°N</div>
           </div>
 
           <div className="mr-brief" style={{ display: 'flex' }}>
