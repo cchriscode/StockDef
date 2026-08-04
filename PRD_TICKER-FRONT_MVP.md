@@ -194,7 +194,7 @@ MVP는 **기능을 많이 만드는 것이 목적이 아니라, 아래 두 가�
 
 **수용 기준**
 - Given 1x 배속 / When 스테이지 시작부터 종료까지 / Then 총 경과 시간이 390초 ± 2초다
-- Given 포지션 진입 또는 청산 / When 체결 발생 / Then 서버 로그의 체결 가격이 해당 일봉의 실제 종가와 정확히 일치한다
+- Given 포지션 진입 또는 청산 / When 체결 발생 / Then 서버 로그의 체결 가격이 서버 시계 기준 보간식 가격과 정확히 일치한다 (클라 신고가 아님)
 - Given 동일 계정으로 R1을 3회 플레이 / Then 세 번 모두 다른 종목×기간 조합이 배정된다
 
 ---
@@ -232,7 +232,8 @@ MVP는 **기능을 많이 만드는 것이 목적이 아니라, 아래 두 가�
 ```
 **FR-5.2** 동시 보유 포지션은 **1개**로 제한한다 (MVP). 보유 중에는 신규 진입 버튼이 비활성이고 청산 버튼이 표시된다.
 **FR-5.3** 스테이지당 최대 포지션 수 **30개**.
-**FR-5.4 체결가 결정**: 진입·청산 모두 서버가 요청을 받은 시각 이후 **다음 봉(1거래일)의 종가**로 체결한다 (시장가 주문 체결 지연). 요청 시점의 보간 가격을 쓰지 않는다. 청산 체결 봉은 진입 체결 봉보다 이를 수 없다 (같으면 Δ=0).
+**FR-5.4 체결가 결정**: 진입·청산 모두 **요청 순간 화면에 보이는 가격으로 즉시 체결**한다. 체결가는 서버가 자신의 스테이지 시계(t0)로 차트 렌더와 동일한 선형 보간식(직전 봉 종가 → 현재 봉 종가)을 재현해 산출한다 — 클라이언트가 신고한 가격은 쓰지 않는다 (서버 권위). 청산도 즉시 정산되며(CLOSING 대기 없음), 강제 청산(FR-5.11)만 마지막 봉 종가를 쓴다.
+> 개정 이유(2026-08-04): 일봉 전환으로 봉 간 변동이 ±1~3%가 되면서 "다음 봉 종가 체결"의 슬리피지가 체감을 해쳤다. 봉 데이터가 전량 프리로드되는 MVP 구조에서 지연 체결의 조작 방지 효과는 없으므로 즉시 체결로 전환.
 **FR-5.5 청산 손익 수식** — 연속 PnL, 비대칭 계수
 
 ```
@@ -709,10 +710,7 @@ tf.cache.progress 진행도 캐시 (서버가 권위, 오프라인 표시용)
 
 ```json
 { "op": "position.opened",
-  "seq": 5, "openBarIdx": 143, "basePrice": 14240, "aumLeft": 1800 }
-
-{ "op": "position.closing",
-  "seq": 5, "exitBarIdx": 168 }
+  "seq": 5, "openBarIdx": 143, "basePrice": 14240.6, "aumLeft": 1800 }
 
 { "op": "position.closed",
   "seq": 5, "outcome": "win", "deltaPct": 0.83, "g": 1.41,
@@ -733,18 +731,14 @@ tf.cache.progress 진행도 캐시 (서버가 권위, 오프라인 표시용)
 ```
 클라이언트                    서버
     │  position.open (seq=5) ──▶│
-    │                           │ 현재 서버 기준 bar 인덱스 확인 (i)
-    │                           │ openBarIdx = i + 1
-    │                           │ basePrice  = bars[i+1].close (진입 체결)
+    │                           │ 서버 시계로 보간 체결가 산출 (직전 봉 종가 → 현재 봉 종가 선형 보간)
+    │                           │ basePrice = interp(now) — 요청 순간 화면가와 일치 (FR-5.4)
     │                           │ AUM 차감, DB insert
     │◀── position.opened ───────│
     │        (자유 보유 — 미실현 손익은 클라이언트 표시 전용)
     │  position.close (seq=5) ─▶│
-    │                           │ exitBarIdx = max(현재 i + 1, openBarIdx)
-    │◀── position.closing ──────│
-    │                           │ (exitBarIdx 봉이 닫히는 시각까지 대기)
-    │                           │ Δ%, g 계산 → payout 확정
-    │                           │ payout 골드 입금, DB update
+    │                           │ closePrice = interp(now) → Δ%, g 계산 → 즉시 정산
+    │                           │ 스테이크(−손실) AUM 반환, 순수익 골드 환전, DB update
     │◀── position.closed ───────│
 
 미청산 상태로 마지막 봉 마감 → 서버가 bars[last].close로 강제 청산 (forced=true)
@@ -786,10 +780,10 @@ tf.cache.progress 진행도 캐시 (서버가 권위, 오프라인 표시용)
   NONE ──open 요청──▶ PENDING ──서버 opened──▶ ACTIVE
                          │                       │ close 요청 (또는 스테이지 종료 강제 청산)
                          │ 에러                  ▼
-                         ▼                    CLOSING ──exitBar 마감──▶ CLOSED (win|lose|draw)
-                       NONE                                                │ 연출 0.8s
-                                                                           ▼
-                                                                         NONE
+                         ▼                    CLOSED (win|lose|draw) — 즉시 정산
+                       NONE                      │ 연출 0.8s
+                                                 ▼
+                                               NONE
 ```
 
 동시 `ACTIVE` 포지션은 최대 1개 (FR-5.2). `ACTIVE` 중 미실현 손익은 클라이언트 표시 전용.

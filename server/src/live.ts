@@ -21,7 +21,6 @@ export class LiveSession {
   goldSum = 0; // 골드로 환전된 순수익 누적 (payout − 반환 스테이크)
   wins = 0; loses = 0; draws = 0;
   open: { seq: number; direction: Direction; stake: number; openBarIdx: number; basePrice: number } | null = null;
-  closing = false;
   positionCount = 0;
   combatCredited = 0; // 전투 처치로 크레딧된 AUM 누적 (상한 clamp)
   lastOpenAt = 0;
@@ -58,7 +57,7 @@ export class LiveSession {
       this.endTimerSet = true;
       const endAt = this.t0 + this.bars.barCount * this.barMs + 50;
       this.timers.push(setTimeout(() => {
-        if (this.open && !this.closing) this.settleClose(this.bars.barCount - 1, true);
+        if (this.open) this.settleClose(this.bars.barCount - 1, this.bars.bars[this.bars.barCount - 1].c, true);
       }, Math.max(0, endAt - Date.now())));
     }
     this.send({ op: 'started', serverT0: this.t0 });
@@ -67,6 +66,17 @@ export class LiveSession {
   serverBarIdx(now = Date.now()): number {
     if (this.t0 == null) return -1;
     return Math.floor((now - this.t0) / this.barMs);
+  }
+
+  /** FR-5.4 즉시 체결가 — 차트 렌더와 동일한 선형 보간(직전 봉 종가 → 현재 봉 종가)을 서버 시계로 재현 */
+  interpPrice(now = Date.now()): { price: number; barIdx: number } {
+    const n = this.bars.barCount;
+    const barF = Math.max((now - this.t0!) / this.barMs, 0);
+    const i = Math.min(Math.floor(barF), n - 1);
+    const frac = Math.min(barF - i, 1);
+    const prev = i <= 0 ? this.bars.bars[0].o : this.bars.bars[i - 1].c;
+    const cur = this.bars.bars[i].c;
+    return { price: prev + (cur - prev) * frac, barIdx: i };
   }
 
   /** 웨이브 시계 기준 현재까지 지급된 기본 수입 (FR-6.8) */
@@ -90,11 +100,10 @@ export class LiveSession {
     if (direction !== 'long' && direction !== 'short') return err('INVALID_SEQ');
     if (!Number.isInteger(seq) || seq !== this.positionCount + 1) return err('INVALID_SEQ');
 
+    // FR-5.4: 요청 순간 화면에 보이는 보간 가격으로 즉시 체결 (서버가 동일 보간식으로 재현 — 권위 유지)
     const i = this.serverBarIdx(now);
-    const openBarIdx = i + 1; // FR-5.4: 다음 1분봉의 종가로 체결 (시장가 주문 지연)
-    if (i < 0 || openBarIdx >= this.bars.barCount - 1) return err('SESSION_ENDED');
-
-    const basePrice = this.bars.bars[openBarIdx].c;
+    if (i < 0 || i >= this.bars.barCount - 2) return err('SESSION_ENDED'); // 종료 직전 진입 불가
+    const { price: basePrice, barIdx: openBarIdx } = this.interpPrice(now);
     this.open = { seq, direction, stake, openBarIdx, basePrice };
     this.positionCount += 1;
     this.aum -= stake;
@@ -107,26 +116,19 @@ export class LiveSession {
     this.send({ op: 'position.opened', seq, openBarIdx, basePrice, aumLeft: this.aum });
   }
 
-  // FR-5.5: 청산 요청 → 다음 1분봉 종가로 체결 (진입 봉보다 이르게는 불가)
+  // FR-5.4: 청산도 요청 순간 보간 가격으로 즉시 체결·정산
   closePosition(seq: number) {
     const err = (code: Parameters<typeof this.errMsg>[0]) => this.send(this.errMsg(code, seq));
     if (this.t0 == null) return err('SESSION_ENDED');
-    if (!this.open || this.open.seq !== seq || this.closing) return err('NO_OPEN_POSITION');
+    if (!this.open || this.open.seq !== seq) return err('NO_OPEN_POSITION');
 
-    const i = this.serverBarIdx();
-    const exitBarIdx = Math.min(Math.max(i + 1, this.open.openBarIdx), this.bars.barCount - 1);
-    this.closing = true;
-    this.send({ op: 'position.closing', seq, exitBarIdx });
-
-    // exitBarIdx 봉이 "닫히는" 실제 시각에 판정
-    const settleAt = this.t0 + (exitBarIdx + 1) * this.barMs + 30;
-    this.timers.push(setTimeout(() => this.settleClose(exitBarIdx, false), Math.max(0, settleAt - Date.now())));
+    const { price, barIdx } = this.interpPrice();
+    this.settleClose(Math.max(barIdx, this.open.openBarIdx), price, false);
   }
 
-  private settleClose(exitBarIdx: number, forced: boolean) {
+  private settleClose(exitBarIdx: number, closePrice: number, forced: boolean) {
     if (!this.open) return;
     const { seq, direction, stake, basePrice } = this.open;
-    const closePrice = this.bars.bars[exitBarIdx].c;
     const r = judge(basePrice, closePrice, this.bars.sigma['30'], direction, stake, this.params.lossRate);
 
     if (r.outcome === 'win') this.wins += 1;
@@ -139,7 +141,6 @@ export class LiveSession {
     this.aum += returnToAum;
     this.goldSum += goldGain;
     this.open = null;
-    this.closing = false;
 
     db.prepare(
       `UPDATE positions SET close_bar_idx = ?, close_price = ?, delta_pct = ?, z_norm = ?, outcome = ?, payout = ?, forced = ?, resolved_at = datetime('now')
@@ -187,7 +188,6 @@ export class LiveSession {
         this.positionCount -= 1;
       }
       this.open = null;
-      this.closing = false;
     }
   }
 

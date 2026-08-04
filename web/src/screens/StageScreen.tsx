@@ -41,7 +41,6 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     seq: number;
     openMarker: (OpenMarker & { stake: number; basePrice: number }) | null;
     pendingOpen: boolean;
-    closing: boolean;
     aum: number;
     aumReported: number;
     lastAumReportAt: number;
@@ -51,7 +50,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     shakeUntil: number;
   }>({
     start: null, bars: null, battle: null, ws: null, t0: 0, barMs: 1000,
-    seq: 0, openMarker: null, pendingOpen: false, closing: false, aum: 0,
+    seq: 0, openMarker: null, pendingOpen: false, aum: 0,
     aumReported: 0, lastAumReportAt: 0, finished: false,
     lastPayoutAt: 0, lastEventKey: '', shakeUntil: 0,
   });
@@ -137,13 +136,10 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           direction: s.openMarker?.direction ?? 'long',
           stake: s.openMarker?.stake ?? 0,
         };
-      } else if (m.op === 'position.closing') {
-        s.closing = true;
       } else if (m.op === 'position.closed') {
         s.aum = m.aumLeft;
         const holdBars = s.openMarker ? m.exitBarIdx - s.openMarker.openBarIdx : null;
         s.openMarker = null;
-        s.closing = false;
         s.battle?.addGold(m.goldGain); // FR-5.5b: 순수익만 골드로 자동 환전 (스테이크는 AUM 반환)
         s.lastPayoutAt = Date.now();
         setPopup({ outcome: m.outcome, amount: m.pnl, goldGain: m.goldGain });
@@ -275,7 +271,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
   // 튜토리얼 ③단계: WIN이 보장되는 상승 구간이 지난 뒤에만 청산 허용
   const canClose = (() => {
     const s = g.current;
-    if (phase !== 'playing' || !s.openMarker || s.openMarker.basePrice <= 0 || s.closing) return false;
+    if (phase !== 'playing' || !s.openMarker || s.openMarker.basePrice <= 0) return false;
     if (isTut && guide === 2 && hud.barF < s.openMarker.openBarIdx + 26) return false;
     return true;
   })();
@@ -423,7 +419,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
                   </span>
                 </div>
                 <button className={`close-pos ${isTut && guide === 2 && canClose ? 'pulse' : ''}`} disabled={!canClose} onClick={closePosition}>
-                  {s.closing ? '청산 중…' : '청산 ✕'}
+                  청산 ✕
                 </button>
               </>
             ) : (

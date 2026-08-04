@@ -78,7 +78,6 @@ export type WsClientMsg =
 export type WsServerMsg =
   | { op: 'started'; serverT0: number }
   | { op: 'position.opened'; seq: number; openBarIdx: number; basePrice: number; aumLeft: number }
-  | { op: 'position.closing'; seq: number; exitBarIdx: number }
   | {
       op: 'position.closed'; seq: number; outcome: Outcome; deltaPct: number; g: number; goldGain: number;
       payout: number; pnl: number; exitBarIdx: number; forced: boolean; earnedTotal: number; aumLeft: number;
