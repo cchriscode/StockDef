@@ -1,8 +1,9 @@
 // FR-6.1 일자형 전투 렌더러 — Battle 엔진 상태를 그리기만 한다 (로직·렌더 분리, §11)
 import { BASE_TURRET, ENEMY_TYPES, TOWERS, type Battle, type Enemy } from '@tf/shared';
+import { BACKDROPS, BACKDROP_GROUND, BACKDROP_H, BACKDROP_W, type Backdrop } from './battleBackdrops.js';
 
-const AIR_Y = 48;
-const GROUND_Y = 150;
+const AIR_Y = 70;
+const GROUND_Y = 200;
 
 const ENEMY_COLORS: Record<Enemy['type'], string> = {
   grunt: '#E8654F', runner: '#FF9E86', tank: '#A83A2E', shield: '#C9A84A',
@@ -12,17 +13,82 @@ const UNIT_COLORS = { intern: '#7BD8A0', analyst: '#46A574', trader: '#3E8C68' }
 const TOWER_COLORS = { basic: '#4E7FB8', aa: '#9B6BFF', splash: '#F79B76' };
 const MODE_LABEL = { first: '선두', last: '후미', strong: '강적', close: '근접' };
 
-// 석양 8단계 램프 (목업 04번 전장 하늘)
-const SKY_RAMP = ['#17223A', '#3A3350', '#6E4358', '#B0565A', '#D96A5C', '#F79B76', '#FFC48E'];
-// 원경 실루엣: 좌 = 아군 그린 지구, 우 = 베어 요새 레드 지구 (x는 0~1000 논리 좌표)
-const SKYLINE: { x: number; w: number; h: number; col: string }[] = [
-  { x: 30, w: 60, h: 76, col: '#173C31' }, { x: 105, w: 44, h: 52, col: '#12332A' },
-  { x: 160, w: 52, h: 88, col: '#173C31' }, { x: 225, w: 40, h: 44, col: '#12332A' },
-  { x: 300, w: 56, h: 62, col: '#1B4636' },
-  { x: 640, w: 48, h: 50, col: '#5E2019' }, { x: 700, w: 60, h: 80, col: '#7A2A20' },
-  { x: 775, w: 40, h: 58, col: '#5E2019' }, { x: 830, w: 56, h: 94, col: '#7A2A20' },
-  { x: 900, w: 44, h: 66, col: '#5E2019' }, { x: 950, w: 48, h: 84, col: '#7A2A20' },
-];
+// ─── 도시별 전장 배경 (Backgrounds 목업 트레이스 세트) — 오프스크린 1회 렌더 후 재사용 ───
+const backdropCache = new Map<string, HTMLCanvasElement>();
+
+function drawStripes(ctx: CanvasRenderingContext2D, r: { xx: number; yy: number; ww: number; hh: number }, layer: Backdrop['rects'][number]['g'], sx2: number, sy2: number) {
+  if (!layer) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(r.xx, r.yy, r.ww, r.hh);
+  ctx.clip();
+  // CSS는 먼저 선언된 레이어가 위 — 캔버스는 뒤집어서 그린다
+  for (let li = layer.length - 1; li >= 0; li--) {
+    const st = layer[li];
+    const scale = st.dir === 'x' ? sx2 : sy2;
+    const period = Math.max(st.period * scale, 1);
+    const len = st.dir === 'x' ? r.ww : r.hh;
+    for (let off = 0; off < len; off += period) {
+      for (const seg of st.segs) {
+        ctx.fillStyle = seg.c;
+        const a = off + seg.a * scale;
+        const b = off + seg.b * scale;
+        if (st.dir === 'x') ctx.fillRect(r.xx + a, r.yy, b - a, r.hh);
+        else ctx.fillRect(r.xx, r.yy + a, r.ww, b - a);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function backdropFor(regionId: string, W: number, H: number, groundTop: number): HTMLCanvasElement {
+  const key = `${regionId}:${W}x${H}`;
+  const hit = backdropCache.get(key);
+  if (hit) return hit;
+  const bd = BACKDROPS[regionId] ?? BACKDROPS.R1;
+  const cv = document.createElement('canvas');
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext('2d')!;
+  const sx2 = W / BACKDROP_W;
+  const sy2 = groundTop / (BACKDROP_H - BACKDROP_GROUND); // 패널 지면선 → 우리 지면선 정합
+  // 하늘 램프 (디더 포함)
+  let y = 0;
+  for (const band of bd.bands) {
+    const h = band.h < 0 ? Math.max(H - y, 0) : band.h * sy2;
+    if (band.c) {
+      ctx.fillStyle = band.c;
+      ctx.fillRect(0, y, W, h + 1);
+    } else if (band.d) {
+      ctx.fillStyle = band.d[0];
+      ctx.fillRect(0, y, W, h + 1);
+      ctx.fillStyle = band.d[1];
+      for (let yy = 0; yy < h; yy += 4) {
+        for (let xx = ((yy / 4) % 2) * 4; xx < W; xx += 8) ctx.fillRect(xx, y + yy, 4, Math.min(4, h - yy));
+      }
+    }
+    y += h;
+    if (y >= H) break;
+  }
+  // 실루엣·랜드마크 사각형 (t = 하늘 앵커 / b = 지면선 앵커)
+  for (const r of bd.rects) {
+    const ww = r.x * sx2 + r.w * sx2 - Math.floor(r.x * sx2); // 반올림 이음새 방지
+    const xx = Math.floor(r.x * sx2);
+    const hh = r.h * sy2;
+    let yy: number;
+    if (r.t != null) yy = r.t * sy2;
+    else yy = groundTop - (r.b! - BACKDROP_GROUND) * sy2 - hh;
+    ctx.globalAlpha = r.o ?? 1;
+    if (r.c) {
+      ctx.fillStyle = r.c;
+      ctx.fillRect(xx, yy, ww, hh);
+    }
+    drawStripes(ctx, { xx, yy, ww, hh }, r.g, sx2, sy2);
+    ctx.globalAlpha = 1;
+  }
+  backdropCache.set(key, cv);
+  return cv;
+}
 
 export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, selectedSlot: number | null) {
   const ctx = canvas.getContext('2d')!;
@@ -33,22 +99,10 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
   ctx.clearRect(-8, -8, W + 16, H + 16);
 
-  // 하늘 (석양 램프 + 디더 경계) / 원경 실루엣 / 지면
+  // 도시별 전장 배경 (오프스크린 캐시) + 지면
   const groundTop = GROUND_Y + 16;
-  const bandH = Math.ceil(groundTop / SKY_RAMP.length);
-  for (let i = 0; i < SKY_RAMP.length; i++) {
-    ctx.fillStyle = SKY_RAMP[i];
-    ctx.fillRect(-8, i * bandH, W + 16, bandH);
-    if (i > 0) { // 4px 체커 디더
-      for (let x = 0; x < W; x += 8) {
-        ctx.fillRect(x + ((i % 2) * 4), i * bandH - 4, 4, 4);
-      }
-    }
-  }
-  for (const bd of SKYLINE) {
-    ctx.fillStyle = bd.col;
-    ctx.fillRect(sx(bd.x), groundTop - bd.h, sx(bd.w), bd.h);
-  }
+  const regionKey = b.params.regionId === 'TUT' ? 'R1' : b.params.regionId;
+  ctx.drawImage(backdropFor(regionKey, W, H, groundTop), 0, 0);
   ctx.fillStyle = '#2E3D57';
   ctx.fillRect(-8, groundTop, W + 16, 4);
   ctx.fillStyle = 'rgba(123,216,160,0.5)';

@@ -434,7 +434,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
       </div>
 
       <div className="battle-wrap">
-        <canvas ref={battleRef} width={860} height={190} className="battle" onClick={onBattleClick} />
+        <canvas ref={battleRef} width={860} height={240} className="battle" onClick={onBattleClick} />
         {/* 양측 HP + 웨이브 (목업 04번 오버레이) */}
         <div className="hp-overlay left">
           <div className="who"><i />우리 사옥</div>
