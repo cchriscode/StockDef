@@ -186,9 +186,7 @@ b.danger { color: var(--red2); }
 .map-stats { display: flex; gap: 14px; font-size: 12px; flex-wrap: wrap; color: var(--mut); }
 .map-stats b { color: var(--text); }
 .map-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.mr-cols { position: relative; display: flex; gap: 24px; align-items: flex-start; flex: 1; }
-/* 국가 리스트는 지도 위 오버레이 (목업 03번) — 지도가 리스트 밑까지 넓게 깔린다 */
-.mr-cols > .country-col { position: absolute; left: 0; top: 0; z-index: 2; }
+.mr-cols { display: flex; gap: 16px; align-items: flex-start; flex: 1; }
 .mr-mid { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; align-items: center; }
 .mr-glow {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -225,7 +223,7 @@ b.danger { color: var(--red2); }
 .callout .clabel { position: absolute; font-size: 13px; white-space: nowrap; text-shadow: 0 2px 0 var(--bg1); }
 
 /* 국가 리스트 (좌측 세로 1열) */
-.country-col { width: 264px; flex: none; display: flex; flex-direction: column; gap: 5px; }
+.country-col { width: 240px; flex: none; display: flex; flex-direction: column; gap: 5px; }
 .country-row {
   display: flex; align-items: center; gap: 10px; padding: 11px 12px;
   background: var(--panel2); border: none; min-height: 52px; text-align: left; cursor: pointer;
@@ -277,7 +275,7 @@ b.danger { color: var(--red2); }
 .briefing .cta:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 var(--green-dk); }
 .briefing .cta:disabled { background: var(--head); color: var(--dim); box-shadow: none; opacity: 1; }
 .briefing.next-lock .cta:disabled { background: var(--head); border: 2px solid #B85C7A; color: #E8A0B4; }
-.mr-brief { width: 400px; flex: none; }
+.mr-brief { width: 360px; flex: none; }
 
 /* 한국 지도 위 거점 마커 */
 .kmark { position: absolute; display: flex; align-items: center; gap: 8px; cursor: pointer; z-index: 2; }
@@ -519,7 +517,6 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
   .chart-band { flex-direction: column; }
   .trade-panel { width: 100%; }
   .mr-cols { flex-direction: column; align-items: stretch; }
-  .mr-cols > .country-col { position: static; }
   .country-col, .mr-brief { width: 100%; }
   .hp-overlay .track { width: 100px; }
 }

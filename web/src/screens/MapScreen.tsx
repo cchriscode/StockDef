@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { MapRes, RegionId } from '@tf/shared';
 import { api } from '../net/api.js';
 import { COUNTRIES, KR_COLS, KR_ROWS, WORLD_COLS, WORLD_ROWS, krSegs, worldSegs } from '../game/pixelMaps.js';
@@ -25,18 +25,20 @@ const KR_MARKS: Record<string, { x: number; y: number }> = {
 const STATUS_LABEL = { open: '진행 중', next: '해금', locked: '잠김' } as const;
 const STATUS_COLOR = { open: '#7BD8A0', next: '#FF9E86', locked: '#4E5B72' } as const;
 
-/** 중앙 컬럼 폭에 맞춰 고정 크기 지도를 확대·축소 (상황실 레이아웃 유지, 최대 1.6배) */
+/** 중앙 컬럼 폭에 맞춰 고정 크기 지도를 확대·축소 (양옆 패널과 겹치지 않게 딱 맞춤, 최대 1.6배)
+ *  콜백 ref 사용: 로딩 화면 뒤에 늦게 마운트되어도 관측이 확실히 붙는다. */
 function useFitScale(natural: number) {
-  const ref = useRef<HTMLDivElement>(null);
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
   useLayoutEffect(() => {
-    const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setScale(Math.min(1.6, el.clientWidth / natural)));
+    const measure = () => setScale(Math.min(1.6, el.clientWidth / natural));
+    measure();
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [natural]);
-  return { ref, scale };
+  }, [el, natural]);
+  return { ref: setEl, scale };
 }
 
 export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props) {
