@@ -162,45 +162,74 @@ def process_ticker(raw):
     return results
 
 
-def make_tutorial():
-    """FR-12: 5웨이브(150봉) 합성 데이터. 25~70봉 강한 상승 → LONG 30봉 보유 WIN 보장."""
-    bars, price = [], 10000.0
-    import random
-    rng = random.Random(42)
-    for i in range(150):
-        drift = 0.0006 if 21 <= i <= 70 else 0.00003
-        noise = rng.uniform(-0.0004, 0.0004)
-        o = price
-        c = price * (1 + drift + noise)
-        h = max(o, c) * (1 + rng.uniform(0, 0.0003))
-        l = min(o, c) * (1 - rng.uniform(0, 0.0003))
-        bars.append({"t": i, "o": round(o, 2), "h": round(h, 2), "l": round(l, 2), "c": round(c, 2), "v": 5000 + rng.randint(-500, 2500)})
-        price = c
-    closes = [b["c"] for b in bars]
+TUT_BARS = 150       # 5웨이브
+TUT_ENTRY = range(23, 37)   # 가이드 진입 체결 봉 (LONG 버튼 활성 22~34 + 다음 봉 체결)
+TUT_HOLD = range(27, 46)    # 청산 게이트(진입+26) 이후 현실적 청산 시점
+
+
+def tutorial_win_score(closes, s30):
+    """가이드 구간의 모든 (진입, 청산) 조합에서 z = Δ%/σ30 의 최솟값. > 0.30 이면 WIN 보장."""
+    worst = float("inf")
+    for i in TUT_ENTRY:
+        for h in TUT_HOLD:
+            j = i + h
+            if j >= len(closes):
+                return -1.0
+            z = ((closes[j] / closes[i] - 1) * 100) / s30
+            worst = min(worst, z)
+    return worst
+
+
+def make_tutorial(raws):
+    """FR-12: 실제 차트 고정 튜토리얼 — 전 종목 150거래일 윈도우에서
+    가이드 구간(LONG 진입 → 26봉+ 보유 청산)이 어떤 타이밍에도 WIN이 되는
+    가장 안전한 상승 구간을 결정론적으로 선택한다."""
+    best = None  # (score, symbol, name, daily, i0)
+    for raw in raws:
+        daily = [d for d in raw["daily"] if d["c"] > 0 and d["o"] > 0]
+        for i0 in range(0, len(daily) - TUT_BARS + 1, 5):
+            closes = [d["c"] for d in daily[i0:i0 + TUT_BARS]]
+            s30 = sigma_k(closes, 30)
+            score = tutorial_win_score(closes, s30)
+            if score > 0.30 and (best is None or score > best[0]):
+                best = (score, raw["symbol"], raw["name"], daily, i0)
+    assert best is not None, "튜토리얼 WIN 보장 실제 구간을 찾지 못함 — 데이터 확인 필요"
+    score, symbol, name, daily, i0 = best
+    n = len(daily)
+    i1 = i0 + TUT_BARS - 1
+    window = daily[i0:i1 + 1]
+    arr = [{"t": t, "o": b["o"], "h": b["h"], "l": b["l"], "c": b["c"], "v": b["v"]} for t, b in enumerate(window)]
+    closes = [x["c"] for x in arr]
+    open_price = arr[0]["o"]
     s15, s30, s60 = sigma_k(closes, 15), sigma_k(closes, 30), sigma_k(closes, 60)
-    # WIN 보장 검증: 가이드 구간(25~35봉 진입, 30봉 보유)의 z가 DRAW_BAND(0.25) 초과 & 양수
-    for i in range(24, 36):
-        delta = (closes[i + 30] / closes[i] - 1) * 100
-        assert delta > 0 and delta / s30 > 0.30, f"튜토리얼 WIN 보장 실패 @bar{i}: Δ={delta:.3f} σ30={s30}"
+    change_pct = round((closes[-1] / open_price - 1) * 100, 3)
+    print(f"튜토리얼 차트: {name} {window[0]['d']}~{window[-1]['d']} (min z={score:.2f}, 등락 {change_pct:+.1f}%)", flush=True)
+
+    lo_i = max(0, i0 - CONTEXT_PAD)
+    hi_i = min(n, i1 + 1 + CONTEXT_PAD)
+    ctx = daily[lo_i:hi_i:CONTEXT_STEP]
+    around = [{"d": x["d"], "o": x["o"], "h": x["h"], "l": x["l"], "c": x["c"]} for x in ctx]
 
     set_id = str(uuid.uuid4())
     bars_file = {
-        "v": 1, "barCount": 150, "openPrice": 10000, "bars": bars,
-        "volumeAvg20d": 5500.0,
+        "v": 1, "barCount": TUT_BARS, "openPrice": open_price,
+        "bars": [{k: (round(v, 4) if isinstance(v, float) else v) for k, v in x.items()} for x in arr],
+        "volumeAvg20d": round(max(sum(x["v"] for x in arr) / TUT_BARS, 1.0), 1),
         "sigma": {"15": s15, "30": s30, "60": s60},
         "events": [],
         "tags": {"region": "연습", "sector": "연습", "capTier": "large"},
     }
     cs = {
-        "id": set_id, "ticker": "TUT", "company_name": "가상 연습 종목 (합성 데이터)",
-        "trade_date": str(date.today()), "market": "SYNTH", "sector": "연습", "cap_tier": "large",
-        "region_id": "TUT", "archetype": "surge", "day_change_pct": round((closes[-1] / 10000 - 1) * 100, 3),
+        "id": set_id, "ticker": symbol.split(".")[0], "company_name": name,
+        "trade_date": window[-1]["d"], "market": "KRX", "sector": "연습", "cap_tier": "large",
+        "region_id": "TUT", "archetype": "surge", "day_change_pct": change_pct,
         "rarity": "common", "difficulty": 0, "bars_url": f"/static/bars/{set_id}.json",
         "sigma_15m": s15, "sigma_30m": s30, "sigma_60m": s60,
         "events": [], "news": [],
-        "ohlcv_day": {"around": [], "dayIndex": 0, "windowLen": 0, "dateStart": str(date.today()),
-                      "o": 10000, "h": max(b["h"] for b in bars),
-                      "l": min(b["l"] for b in bars), "c": closes[-1], "v": 800000},
+        "ohlcv_day": {"around": around, "dayIndex": (i0 - lo_i) // CONTEXT_STEP,
+                      "windowLen": TUT_BARS // CONTEXT_STEP, "dateStart": window[0]["d"],
+                      "o": open_price, "h": max(x["h"] for x in arr),
+                      "l": min(x["l"] for x in arr), "c": closes[-1], "v": sum(x["v"] for x in arr)},
     }
     return cs, bars_file
 
@@ -210,9 +239,10 @@ def main():
     for old in BARS_OUT.glob("*.json"):
         old.unlink()
 
-    all_sets, all_bars = [], []
+    all_sets, all_bars, raws = [], [], []
     for f in sorted(RAW.glob("*.json")):
         raw = json.loads(f.read_text(encoding="utf-8"))
+        raws.append(raw)
         for cs, bf in process_ticker(raw):
             all_sets.append(cs)
             all_bars.append(bf)
@@ -228,7 +258,7 @@ def main():
     for c in all_sets:
         c.pop("_vol30", None)
 
-    tut_cs, tut_bars = make_tutorial()
+    tut_cs, tut_bars = make_tutorial(raws)
     all_sets.append(tut_cs)
     all_bars.append(tut_bars)
 

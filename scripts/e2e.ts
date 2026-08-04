@@ -119,8 +119,8 @@ check('FR-12 튜토리얼 클리어', tut.finish.status === 'cleared');
 check('FR-12.5 튜토리얼 자본금 500 고정', tut.finish.capitalAwarded === 500);
 check('튜토리얼 첫 예측 WIN 보장 (적중률 100%)', tut.finish.accuracy === 1);
 
-const revealTut = await req<{ companyName: string }>(`/api/stage/${tut.sessionId}/reveal`);
-check('FR-9.3 공개 API (튜토리얼 = 가상 종목)', revealTut.companyName.includes('가상'));
+const revealTut = await req<{ companyName: string; ticker: string }>(`/api/stage/${tut.sessionId}/reveal`);
+check('FR-9.3 공개 API (튜토리얼 = 고정 실제 차트)', revealTut.ticker !== 'TUT' && revealTut.companyName.length > 0);
 
 console.log('▶ R1 여의도 (195초 @2x, p=0.65 봇)…');
 const r1 = await playStage('R1', 0.65);
