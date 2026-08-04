@@ -175,8 +175,8 @@ b.danger { color: var(--red2); }
   background: repeating-linear-gradient(to right, transparent 0 60px, #0E1626 60px 62px),
     repeating-linear-gradient(to bottom, transparent 0 60px, #0E1626 60px 62px);
 }
-.map-room::after { /* 스캔라인 */
-  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+.map-room::after { /* 스캔라인 — 배경 전용 (격자 위, 패널·버튼 아래) */
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
   background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 4px);
 }
 .map-room > * { position: relative; z-index: 1; }
