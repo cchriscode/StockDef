@@ -2,8 +2,8 @@
 import { BASE_TURRET, ENEMY_TYPES, TOWERS, type Battle, type Enemy } from '@tf/shared';
 import { BACKDROPS, BACKDROP_GROUND, BACKDROP_H, BACKDROP_W, type Backdrop } from './battleBackdrops.js';
 
-const AIR_Y = 70;
-const GROUND_Y = 200;
+const AIR_Y = 96;
+const GROUND_Y = 258; // 캔버스 1400×300 기준 — 스프라이트는 고정 px, 레인만 길어진다
 
 const ENEMY_COLORS: Record<Enemy['type'], string> = {
   grunt: '#E8654F', runner: '#FF9E86', tank: '#A83A2E', shield: '#C9A84A',

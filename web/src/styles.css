@@ -283,7 +283,7 @@ b.danger { color: var(--red2); }
 .card.settings label { display: flex; flex-direction: column; gap: 6px; }
 
 /* ── 스테이지 (목업 04번) ── */
-.stage { gap: 8px; max-width: 1080px; transition: box-shadow 0.4s; }
+.stage { gap: 8px; max-width: 1520px; transition: box-shadow 0.4s; }
 .tint-panic { box-shadow: inset 0 0 120px rgba(232, 101, 79, 0.3); }
 .tint-fomo { box-shadow: inset 0 0 120px rgba(70, 165, 116, 0.24); }
 .stage-top { display: flex; align-items: center; gap: 10px; }
