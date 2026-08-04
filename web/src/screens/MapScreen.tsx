@@ -53,6 +53,19 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
 
   const wSegs = useMemo(() => worldSegs(WORLD_CELL), []);
   const kSegs = useMemo(() => krSegs(KR_CELL), []);
+  // 국가별 바운딩 박스 — 리스트 선택 시 지도 하이라이트 프레임용
+  const wBounds = useMemo(() => {
+    const m = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
+    for (const s of wSegs) {
+      const b = m.get(s.k) ?? { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+      b.x0 = Math.min(b.x0, s.x);
+      b.y0 = Math.min(b.y0, s.y);
+      b.x1 = Math.max(b.x1, s.x + s.w);
+      b.y1 = Math.max(b.y1, s.y + s.h);
+      m.set(s.k, b);
+    }
+    return m;
+  }, [wSegs]);
 
   if (!map) return <div className="screen center"><p className="dim">지도 로딩…</p></div>;
 
@@ -122,7 +135,8 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
                 <div className="pixmap" style={{ width: WORLD_W, height: WORLD_H }}>
                   {wSegs.map((s, i) => {
                     const c = COUNTRIES.find((cc) => cc.key === s.k)!;
-                    const opacity = c.status === 'open' ? 1 : c.status === 'next' ? 0.85 : 0.36;
+                    const base = c.status === 'open' ? 1 : c.status === 'next' ? 0.85 : 0.36;
+                    const opacity = s.k === selCountry ? Math.max(base, 0.9) : base; // 선택 국가는 밝게
                     return (
                       <div
                         key={i}
@@ -138,14 +152,24 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
                   <div className="lat" style={{ top: 188 }} />
                   <div className="lat" style={{ top: 348 }} />
                   <div className="meridian" style={{ left: 576 }} />
-                  {/* 한국 하이라이트 + 콜아웃 */}
+                  {/* 콜아웃 (한국 진행 중 / 일본 해금) */}
                   <div className="callout">
-                    <div className="frame" style={{ left: 956, top: 124, width: 56, height: 56 }} />
                     <div className="tick" style={{ left: 1012, top: 150, width: 48, background: '#7BD8A0' }} />
                     <div className="clabel" style={{ left: 1066, top: 141, color: '#7BD8A0' }}>한국 · 진행 중</div>
                     <div className="tick" style={{ left: 1040, top: 202, width: 24, background: '#B85C7A' }} />
                     <div className="clabel" style={{ left: 1070, top: 193, color: '#E8A0B4' }}>일본 · 해금</div>
                   </div>
+                  {/* 리스트 선택 국가 하이라이트 프레임 */}
+                  {(() => {
+                    const bb = wBounds.get(selCountry);
+                    if (!bb) return null;
+                    return (
+                      <div
+                        className="sel-frame"
+                        style={{ left: bb.x0 - 8, top: bb.y0 - 8, width: bb.x1 - bb.x0 + 16, height: bb.y1 - bb.y0 + 16, borderColor: country.color }}
+                      />
+                    );
+                  })()}
                   {/* 한국 클릭 히트박스 (셀이 작아 프레임 영역 전체를 클릭 가능하게) */}
                   <div
                     style={{ position: 'absolute', left: 956, top: 124, width: 56, height: 56, cursor: 'pointer', background: 'rgba(255,255,255,0.02)' }}
