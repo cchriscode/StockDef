@@ -36,6 +36,16 @@ export const BALANCE = {
   SKILL_DAMAGE: 80,
   COOLDOWN_PLAYS: 20, // FR-3.6 조합 재출현 쿨다운
 
+  // FR-3.6b 지역별 차트 아키타입 가중 추첨 — 쉬운 지역은 박스권(작은 |g|, 실수에 관대),
+  // 어려운 지역은 원웨이·급변(방향 맞으면 대박, 틀리면 L 계수로 크게 잃음 → 실력 게이트 강화).
+  // 미기재 아키타입 가중치는 1. 봇 시뮬(npm run sim)로 §9.3 곡선 재검증할 것.
+  ARCHETYPE_WEIGHTS: {
+    TUT: {},
+    R1: { range: 5, reversal: 3, surge: 1, plunge: 1, panic: 1, earnings: 0.5 },
+    R2: { range: 2, reversal: 3, surge: 2, plunge: 2, panic: 2, earnings: 1 },
+    R3: { range: 0.5, reversal: 1, surge: 3, plunge: 3, panic: 3, earnings: 3 },
+  } as Record<RegionId, Record<string, number>>,
+
   // 웨이브 사이클 (FR-3.1)
   PREP_SECONDS: 10,
   WAVE_SECONDS: 20,

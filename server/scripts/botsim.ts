@@ -12,7 +12,7 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
 const SETS = JSON.parse(fs.readFileSync(path.join(ROOT, 'pipeline', 'out', 'chart_sets.json'), 'utf-8')) as {
-  id: string; region_id: string; bars_url: string;
+  id: string; region_id: string; bars_url: string; archetype: string;
 }[];
 
 const RUNS = Number(process.argv[2] ?? 60);
@@ -47,8 +47,16 @@ interface RunResult { victory: boolean; goldLeft: number; positions: number; win
 
 /** 승률 p 봇: 실제 봉 데이터로 판정하되, 방향을 확률 p로 정답에 맞춘다 (PRD §9.1 검증 방식) */
 function runStage(region: RegionId, p: number, usePositions: boolean): RunResult {
+  // FR-3.6b 지역별 아키타입 가중 추첨 (서버 선택 로직과 동일)
   const pool = SETS.filter((s) => s.region_id === region);
-  const cs = pool[Math.floor(Math.random() * pool.length)];
+  const weights = BALANCE.ARCHETYPE_WEIGHTS[region] ?? {};
+  const wsum = pool.reduce((s, c) => s + (weights[c.archetype] ?? 1), 0);
+  let roll = Math.random() * wsum;
+  let cs = pool[pool.length - 1];
+  for (const c of pool) {
+    roll -= weights[c.archetype] ?? 1;
+    if (roll <= 0) { cs = c; break; }
+  }
   const bars = loadBars(cs.bars_url);
   const params = makeParams(region);
   const b = new Battle(params, bars.events);

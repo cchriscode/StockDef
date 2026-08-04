@@ -122,7 +122,15 @@ router.post('/stage/start', (req, res) => {
   const territory = territoryOf(accountId, regionId);
   const firstPlay = !territory || territory.play_count === 0;
   const candidates = firstPlay ? (pool.filter((c) => c.difficulty <= 1).length ? pool.filter((c) => c.difficulty <= 1) : pool) : pool;
-  const chart = candidates[Math.floor(Math.random() * candidates.length)];
+  // FR-3.6b: 지역별 아키타입 가중 추첨 — 쉬운 지역 박스권 / 어려운 지역 원웨이·급변
+  const weights = BALANCE.ARCHETYPE_WEIGHTS[regionId] ?? {};
+  const wsum = candidates.reduce((s, c) => s + (weights[c.archetype] ?? 1), 0);
+  let roll = Math.random() * wsum;
+  let chart = candidates[candidates.length - 1];
+  for (const c of candidates) {
+    roll -= weights[c.archetype] ?? 1;
+    if (roll <= 0) { chart = c; break; }
+  }
 
   const params = buildStageParams(accountId, regionId);
   const sessionId = crypto.randomUUID();
