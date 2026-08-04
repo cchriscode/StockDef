@@ -42,13 +42,16 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     pendingOpen: boolean;
     closing: boolean;
     aum: number;
+    aumReported: number;
+    lastAumReportAt: number;
     finished: boolean;
     lastPayoutAt: number;
     lastEventKey: string;
     shakeUntil: number;
   }>({
     start: null, bars: null, battle: null, ws: null, t0: 0, barMs: 1000,
-    seq: 0, openMarker: null, pendingOpen: false, closing: false, aum: 0, finished: false,
+    seq: 0, openMarker: null, pendingOpen: false, closing: false, aum: 0,
+    aumReported: 0, lastAumReportAt: 0, finished: false,
     lastPayoutAt: 0, lastEventKey: '', shakeUntil: 0,
   });
 
@@ -146,6 +149,8 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         setTimeout(() => setPopup(null), 800); // FR-5.9: 0.8초 이내
         track('position_closed', { outcome: m.outcome, g: m.g, payout: m.payout, pnl: m.pnl, holdBars, forced: m.forced });
         if (isTut) setGuide((cur) => (cur === 2 ? 3 : cur));
+      } else if (m.op === 'aum.update') {
+        s.aum = m.aumLeft; // 전투 처치 AUM 크레딧 (서버 clamp 결과)
       } else if (m.op === 'clock.resync') {
         s.t0 = Date.now() - m.serverBarIdx * s.barMs;
       } else if (m.op === 'error') {
@@ -184,6 +189,14 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
       }
       if (battleRef.current) {
         drawBattle(battleRef.current, s.battle, Date.now() < s.shakeUntil ? 5 : 0, slotMenuRef.current);
+      }
+
+      // 적 처치 AUM 보고 (1초 스로틀, 누적 단조 증가 — 서버가 상한 clamp 후 aum.update로 응답)
+      const earned = Math.floor(s.battle.aumEarned);
+      if (earned > s.aumReported && Date.now() - s.lastAumReportAt >= 1000) {
+        s.aumReported = earned;
+        s.lastAumReportAt = Date.now();
+        s.ws?.reportCombatAum(earned);
       }
 
       // HUD는 100ms 스로틀 — 캔버스는 60fps, DOM 리렌더는 10fps면 충분

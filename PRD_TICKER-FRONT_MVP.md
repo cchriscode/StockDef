@@ -330,6 +330,8 @@ heat (경계도 계수) = 1 + (점령 지역 수 × 0.02)
 ```
 > 반드시 총액을 먼저 확정하고 웨이브에 분배한다. 웨이브당 값을 먼저 내림 계산하면 총액이 §9.3 설계치와 어긋난다.
 > 예) 점령 2개 → 총 275 G, 웨이브 1~12 각 21 G, 웨이브 13은 275 − 252 = 23 G
+
+**FR-6.8b 처치 AUM 보상**: 적을 **처치**하면 유형별 `aumBounty`만큼 AUM(운용자금)이 회복된다 — 전투 성과가 트레이딩 자본을 되채우는 루프. 본진에 도달해 소멸한 적은 보상이 없다. 클라이언트가 누적 처치 AUM을 WS로 보고(`combat.aum`)하면 서버가 `초기 AUM × AUM_COMBAT_CAP_RATE` 상한으로 clamp해 크레딧하고 `aum.update`로 응답한다 (전투는 비권위이므로 상한으로만 신뢰).
 **FR-6.9 패배 조건**: 본진 HP 0. 패배 시 정산 없음, 자본금 0, 도감 등록 없음. **단 공개 연출은 보여준다** (실패해도 정체는 알려줘야 재도전 동기가 생김).
 **FR-6.10 승리 조건**: 13웨이브 방어 완료. 적 본진 파괴는 **선택적 보너스** — 유닛을 우측 끝까지 밀어 적 본진 HP를 0으로 만들면 `공격 계열` 자격이 열린다.
 **FR-6.11 일시정지**: 불가. 단 `이탈` 가능하며 이탈 시 패배 처리.
@@ -687,6 +689,7 @@ tf.cache.progress 진행도 캐시 (서버가 권위, 오프라인 표시용)
 ```json
 { "op": "position.open",  "seq": 5, "direction": "long", "stake": 600 }
 { "op": "position.close", "seq": 5 }
+{ "op": "combat.aum",     "earned": 84 }
 { "op": "clock.sync",     "clientBarIdx": 142 }
 ```
 
@@ -704,8 +707,12 @@ tf.cache.progress 진행도 캐시 (서버가 권위, 오프라인 표시용)
   "payout": 1361, "pnl": 761, "exitBarIdx": 168, "forced": false,
   "earnedTotal": 2104, "aumLeft": 1800 }
 
+{ "op": "aum.update", "aumLeft": 1884, "combatCredited": 84 }
+
 { "op": "error", "code": "POSITION_ALREADY_OPEN" | "NO_OPEN_POSITION" | "RATE_LIMITED" | "MAX_POSITIONS" }
 ```
+
+> `combat.aum`은 클라 전투의 누적 처치 AUM 보고 (단조 증가). 서버는 `초기 AUM × AUM_COMBAT_CAP_RATE` 상한으로 clamp해 크레딧한다 (FR-6.8b).
 
 **에러 코드**: `POSITION_ALREADY_OPEN` / `NO_OPEN_POSITION` / `RATE_LIMITED` / `MAX_POSITIONS` / `INSUFFICIENT_AUM` / `SESSION_ENDED` / `INVALID_SEQ`
 
@@ -818,6 +825,8 @@ tf.cache.progress 진행도 캐시 (서버가 권위, 오프라인 표시용)
 | `UPKEEP_PER_TERRITORY` | 25 G (스테이지 총액 기준) |
 | `HEAT_PER_TERRITORY` | +0.02 |
 | `AUM_BY_DESK_LV` | Lv1 2000 / Lv2 2400 / Lv3 2800 |
+| `AUM_COMBAT_CAP_RATE` | 0.2 (처치 AUM 크레딧 상한 = 초기 AUM × 0.2) |
+| `aumBounty` (처치 AUM) | 그런트 2 / 러너 1 / 탱커 5 / 실드 3 / 힐러 3 / 드론 2 / 보스 12 — R1 전량 처치 ≈ 초기 AUM의 ~12% (§9.3 게이트 유지 한도, 봇 시뮬 검증) |
 | `TOWER_COST` | 기본·대공 120 / 광역 160 |
 | `TOWER_UPGRADE` | 기본·대공 180 / 광역 220 |
 | `UNIT_COST` | 30 / 60 / 90 |

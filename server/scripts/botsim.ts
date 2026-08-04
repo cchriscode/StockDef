@@ -54,6 +54,8 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
   const b = new Battle(params, bars.events);
 
   let aum = params.aum;
+  let combatCredited = 0; // 처치 AUM 크레딧 (서버 clamp와 동일 로직)
+  const combatCap = Math.floor(params.aum * BALANCE.AUM_COMBAT_CAP_RATE);
   let openUntil = -1; // 포지션 만기 bar
   let pending: { stake: number; dir: 'long' | 'short'; openIdx: number; closeIdx: number } | null = null;
   let positions = 0;
@@ -66,6 +68,13 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
     b.advanceTo(t);
     if (b.phase === 'done') break;
     const bar = Math.floor(Math.min(t, 389));
+
+    // 적 처치 → AUM 크레딧 (서버 reportCombatAum과 동일한 상한)
+    const aumTarget = Math.min(Math.floor(b.aumEarned), combatCap);
+    if (aumTarget > combatCredited) {
+      aum += aumTarget - combatCredited;
+      combatCredited = aumTarget;
+    }
 
     // 포지션 청산 (봇: 30봉 보유 후 청산 — 서버 판정과 동일한 judge 사용)
     if (pending && bar >= pending.closeIdx) {

@@ -72,6 +72,7 @@ export type WsClientMsg =
   | { op: 'start' }
   | { op: 'position.open'; seq: number; direction: Direction; stake: number }
   | { op: 'position.close'; seq: number }
+  | { op: 'combat.aum'; earned: number } // 전투 처치 AUM 누적 보고 (서버가 상한 clamp)
   | { op: 'clock.sync'; clientBarIdx: number };
 
 export type WsServerMsg =
@@ -82,6 +83,7 @@ export type WsServerMsg =
       op: 'position.closed'; seq: number; outcome: Outcome; deltaPct: number; g: number;
       payout: number; pnl: number; exitBarIdx: number; forced: boolean; earnedTotal: number; aumLeft: number;
     }
+  | { op: 'aum.update'; aumLeft: number; combatCredited: number }
   | { op: 'clock.resync'; serverBarIdx: number }
   | { op: 'error'; code: WsErrorCode; seq?: number };
 

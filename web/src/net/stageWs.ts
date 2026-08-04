@@ -41,6 +41,10 @@ export class StageWs {
     this.send({ op: 'position.close', seq });
   }
 
+  reportCombatAum(earned: number) {
+    this.send({ op: 'combat.aum', earned });
+  }
+
   beginClockSync(getBarIdx: () => number) {
     this.syncTimer = window.setInterval(() => this.send({ op: 'clock.sync', clientBarIdx: getBarIdx() }), 5000);
   }

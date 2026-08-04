@@ -182,6 +182,11 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.fillStyle = '#FFE9C4';
       ctx.font = f.amount >= 30 ? 'bold 12px monospace' : '10px monospace';
       ctx.fillText(String(f.amount), sx(f.x), y);
+    } else if (f.kind === 'aum' && f.amount > 0) { // 처치 AUM 보상 (보라)
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#C4A8FF';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText(`+${f.amount}`, sx(f.x), y - 10);
     } else if (f.kind === 'death') {
       ctx.globalAlpha = alpha * 0.7;
       ctx.strokeStyle = '#A9B6C4';

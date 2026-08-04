@@ -22,6 +22,7 @@ export class LiveSession {
   open: { seq: number; direction: Direction; stake: number; openBarIdx: number; basePrice: number } | null = null;
   closing = false;
   positionCount = 0;
+  combatCredited = 0; // 전투 처치로 크레딧된 AUM 누적 (상한 clamp)
   lastOpenAt = 0;
   ws: WebSocket | null = null;
   private timers: NodeJS.Timeout[] = [];
@@ -145,6 +146,19 @@ export class LiveSession {
       deltaPct: Math.round(r.deltaPct * 100) / 100, g: Math.round(r.g * 1000) / 1000,
       payout: r.payout, pnl: r.pnl, exitBarIdx, forced, earnedTotal, aumLeft: this.aum,
     });
+  }
+
+  /** 적 처치 AUM 보고 — 클라 전투는 비권위이므로 aum × CAP_RATE 상한으로만 신뢰 (누적 단조 증가) */
+  reportCombatAum(earned: number) {
+    if (this.t0 == null) return;
+    if (!Number.isFinite(earned)) return;
+    const cap = Math.floor(this.params.aum * BALANCE.AUM_COMBAT_CAP_RATE);
+    const target = Math.min(Math.max(0, Math.floor(earned)), cap);
+    if (target > this.combatCredited) {
+      this.aum += target - this.combatCredited;
+      this.combatCredited = target;
+    }
+    this.send({ op: 'aum.update', aumLeft: this.aum, combatCredited: this.combatCredited });
   }
 
   clockSync(clientBarIdx: number) {

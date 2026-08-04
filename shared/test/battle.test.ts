@@ -113,6 +113,23 @@ describe('Battle 엔진', () => {
     b.advanceTo(b.t + 2);
     expect(anyB.enemies[1].hp).toBeGreaterThan(60); // ~9HP/s × 2s
   });
+  it('적 처치 → AUM 획득 (공시폭탄으로 그런트 처치 = aumBounty 2)', () => {
+    const b = new Battle(params(), []);
+    const anyB = b as unknown as { enemies: unknown[] };
+    b.addGold(500);
+    anyB.enemies.push({ id: 700, type: 'grunt', x: 500, hp: 10, maxHp: 10, baseSpeed: 0, dps: 0, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 10, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false } as never);
+    b.useSkill(); // 마법 80 → 즉사
+    expect(b.aumEarned).toBe(2);
+  });
+  it('본진 도달로 소멸한 적은 AUM을 주지 않는다', () => {
+    const b = new Battle(params(), []);
+    const anyB = b as unknown as { enemies: unknown[] };
+    anyB.enemies.push({ id: 701, type: 'grunt', x: 14, hp: 100, maxHp: 100, baseSpeed: 60, dps: 0, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 10, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false } as never);
+    const hp0 = b.baseHP;
+    b.advanceTo(b.t + 1); // 본진 도달
+    expect(b.baseHP).toBeLessThan(hp0);
+    expect(b.aumEarned).toBe(0);
+  });
   it('heat 반영: 점령 2개(1.04) → 적 수 ceil(count×1.04)', () => {
     const b = new Battle(params({ heat: 1.04 }), []);
     b.advanceTo(11); // 웨이브 1 (base 3) 스폰 직후

@@ -16,6 +16,10 @@ export const BALANCE = {
   STAKE_PCTS: [0.1, 0.25, 0.5, 1.0],
 
   // §9.2 경제 파라미터
+  // 적 처치 → AUM 획득 (전투가 트레이딩 자본을 되채우는 루프). 서버는 클라 보고를
+  // aum × CAP_RATE 상한으로 clamp — R1 전량 처치 시 이론 획득 ≈ 초기 AUM의 ~12%
+  // (그 이상 주면 §9.3 실력 게이트가 무너짐 — 봇 시뮬로 확인, npm run sim).
+  AUM_COMBAT_CAP_RATE: 0.2,
   BASE_INCOME_PER_WAVE: 25,
   WAVE_COUNT: 13,
   UPKEEP_PER_TERRITORY: 25,
@@ -125,16 +129,17 @@ export interface EnemyTypeSpec {
   baseDmg: number; // 본진 도달 시 피해
   isAir: boolean;
   size: number; // 렌더 반경
+  aumBounty: number; // 처치 시 AUM 획득 (본진 도달로 죽으면 0)
 }
 
 export const ENEMY_TYPES: Record<EnemyTypeSpec['key'], EnemyTypeSpec> = {
-  grunt: { key: 'grunt', name: '공매도 요원', icon: '👤', hpMult: 1.0, speedMult: 1.0, armor: 0, mr: 0, dpsMult: 1, healPerSec: 0, baseDmg: 10, isAir: false, size: 8 },
-  runner: { key: 'runner', name: '스캘퍼', icon: '💨', hpMult: 0.55, speedMult: 1.8, armor: 0, mr: 0, dpsMult: 0.7, healPerSec: 0, baseDmg: 8, isAir: false, size: 6 },
-  tank: { key: 'tank', name: '기관 물량', icon: '🛡', hpMult: 2.2, speedMult: 0.6, armor: 0.4, mr: 0, dpsMult: 1.4, healPerSec: 0, baseDmg: 18, isAir: false, size: 11 },
-  shield: { key: 'shield', name: '로펌 실드', icon: '⚖', hpMult: 1.3, speedMult: 0.8, armor: 0.55, mr: 0, dpsMult: 1, healPerSec: 0, baseDmg: 12, isAir: false, size: 9 },
-  healer: { key: 'healer', name: '리스크 헤지', icon: '➕', hpMult: 0.9, speedMult: 0.9, armor: 0, mr: 0.3, dpsMult: 0.5, healPerSec: 6, baseDmg: 8, isAir: false, size: 8 },
-  air: { key: 'air', name: '드론', icon: '✈', hpMult: 0.8, speedMult: 1.15, armor: 0, mr: 0.3, dpsMult: 0.8, healPerSec: 0, baseDmg: 10, isAir: true, size: 8 },
-  boss: { key: 'boss', name: '베어 간부', icon: '👹', hpMult: 5.5, speedMult: 0.45, armor: 0.25, mr: 0.2, dpsMult: 3, healPerSec: 0, baseDmg: 30, isAir: false, size: 15 },
+  grunt: { key: 'grunt', name: '공매도 요원', icon: '👤', hpMult: 1.0, speedMult: 1.0, armor: 0, mr: 0, dpsMult: 1, healPerSec: 0, baseDmg: 10, isAir: false, size: 8, aumBounty: 2 },
+  runner: { key: 'runner', name: '스캘퍼', icon: '💨', hpMult: 0.55, speedMult: 1.8, armor: 0, mr: 0, dpsMult: 0.7, healPerSec: 0, baseDmg: 8, isAir: false, size: 6, aumBounty: 1 },
+  tank: { key: 'tank', name: '기관 물량', icon: '🛡', hpMult: 2.2, speedMult: 0.6, armor: 0.4, mr: 0, dpsMult: 1.4, healPerSec: 0, baseDmg: 18, isAir: false, size: 11, aumBounty: 5 },
+  shield: { key: 'shield', name: '로펌 실드', icon: '⚖', hpMult: 1.3, speedMult: 0.8, armor: 0.55, mr: 0, dpsMult: 1, healPerSec: 0, baseDmg: 12, isAir: false, size: 9, aumBounty: 3 },
+  healer: { key: 'healer', name: '리스크 헤지', icon: '➕', hpMult: 0.9, speedMult: 0.9, armor: 0, mr: 0.3, dpsMult: 0.5, healPerSec: 6, baseDmg: 8, isAir: false, size: 8, aumBounty: 3 },
+  air: { key: 'air', name: '드론', icon: '✈', hpMult: 0.8, speedMult: 1.15, armor: 0, mr: 0.3, dpsMult: 0.8, healPerSec: 0, baseDmg: 10, isAir: true, size: 8, aumBounty: 2 },
+  boss: { key: 'boss', name: '베어 간부', icon: '👹', hpMult: 5.5, speedMult: 0.45, armor: 0.25, mr: 0.2, dpsMult: 3, healPerSec: 0, baseDmg: 30, isAir: false, size: 15, aumBounty: 12 },
 };
 
 // 웨이브 조합 (비율) — 지역별로 성격이 다르다: R2 고속·공중 / R3 중장갑

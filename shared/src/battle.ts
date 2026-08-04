@@ -37,6 +37,7 @@ export interface Enemy {
   slowUntil: number;
   slowPct: number;
   stunUntil: number;
+  leaked: boolean; // 본진 도달로 소멸 (처치 아님 → AUM 보상 없음)
 }
 
 export interface Unit {
@@ -73,7 +74,7 @@ export interface Projectile {
 }
 
 export interface Fx {
-  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'skill';
+  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'skill' | 'aum';
   x: number;
   air: boolean;
   amount: number;
@@ -103,6 +104,7 @@ export class Battle {
   gold = 0;
   goldEarned = 0;
   goldSpent = 0;
+  aumEarned = 0; // 적 처치로 획득한 AUM 누적 (서버가 상한 clamp 후 크레딧)
   baseHP: number = BALANCE.BASE_HP;
   enemyBaseHP: number = BALANCE.ENEMY_BASE_HP;
   enemyBaseDestroyed = false;
@@ -250,6 +252,11 @@ export class Battle {
   private aliveOrDeathFx(e: Enemy): boolean {
     if (e.hp > 0) return true;
     this.pushFx('death', e.x, e.air, 0);
+    if (!e.leaked) { // 처치 보상: 트레이딩 자본(AUM) 회복
+      const bounty = ENEMY_TYPES[e.type].aumBounty;
+      this.aumEarned += bounty;
+      this.pushFx('aum', e.x, e.air, bounty);
+    }
     return false;
   }
 
@@ -307,7 +314,7 @@ export class Battle {
       dps: (6 + p.wave * 1.2) * et.dpsMult,
       armor: et.armor, mr: et.mr, air: et.isAir, size: et.size,
       wave: p.wave, baseDmg: et.baseDmg, healPerSec: et.healPerSec,
-      slowUntil: 0, slowPct: 0, stunUntil: 0,
+      slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false,
     });
   }
 
@@ -446,6 +453,7 @@ export class Battle {
       if (e.x <= PLAYER_BASE_X + 12) {
         this.baseHP -= e.baseDmg;
         this.pushFx('death', e.x, e.air, 0);
+        e.leaked = true; // 도달 소멸 — 처치 아님
         e.hp = 0;
       }
     }
