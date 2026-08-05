@@ -58,8 +58,10 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
   });
   ws.send(JSON.stringify({ op: 'start' }));
 
-  const buildOrder = ['limit', 'dividend', 'limit', 'barrier', 'limit', 'limit'] as const;
+  const buildOrder = ['limit', 'cannon', 'dividend', 'spire', 'flame', 'barrier'] as const;
   let built = 0;
+  let unitIdx = 0;
+  const unitCycle = ['lancer', 'mage', 'trader', 'analyst'] as const;
   const totalBars = params.waveCount * 30;
 
   while (true) {
@@ -77,7 +79,7 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
       const dir = Math.random() < p ? correct : correct === 'long' ? 'short' : 'long';
       seq += 1;
       openPending = true;
-      ws.send(JSON.stringify({ op: 'position.open', seq, direction: dir, stake: Math.max(1, Math.floor(aum * 0.25)) }));
+      ws.send(JSON.stringify({ op: 'position.open', seq, direction: dir, stake: Math.max(1, Math.floor(aum * 0.5)) })); // 고수 플레이 가정 (기능 검증용)
     }
     // 청산 요청: exitBar = 요청 시점 bar + 1 → closeTarget−1에 보내면 목표 봉에 체결
     if (active && !closeSent && bar >= active.closeTarget - 1) {
@@ -87,10 +89,10 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
     if (built < Math.min(buildOrder.length, battle.towers.length)) {
       if (battle.buildTower(built, buildOrder[built])) built += 1;
     } else {
-      if (battle.gold >= 320) battle.spawnUnit('trader');
-      else if (battle.gold >= 220) battle.spawnUnit('analyst');
+      if (battle.gold >= 300) { if (battle.spawnUnit(unitCycle[unitIdx % 4])) unitIdx += 1; }
+      else if (battle.gold >= 200) battle.spawnUnit('analyst');
     }
-    if (battle.enemies.filter((e) => !e.air).length >= 6 && battle.gold >= 380) battle.useSkill();
+    if (battle.enemies.filter((e) => !e.air).length >= 5 && battle.gold >= 300) battle.useSkill();
   }
   ws.close();
   const finish = await req<FinishRes>('/api/stage/finish', {
@@ -122,14 +124,14 @@ check('튜토리얼 첫 예측 WIN 보장 (적중률 100%)', tut.finish.accuracy
 const revealTut = await req<{ companyName: string; ticker: string }>(`/api/stage/${tut.sessionId}/reveal`);
 check('FR-9.3 공개 API (튜토리얼 = 고정 실제 차트)', revealTut.ticker !== 'TUT' && revealTut.companyName.length > 0);
 
-console.log('▶ R1 여의도 (195초 @2x, p=0.65 봇)…');
-let r1 = await playStage('R1', 0.65);
-// 봇 클리어율은 확률적 (§9.3 의도된 난이도) — 사람의 재도전처럼 최대 4회 시도
-for (let attempt = 2; attempt <= 4 && r1.finish.status !== 'cleared'; attempt++) {
-  console.log(`  미클리어 → 재도전 ${attempt}/4…`);
-  r1 = await playStage('R1', 0.65);
+console.log('▶ R1 여의도 (~4분 @2x, p=0.9 고수 봇)…');
+let r1 = await playStage('R1', 0.9);
+// 봇 클리어율은 확률적 (§9.3 의도된 고난이도) — 사람의 재도전처럼 최대 6회 시도 (기능 검증이 목적)
+for (let attempt = 2; attempt <= 6 && r1.finish.status !== 'cleared'; attempt++) {
+  console.log(`  미클리어 → 재도전 ${attempt}/6…`);
+  r1 = await playStage('R1', 0.9);
 }
-check('R1 클리어 (봇 p=0.65, ≤4회 시도)', r1.finish.status === 'cleared');
+check('R1 클리어 (봇 p=0.9, ≤6회 시도)', r1.finish.status === 'cleared');
 const r1Reveal = await req<{ companyName: string; tradeDate: string; positions: unknown[] }>(`/api/stage/${r1.sessionId}/reveal`);
 check('FR-9 공개: 실제 종목명·날짜 노출', !!r1Reveal.companyName && /^\d{4}-\d{2}-\d{2}$/.test(r1Reveal.tradeDate), `${r1Reveal.companyName} ${r1Reveal.tradeDate}`);
 

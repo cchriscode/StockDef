@@ -33,8 +33,10 @@ export const BALANCE = {
   TOWER_SLOTS_BASE: 6,
   TOWER_SLOTS_MAX: 8,
   SKILL_COST: 200,
-  SKILL_COOLDOWN_S: 45,
+  SKILL_COOLDOWN_S: 25, // 2026-08-05 난이도 개편: 스킬을 더 자주 쓰는 대신 적이 강해짐
   SKILL_DAMAGE: 80,
+  ENEMY_HP_MULT: 1.3, // 2026-08-05 전 지역 적 체력 +30% (플레이테스트 "너무 쉽다" 반영)
+  ENEMY_DPS_MULT: 1.3, // 적 공격력 +30%
   COOLDOWN_PLAYS: 20, // FR-3.6 조합 재출현 쿨다운
 
   // FR-3.6b 지역별 차트 아키타입 가중 추첨 — 쉬운 지역은 박스권(작은 |g|, 실수에 관대),
@@ -104,10 +106,10 @@ export interface TowerSpec {
 }
 
 export const TOWERS: TowerSpec[] = [
-  { key: 'limit', name: '지정가 포탑', cost: 110, upgradeCost: 160, target: 'both', dmgType: 'physical', dmg: 20, rate: 1.4, range: 560, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
-  { key: 'cannon', name: '공매도 캐논', cost: 150, upgradeCost: 210, target: 'ground', dmgType: 'physical', dmg: 26, rate: 0.5, range: 460, splashRadius: 60, slowPct: 0, slowDur: 0, projSpeed: 420, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
-  { key: 'spire', name: '옵션 스파이어', cost: 140, upgradeCost: 200, target: 'both', dmgType: 'magic', dmg: 14, rate: 0.9, range: 500, splashRadius: 0, slowPct: 0.3, slowDur: 1.5, projSpeed: 620, lv2Mult: 1.6, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
-  { key: 'flame', name: '복리 화염', cost: 120, upgradeCost: 170, target: 'ground', dmgType: 'physical', dmg: 8, rate: 2.2, range: 380, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 520, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0.12, rampMax: 1.2 },
+  { key: 'limit', name: '지정가 포탑', cost: 110, upgradeCost: 160, target: 'both', dmgType: 'physical', dmg: 16, rate: 1.4, range: 560, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'cannon', name: '공매도 캐논', cost: 150, upgradeCost: 210, target: 'ground', dmgType: 'physical', dmg: 21, rate: 0.5, range: 460, splashRadius: 60, slowPct: 0, slowDur: 0, projSpeed: 420, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'spire', name: '옵션 스파이어', cost: 140, upgradeCost: 200, target: 'both', dmgType: 'magic', dmg: 11, rate: 0.9, range: 500, splashRadius: 0, slowPct: 0.3, slowDur: 1.5, projSpeed: 620, lv2Mult: 1.6, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'flame', name: '복리 화염', cost: 120, upgradeCost: 170, target: 'ground', dmgType: 'physical', dmg: 6.5, rate: 2.2, range: 380, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 520, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0.12, rampMax: 1.2 },
   { key: 'dividend', name: '배당 파밍', cost: 130, upgradeCost: 190, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 8, incomePeriod: 10, barrierHP: 0, rampPct: 0, rampMax: 0 },
   { key: 'barrier', name: '손절 방벽', cost: 70, upgradeCost: 100, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 260, rampPct: 0, rampMax: 0 },
 ];
@@ -131,16 +133,16 @@ export interface UnitSpec {
 }
 
 export const UNITS: UnitSpec[] = [
-  { key: 'intern', name: '인턴', cost: 30, hp: 60, dps: 4, speed: 23, range: 26, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'analyst', name: '애널리스트', cost: 60, hp: 70, dps: 15, speed: 21, range: 110, cleave: 1, antiAirPct: 0.5, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'lancer', name: '창병', cost: 75, hp: 120, dps: 16, speed: 20, range: 34, cleave: 3, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'trader', name: '트레이더', cost: 90, hp: 170, dps: 22, speed: 20, range: 26, cleave: 2, antiAirPct: 0, block: 2, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'mage', name: '술사', cost: 110, hp: 55, dps: 18, speed: 20, range: 130, cleave: 1, antiAirPct: 0.6, block: 1, dmgType: 'magic', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'intern', name: '인턴', cost: 30, hp: 60, dps: 3, speed: 23, range: 26, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'analyst', name: '애널리스트', cost: 60, hp: 70, dps: 12, speed: 21, range: 110, cleave: 1, antiAirPct: 0.5, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'lancer', name: '창병', cost: 75, hp: 120, dps: 13, speed: 20, range: 34, cleave: 3, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'trader', name: '트레이더', cost: 90, hp: 170, dps: 18, speed: 20, range: 26, cleave: 2, antiAirPct: 0, block: 2, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'mage', name: '술사', cost: 110, hp: 55, dps: 14, speed: 20, range: 130, cleave: 1, antiAirPct: 0.6, block: 1, dmgType: 'magic', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'riskmgr', name: '리스크 매니저', cost: 90, hp: 80, dps: 0, speed: 20, range: 0, cleave: 0, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0.5, guardPct: 0.2, guardRadius: 120 },
 ];
 
 // 사옥 자동 포탑 (Age of War 본진 방어) — 최후 방어선
-export const BASE_TURRET = { dmg: 5.6, rate: 1.0, range: 260, dmgType: 'physical' as DmgType }; // 2026-08-05 하향 (기존 8의 70%)
+export const BASE_TURRET = { dmg: 4.5, rate: 1.0, range: 260, dmgType: 'physical' as DmgType }; // 2026-08-05 난이도 개편: 아군 공격력 −20%
 
 // 적 아키타입 — Kingdom Rush식 카운터 관계 (armor ↔ 마법, 공중 ↔ 대공/애널리스트)
 export interface EnemyTypeSpec {

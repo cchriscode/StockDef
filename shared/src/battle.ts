@@ -301,20 +301,21 @@ export class Battle {
     const types = this.compose(w);
     const interval = BALANCE.WAVE_SECONDS / types.length;
     const waveStart = (w - 1) * BALANCE.CYCLE_SECONDS + BALANCE.PREP_SECONDS;
+    const buff = this.params.regionId === 'TUT' ? 1 : BALANCE.ENEMY_HP_MULT; // 튜토리얼은 난이도 상향 제외
     types.forEach((type, i) => {
       const et = ENEMY_TYPES[type];
       this.pending.push({
         at: waveStart + i * interval, wave: w, type,
-        hp: spec.hp * this.params.heat * mod.enemyHpMult * et.hpMult,
-        speed: 30 * spec.speed * mod.speedMult * et.speedMult,
+        hp: spec.hp * buff * this.params.heat * mod.enemyHpMult * et.hpMult,
+        speed: 15 * spec.speed * mod.speedMult * et.speedMult, // 2026-08-05 이동속도 절반 (아군과 동일 하향)
       });
     });
     if (BOSS_WAVES[this.params.regionId].includes(w)) {
       const et = ENEMY_TYPES.boss;
       this.pending.push({
         at: waveStart + 2, wave: w, type: 'boss',
-        hp: spec.hp * this.params.heat * mod.enemyHpMult * et.hpMult,
-        speed: 30 * spec.speed * et.speedMult,
+        hp: spec.hp * buff * this.params.heat * mod.enemyHpMult * et.hpMult,
+        speed: 15 * spec.speed * et.speedMult,
       });
     }
     this.pending.sort((a, b) => a.at - b.at);
@@ -325,7 +326,7 @@ export class Battle {
     this.enemies.push({
       id: this.nextId++, type: p.type, x: ENEMY_BASE_X - 10,
       hp: p.hp, maxHp: p.hp, baseSpeed: p.speed,
-      dps: (6 + p.wave * 1.2) * et.dpsMult,
+      dps: (6 + p.wave * 1.2) * et.dpsMult * (this.params.regionId === 'TUT' ? 1 : BALANCE.ENEMY_DPS_MULT),
       armor: et.armor, mr: et.mr, air: et.isAir, size: et.size,
       wave: p.wave, baseDmg: et.baseDmg, healPerSec: et.healPerSec,
       slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false,
@@ -386,7 +387,7 @@ export class Battle {
       }
     } else if (this.enemies.length > 0 || this.pending.length > 0) {
       this.phase = 'overtime';
-      if (t > this.stageEndT + 40) {
+      if (t > this.stageEndT + 90) { // 이동속도 절반에 맞춰 연장 — 마지막 웨이브가 도달 전에 소거되지 않게
         this.enemies = [];
         this.pending = [];
       }
@@ -544,7 +545,7 @@ export class Battle {
       const target = this.pickTarget(near, 'first', 0);
       if (target) {
         this.baseTurretCd = 1 / BASE_TURRET.rate;
-        this.fireProjectile(20, target, BASE_TURRET.dmg * atkMult, { dmgType: BASE_TURRET.dmgType, projSpeed: 600, splashRadius: 0, slowPct: 0, slowDur: 0 }, true);
+        this.fireProjectile(20, target, BASE_TURRET.dmg * atkMult, { dmgType: BASE_TURRET.dmgType, projSpeed: 380, splashRadius: 0, slowPct: 0, slowDur: 0 }, true); // 투척 궤적에 맞춘 체공
       }
     }
 

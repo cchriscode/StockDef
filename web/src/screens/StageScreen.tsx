@@ -9,6 +9,8 @@ import { clockLabel, drawChart, interpPct, pctOf, type OpenMarker } from '../gam
 import { drawBattle } from '../game/battleRender.js';
 import { sfx } from '../game/sfx.js';
 import { TOWER_INFO, UNIT_INFO, towerStatsLine, unitStatsLine } from '../game/unitInfo.js';
+import { RIG_TOWER, RIG_UNIT } from '../game/rigFrames.js';
+import { RigPreview } from '../ui/RigPreview.js';
 
 interface Props {
   regionId: RegionId;
@@ -573,10 +575,12 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         const stats = isUnit
           ? unitStatsLine(infoKey.key as keyof typeof UNIT_INFO)
           : towerStatsLine(infoKey.key as keyof typeof TOWER_INFO);
+        const rigIdx = isUnit ? RIG_UNIT[infoKey.key] : RIG_TOWER[infoKey.key];
         return (
           <div className="overlay center" onClick={() => setInfoKey(null)}>
             <div className="card info-card" onClick={(e) => e.stopPropagation()}>
               <h3>{name} <span className="small dim">{card.role}</span></h3>
+              <RigPreview unit={rigIdx} height={150} />
               <p>{card.desc}</p>
               <p className="skill-line">✦ {card.skill}</p>
               <p className="small mono dim">{stats}</p>

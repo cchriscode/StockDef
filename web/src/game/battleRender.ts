@@ -62,7 +62,7 @@ interface Corpse { rigIdx: number; x: number; y: number; h: number; t0: number }
 interface VfxShot { name: string; x: number; y: number; t0: number; dur: number; s0: number; s1: number }
 interface RenderFxState {
   lastFxT: number;
-  prevProj: Map<number, { x: number; air: boolean; fromTower: boolean }>;
+  prevProj: Map<number, { x: number; air: boolean; fromTower: boolean; base?: boolean; x0?: number }>;
   lastHp: Map<string, number>; // 'u3'/'e17'/'t0' → 지난 프레임 hp (피격 감지)
   hitT: Map<string, number>; // 피격 애니메이션 시작 시각
   prevUnits: Map<number, { key: string; x: number }>;
@@ -220,8 +220,10 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   } else {
     drawBase(ctx, 8, GROUND_Y - 50, 40, 64, '#46A574', '#0C1A12', b.baseHP / 100, '사옥');
   }
-  ctx.fillStyle = '#7BD8A0';
-  ctx.fillRect(78, GROUND_Y - 46, 8, 8); // 사옥 자동 포탑 총구
+  ctx.fillStyle = '#C39C4C'; // 사옥 옥상 투척대 (자동 포탑 발사 원점)
+  ctx.fillRect(38, groundTop - 124, 12, 6);
+  ctx.fillStyle = '#FFE9C4';
+  ctx.fillRect(41, groundTop - 127, 6, 3);
   const foe = spr(`foe_${hpState(b.enemyBaseHP / 300)}`);
   if (foe) {
     const hh = 88;
@@ -412,33 +414,62 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     }
   }
 
-  // 투사체 — 아군 팔레트 볼트 (타워=골드 대형 / 유닛=크림 소형), 소멸 시 관통 충격파 vfx
+  // 투사체 — 사옥 자동 포탑=옥상 투척 골드 주머니(포물선) / 타워·유닛=팔레트 볼트, 소멸 시 충격파 vfx
   const liveProj = new Set<number>();
   for (const p of b.projectiles) {
     liveProj.add(p.id);
-    const y = (p.air ? AIR_Y : GROUND_Y) - (p.fromTower ? 14 : 4) + Math.sin(p.x * 0.15) * 2;
     const px = sx(p.x);
-    const len = p.fromTower ? 16 : 11;
-    const core = p.dmgType === 'magic' ? '#C4A8FF' : p.fromTower ? '#C39C4C' : '#E8D9A0';
-    ctx.save();
-    ctx.shadowColor = core;
-    ctx.shadowBlur = 6;
-    ctx.strokeStyle = core;
-    ctx.lineWidth = p.fromTower ? 3 : 2;
-    ctx.beginPath();
-    ctx.moveTo(px - len / 2, y);
-    ctx.lineTo(px + len / 2, y);
-    ctx.stroke();
-    ctx.fillStyle = '#FFF6E0';
-    ctx.fillRect(px + len / 2 - 2, y - 1.5, 3, 3);
-    ctx.restore();
-    st.prevProj.set(p.id, { x: p.x, air: p.air, fromTower: p.fromTower });
+    const prev = st.prevProj.get(p.id);
+    const isBase = prev ? !!prev.base : p.fromTower && p.x < 70; // 사옥 발사 원점(x=20) 식별
+    const x0 = prev?.x0 ?? p.x;
+    if (isBase) {
+      // 투척 궤적: 옥상에서 목표 레인까지 포물선 낙하
+      const laneY = (p.air ? AIR_Y : GROUND_Y) - 8;
+      const roofY = groundTop - 118;
+      const prog = Math.max(0, Math.min(1, (p.x - x0) / 220));
+      const y = roofY + (laneY - roofY) * prog - 46 * Math.sin(Math.PI * prog);
+      ctx.save();
+      ctx.shadowColor = '#FFC53D';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#C39C4C';
+      ctx.beginPath();
+      ctx.arc(px, y, 7.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#8A6510'; // 주머니 매듭
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, y - 6, 2.6, 0, Math.PI * 2);
+      ctx.stroke();
+      const spin = b.t * 9 + p.id;
+      ctx.fillStyle = '#FFE9C4';
+      ctx.fillRect(px + Math.cos(spin) * 3 - 1.5, y + Math.sin(spin) * 3 - 1.5, 3, 3);
+      ctx.restore();
+    } else {
+      const y = (p.air ? AIR_Y : GROUND_Y) - (p.fromTower ? 14 : 4) + Math.sin(p.x * 0.15) * 2;
+      const len = p.fromTower ? 16 : 11;
+      const core = p.dmgType === 'magic' ? '#C4A8FF' : p.fromTower ? '#C39C4C' : '#E8D9A0';
+      ctx.save();
+      ctx.shadowColor = core;
+      ctx.shadowBlur = 6;
+      ctx.strokeStyle = core;
+      ctx.lineWidth = p.fromTower ? 3 : 2;
+      ctx.beginPath();
+      ctx.moveTo(px - len / 2, y);
+      ctx.lineTo(px + len / 2, y);
+      ctx.stroke();
+      ctx.fillStyle = '#FFF6E0';
+      ctx.fillRect(px + len / 2 - 2, y - 1.5, 3, 3);
+      ctx.restore();
+    }
+    st.prevProj.set(p.id, { x: p.x, air: p.air, fromTower: p.fromTower, base: isBase, x0 });
   }
-  // 소멸한 투사체 → 착탄 충격파
+  // 소멸한 투사체 → 착탄 충격파 (사옥 투척은 더 크게)
   for (const [id, info] of st.prevProj) {
     if (liveProj.has(id)) continue;
     st.prevProj.delete(id);
-    pushVfx(st, 'ally_pierce-shockwave', info.x, (info.air ? AIR_Y : GROUND_Y) - 12, b.t, 0.28, 10, info.fromTower ? 34 : 26);
+    const size = info.base ? 52 : info.fromTower ? 34 : 26;
+    pushVfx(st, 'ally_pierce-shockwave', info.x, (info.air ? AIR_Y : GROUND_Y) - 12, b.t, info.base ? 0.38 : 0.28, 12, size);
   }
 
   // 엔진 fx 이벤트 → 리그 캔버스 VFX 원샷 (배당 지급=금고 코인 흡수 / 공시폭탄=메테오)

@@ -69,11 +69,14 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
   let positions = 0;
   let wins = 0;
   let loses = 0;
-  // 신규 타워 3종: 지정가(지상+공중) 위주 + 초반 배당 파밍 1기 + 방벽 1기
-  const buildOrder: ('limit' | 'dividend' | 'barrier')[] = ['limit', 'limit', 'limit', 'dividend', 'barrier', 'limit'];
+  // 2026-08-05 확장 로스터 반영: 지정가+캐논(광역)+스파이어(마법·슬로우)+화염(램프) + 배당 + 전방 방벽
+  const buildOrder: ('limit' | 'dividend' | 'barrier' | 'cannon' | 'spire' | 'flame')[] =
+    ['limit', 'cannon', 'dividend', 'spire', 'flame', 'barrier'];
   let built = 0;
+  const unitCycle: ('lancer' | 'mage' | 'trader' | 'analyst')[] = ['lancer', 'mage', 'trader', 'analyst'];
+  let unitIdx = 0;
 
-  for (let t = 0.5; t <= 390 + 45; t += 0.5) { // 오버타임 상한(+40) 너머까지 돌아야 done 판정에 도달
+  for (let t = 0.5; t <= 390 + 95; t += 0.5) { // 오버타임 상한(+90) 너머까지 돌아야 done 판정에 도달
     b.advanceTo(t);
     if (b.phase === 'done') break;
     const bar = Math.floor(Math.min(t, 389));
@@ -114,16 +117,16 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
     // 전투 지출 (그리디) — 3번 슬롯 기본 포탑은 강적 타겟팅(힐러·탱커 저격, 평균적 카운터 플레이 반영)
     if (built < buildOrder.length) {
       if (b.buildTower(built, buildOrder[built])) {
-        if (built === 2) { b.cycleTargeting(2); b.cycleTargeting(2); } // first → last → strong (힐러·탱커 저격)
+        if (built === 3) { b.cycleTargeting(3); b.cycleTargeting(3); } // 스파이어: first → strong (힐러·탱커 저격)
         built += 1;
       }
     } else {
       for (let s = 0; s < 6; s++) if (b.gold >= 400) b.upgradeTower(s);
       if (b.gold >= 300 && !b.units.some((u) => u.key === 'riskmgr')) b.spawnUnit('riskmgr');
-      else if (b.gold >= 320) b.spawnUnit('trader');
-      else if (b.gold >= 220) b.spawnUnit('analyst');
+      else if (b.gold >= 300) { if (b.spawnUnit(unitCycle[unitIdx % 4])) unitIdx += 1; }
+      else if (b.gold >= 200) b.spawnUnit('analyst');
     }
-    if (b.enemies.filter((e) => !e.air).length >= 6 && b.gold >= 380) b.useSkill();
+    if (b.enemies.filter((e) => !e.air).length >= 5 && b.gold >= 300) b.useSkill(); // 쿨다운 25s — 더 자주
 
     // FR-6.9 파산 패배 (봇은 25% 투입이라 사실상 도달하지 않음)
     if (aum < 1 && !pending) return { victory: false, goldLeft: Math.floor(b.gold), positions, wins, loses };
