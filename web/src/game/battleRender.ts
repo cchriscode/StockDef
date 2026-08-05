@@ -102,7 +102,9 @@ function pushVfx(st: RenderFxState, name: string, x: number, y: number, t0: numb
 const backdropCache = new Map<string, HTMLCanvasElement>();
 
 // 지역별 픽셀아트 배경 이미지 (높이를 지면선에 맞추고 가로 타일링)
-const IMAGE_BACKDROPS: Record<string, string> = { R1: '/assets/backdrops/r1.png', R2: '/assets/backdrops/r2.png' };
+const IMAGE_BACKDROPS: Record<string, string> = {
+  R1: '/assets/backdrops/r1.png', R2: '/assets/backdrops/r2.png', R3: '/assets/backdrops/r3.png',
+};
 const bdImgCache = new Map<string, HTMLImageElement>();
 
 function backdropImage(regionId: string): HTMLImageElement | null {
