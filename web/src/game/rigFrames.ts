@@ -3,7 +3,7 @@
 import { RigPlayer, RIGS } from './rig/rig-player.js';
 import { DEFS_SVG } from './rig/defs.js';
 
-export type RigMotion = 'walk' | 'attack' | 'hit' | 'death';
+export type RigMotion = 'walk' | 'attack' | 'hit' | 'death' | 'skill';
 
 // 우리 로스터 → 리그 인덱스 (handoff assets/ 파일 번호 - 1)
 export const RIG_UNIT: Record<string, number> = {
@@ -27,8 +27,8 @@ export const RIG_ENEMY: Record<string, number> = {
   boss: 18, // 마진콜 타이탄
 };
 
-// 모션당 굽는 프레임 수 (저작 루프 길이: walk 1.0s / attack 1.25s / hit 0.95s / death 3.0s)
-const FRAME_COUNTS: Record<RigMotion, number> = { walk: 12, attack: 14, hit: 8, death: 14 };
+// 모션당 굽는 프레임 수 (저작 루프 길이: walk 1.0s / attack 1.25s / hit 0.95s / death 3.0s / skill 2.0s)
+const FRAME_COUNTS: Record<RigMotion, number> = { walk: 12, attack: 14, hit: 8, death: 14, skill: 14 };
 const BAKE_H = 96; // 인게임 표시 최대 ~72px — 96px로 구우면 축소만 일어난다
 
 const frames = new Map<string, HTMLCanvasElement[]>();

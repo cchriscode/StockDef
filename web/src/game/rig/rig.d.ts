@@ -37,6 +37,10 @@ declare module '*/rig/rig-player.js' {
   export const RIGS: RigData[];
   export const MOTIONS: string[];
   export const MOTION_PERIODS: Record<string, number>;
+  export const VFX: {
+    drawFor(ctx: CanvasRenderingContext2D, w: number, h: number, unitIndex: number, motion: string, phase: number): boolean;
+    setAnchor(fn: (lx: number, ly: number, partId: string) => { x: number; y: number } | null): unknown;
+  };
 }
 declare module '*/rig/defs.js' {
   export const DEFS_SVG: string;

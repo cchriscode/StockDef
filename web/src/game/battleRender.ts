@@ -3,6 +3,7 @@
 import { BASE_TURRET, ENEMY_TYPES, TOWERS, type Battle, type Enemy } from '@tf/shared';
 import { BACKDROPS, BACKDROP_GROUND, BACKDROP_H, BACKDROP_W, type Backdrop } from './battleBackdrops.js';
 import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
+import { VFX } from './rig/rig-player.js';
 
 const AIR_Y = 96;
 const GROUND_Y = 258; // 캔버스 1400×300 기준 — 스프라이트는 고정 px, 레인만 길어진다
@@ -19,6 +20,18 @@ const MODE_LABEL = { first: '선두', last: '후미', strong: '강적', close: '
 const HIT_DUR = 0.4; // 피격 경직 연출 길이
 const UNIT_ATK_DUR = 0.8; // 유닛 발사 주기(shotCd 리셋값)에 공격 모션을 맞춘다
 const DEATH_DUR = 1.4; // 사망 붕괴 (저작 3s를 압축)
+const CLERIC_SKILL_CYCLE = 5; // 배당 사제(리스크 매니저) 주기 시전 — 앞 2초 skill 모션+goldRing
+
+/** 리그 캔버스 VFX를 엔티티 발밑 기준 박스로 그린다 (fxDraw 좌표계: cx=W/2, 지면=H*0.78) */
+function drawRigVfx(ctx: CanvasRenderingContext2D, idx: number, motion: string, phase: number, feetX: number, feetY: number, scale: number) {
+  const BW = 150;
+  const BH = 130;
+  ctx.save();
+  ctx.translate(feetX - BW * scale * 0.5, feetY - BH * scale * 0.78);
+  ctx.scale(scale, scale);
+  VFX.drawFor(ctx, BW, BH, idx, motion, phase);
+  ctx.restore();
+}
 
 // vfx 단일 SVG 로더 (game_vector_assets 팩의 vfx/ — 배당·메테오·슬로우 등은 계속 사용)
 const vCache = new Map<string, HTMLImageElement>();
@@ -57,6 +70,7 @@ interface RenderFxState {
   prevTowers: (string | null)[]; // slot → key (파괴 감지)
   corpses: Corpse[];
   vfx: VfxShot[];
+  rigVfx: { idx: number; motion: string; x: number; y: number; scale: number; t0: number; dur: number }[]; // 리그 캔버스 VFX 원샷
 }
 const fxStates = new WeakMap<Battle, RenderFxState>();
 
@@ -65,7 +79,7 @@ function fxStateOf(b: Battle): RenderFxState {
   if (!st) {
     st = {
       lastFxT: 0, prevProj: new Map(), lastHp: new Map(), hitT: new Map(),
-      prevUnits: new Map(), prevEnemies: new Map(), prevTowers: [], corpses: [], vfx: [],
+      prevUnits: new Map(), prevEnemies: new Map(), prevTowers: [], corpses: [], vfx: [], rigVfx: [],
     };
     fxStates.set(b, st);
   }
@@ -219,12 +233,14 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   }
   ctx.imageSmoothingEnabled = true; // 벡터 팩은 스무딩 렌더
 
-  // 사망·파괴 연출 (본체 아래 레이어) — death 모션 원샷
+  // 사망·파괴 연출 (본체 아래 레이어) — death 모션 원샷 + 전용 사망 VFX (드론 자폭·실드 파쇄)
   st.corpses = st.corpses.filter((c) => {
-    const img = rigFrame(c.rigIdx, 'death', (b.t - c.t0) / DEATH_DUR, true);
+    const phase = (b.t - c.t0) / DEATH_DUR;
+    const img = rigFrame(c.rigIdx, 'death', phase, true);
     if (!img) return b.t - c.t0 < 0;
     const w = (c.h * img.width) / img.height;
     ctx.drawImage(img, sx(c.x) - w / 2, c.y - c.h, w, c.h);
+    drawRigVfx(ctx, c.rigIdx, 'death', phase, sx(c.x), c.y, c.h / 100); // VFX 없는 리그는 no-op
     return true;
   });
 
@@ -299,9 +315,11 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const hitEl = b.t - (st.hitT.get(`u${u.id}`) ?? -9);
     const moved = Math.abs(u.x - (st.prevUnits.get(u.id)?.x ?? u.x)) > 0.01;
     const atkEl = UNIT_ATK_DUR - u.shotCd; // 발사 시 shotCd=0.8 리셋 → 경과 위상
+    const castLocal = u.key === 'riskmgr' ? (b.t + u.id * 1.7) % CLERIC_SKILL_CYCLE : Infinity; // 사제 주기 시전
     let img: HTMLCanvasElement | null = null;
     if (hitEl < HIT_DUR) img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
     else if (u.shotCd > 0 && atkEl < UNIT_ATK_DUR) img = rigFrame(rigIdx, 'attack', atkEl / UNIT_ATK_DUR, true);
+    else if (castLocal < 2 && !moved) img = rigFrame(rigIdx, 'skill', castLocal / 2, true);
     else if (moved) img = rigFrame(rigIdx, 'walk', (b.t + u.id * 0.37) % 1, false);
     else img = rigFrame(rigIdx, 'walk', (b.t * 0.35 + u.id * 0.37) % 1, false); // 대기 = 저속 제자리 걸음
     if (img) {
@@ -313,13 +331,8 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.arc(ux, groundTop - 10, 8, 0, Math.PI * 2);
       ctx.fill();
     }
-    if (u.key === 'riskmgr') { // 헤지 오라 (보증 방벽 vfx 펄스)
-      const aura = vspr('vfx/ally_barrier-guarantee');
-      if (aura) {
-        ctx.globalAlpha = 0.35 + 0.25 * Math.sin(b.t * 2.6 + u.id);
-        ctx.drawImage(aura, ux - 22, groundTop - hh - 30, 44, 44);
-        ctx.globalAlpha = 1;
-      }
+    if (u.key === 'riskmgr' && castLocal < 2 && !moved) { // 헤지 시전 — 리그 goldRing VFX
+      drawRigVfx(ctx, rigIdx, 'skill', castLocal / 2, ux, groundTop, 0.55);
     }
     hpBar(ctx, ux - 9, groundTop - hh - 8, 18, u.hp / u.maxHp, '#7BD8A0');
     st.prevUnits.set(u.id, { key: u.key, x: u.x });
@@ -425,16 +438,25 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     pushVfx(st, 'ally_pierce-shockwave', info.x, (info.air ? AIR_Y : GROUND_Y) - 12, b.t, 0.28, 10, info.fromTower ? 34 : 26);
   }
 
-  // 엔진 fx 이벤트 → vfx 원샷 (배당 지급 / 공시폭탄)
+  // 엔진 fx 이벤트 → 리그 캔버스 VFX 원샷 (배당 지급=금고 코인 흡수 / 공시폭탄=메테오)
   for (const f of b.fx) {
     if (f.t <= st.lastFxT) continue;
     if (f.kind === 'gold' && f.amount > 0) {
-      pushVfx(st, 'ally_dividend-payout', f.x, GROUND_Y - 44, f.t, 0.6, 22, 44);
+      st.rigVfx.push({ idx: RIG_TOWER.dividend, motion: 'skill', x: f.x, y: groundTop, scale: 0.6, t0: f.t, dur: 0.9 });
     } else if (f.kind === 'skill') {
-      pushVfx(st, 'ally_meteor-impact', f.x, GROUND_Y - 34, f.t, 0.55, 60, 150);
+      st.rigVfx.push({ idx: 5, motion: 'skill', x: f.x, y: groundTop, scale: 1.6, t0: f.t, dur: 1.1 }); // 레버리지 술사 메테오
     }
+    if (st.rigVfx.length > 40) st.rigVfx.splice(0, st.rigVfx.length - 40);
   }
   st.lastFxT = b.t;
+
+  // 리그 VFX 원샷 재생
+  st.rigVfx = st.rigVfx.filter((v) => {
+    const p = (b.t - v.t0) / v.dur;
+    if (p >= 1) return false;
+    if (p >= 0) drawRigVfx(ctx, v.idx, v.motion, p, sx(v.x), v.y, v.scale);
+    return true;
+  });
 
   // vfx 원샷 재생 (스케일 업 + 페이드)
   st.vfx = st.vfx.filter((v) => {
