@@ -131,7 +131,7 @@ export const UNITS: UnitSpec[] = [
 ];
 
 // 사옥 자동 포탑 (Age of War 본진 방어) — 최후 방어선
-export const BASE_TURRET = { dmg: 8, rate: 1.0, range: 260, dmgType: 'physical' as DmgType };
+export const BASE_TURRET = { dmg: 5.6, rate: 1.0, range: 260, dmgType: 'physical' as DmgType }; // 2026-08-05 하향 (기존 8의 70%)
 
 // 적 아키타입 — Kingdom Rush식 카운터 관계 (armor ↔ 마법, 공중 ↔ 대공/애널리스트)
 export interface EnemyTypeSpec {

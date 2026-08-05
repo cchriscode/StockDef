@@ -394,7 +394,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
       {/* 차트 밴드: 좌 차트 + 우 트레이드 패널 (FR-5.1 자유 진입·청산) */}
       <div className="chart-band">
         <div className="chart-area">
-          <canvas ref={chartRef} width={1100} height={252} className="chart" />
+          <canvas ref={chartRef} width={1500} height={252} className="chart" />
         </div>
         <div className="trade-panel">
           <div className="ls-row">
@@ -448,7 +448,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
       </div>
 
       <div className="battle-wrap">
-        <canvas ref={battleRef} width={1400} height={300} className="battle" onClick={onBattleClick} />
+        <canvas ref={battleRef} width={1800} height={300} className="battle" onClick={onBattleClick} />
         {/* 양측 HP + 웨이브 (목업 04번 오버레이) */}
         <div className="hp-overlay left">
           <div className="who"><i />우리 사옥</div>
