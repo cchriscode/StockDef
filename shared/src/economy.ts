@@ -39,6 +39,12 @@ export function judge(
   return { outcome, deltaPct, g, payout, pnl: payout - stake };
 }
 
+// FR-5.12 마진콜 강제청산 — 손실률이 MAX_LOSS_RATE에 도달하는 진입 대비 Δ% (부호 = 손실 방향)
+export function liquidationDeltaPct(sigma: number, lossRate: number, leverage: number, direction: 'long' | 'short'): number {
+  const mag = (BALANCE.MAX_LOSS_RATE / (lossRate * Math.max(leverage, 1))) * Math.max(sigma, 1e-6);
+  return direction === 'long' ? -mag : mag;
+}
+
 // FR-8.1 / FR-8.2 정산
 export interface SettlementInput {
   goldLeft: number;

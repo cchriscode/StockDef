@@ -59,6 +59,8 @@ export class LiveSession {
       this.timers.push(setTimeout(() => {
         if (this.open) this.settleClose(this.bars.barCount - 1, this.bars.bars[this.bars.barCount - 1].c, true);
       }, Math.max(0, endAt - Date.now())));
+      // FR-5.12 마진콜: 미실현 손실이 MAX_LOSS_RATE에 닿으면 즉시 전액 청산 (서버 권위, 보간가 기준)
+      this.timers.push(setInterval(() => this.checkLiquidation(), 250));
     }
     this.send({ op: 'started', serverT0: this.t0 });
   }
@@ -127,10 +129,23 @@ export class LiveSession {
     this.settleClose(Math.max(barIdx, this.open.openBarIdx), price, false);
   }
 
-  private settleClose(exitBarIdx: number, closePrice: number, forced: boolean) {
+  /** FR-5.12: 손실률이 MAX_LOSS_RATE 도달 → 마진콜 (스테이크 전액 소멸 — 올인이면 파산 패배로 이어진다) */
+  private checkLiquidation() {
+    if (!this.open || this.t0 == null) return;
+    const { price, barIdx } = this.interpPrice();
+    const { direction, basePrice, leverage, openBarIdx } = this.open;
+    const deltaPct = ((price - basePrice) / basePrice) * 100;
+    const g = (direction === 'long' ? 1 : -1) * (deltaPct / Math.max(this.bars.sigma['30'], 1e-6)) * leverage;
+    if (g < 0 && this.params.lossRate * g <= -BALANCE.MAX_LOSS_RATE) {
+      this.settleClose(Math.max(barIdx, openBarIdx), price, true, true);
+    }
+  }
+
+  private settleClose(exitBarIdx: number, closePrice: number, forced: boolean, liquidated = false) {
     if (!this.open) return;
     const { seq, direction, stake, basePrice, leverage } = this.open;
-    const r = judge(basePrice, closePrice, this.bars.sigma['30'], direction, stake, this.params.lossRate, leverage);
+    const rj = judge(basePrice, closePrice, this.bars.sigma['30'], direction, stake, this.params.lossRate, leverage);
+    const r = liquidated ? { ...rj, outcome: 'lose' as const, payout: 0, pnl: -stake } : rj; // 마진콜 = 전액 소멸
 
     if (r.outcome === 'win') this.wins += 1;
     else if (r.outcome === 'lose') this.loses += 1;
@@ -152,7 +167,7 @@ export class LiveSession {
     this.send({
       op: 'position.closed', seq, outcome: r.outcome,
       deltaPct: Math.round(r.deltaPct * 100) / 100, g: Math.round(r.g * 1000) / 1000,
-      payout: r.payout, pnl: r.pnl, goldGain, exitBarIdx, forced, earnedTotal, aumLeft: this.aum,
+      payout: r.payout, pnl: r.pnl, goldGain, exitBarIdx, forced, liquidated, earnedTotal, aumLeft: this.aum,
     });
   }
 

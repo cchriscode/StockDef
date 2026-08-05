@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  BALANCE, Battle, ENEMY_TYPES, TOWERS, UNITS,
+  BALANCE, Battle, ENEMY_TYPES, TOWERS, UNITS, liquidationDeltaPct,
   type BarsFile, type Direction, type FinishRes, type RegionId, type StageStartRes, type WsServerMsg,
 } from '@tf/shared';
 import { api, getSettings, getToken, track } from '../net/api.js';
@@ -22,6 +22,7 @@ interface ResultPopup {
   outcome: 'win' | 'lose' | 'draw';
   amount: number;   // pnl (AUM)
   goldGain: number; // 골드 환전액 (수익 × PROFIT_TO_GOLD)
+  liquidated?: boolean; // FR-5.12 마진콜 — 스테이크 전액 소멸
 }
 
 type GuideStep = 0 | 1 | 2 | 3 | 4 | 5; // FR-12.2 강제 가이드
@@ -156,9 +157,9 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         else if (m.outcome === 'lose') sfx.lose();
         else sfx.draw();
         s.lastPayoutAt = Date.now();
-        setPopup({ outcome: m.outcome, amount: m.pnl, goldGain: m.goldGain });
-        setTimeout(() => setPopup(null), 800); // FR-5.9: 0.8초 이내
-        track('position_closed', { outcome: m.outcome, g: m.g, payout: m.payout, pnl: m.pnl, goldGain: m.goldGain, holdBars, forced: m.forced });
+        setPopup({ outcome: m.outcome, amount: m.pnl, goldGain: m.goldGain, liquidated: !!m.liquidated });
+        setTimeout(() => setPopup(null), m.liquidated ? 1400 : 800); // FR-5.9 (마진콜은 조금 더 길게)
+        track('position_closed', { outcome: m.outcome, g: m.g, payout: m.payout, pnl: m.pnl, goldGain: m.goldGain, holdBars, forced: m.forced, liquidated: !!m.liquidated });
         if (isTut) setGuide((cur) => (cur === 2 ? 3 : cur));
       } else if (m.op === 'aum.update') {
         s.aum = m.aumLeft; // 전투 처치 AUM 크레딧 (서버 clamp 결과)
@@ -451,6 +452,12 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
                   </span>
                 </div>
                 <div className="pr">
+                  <span>청산선</span>
+                  <span className="dim mono">
+                    {(() => { const d = liquidationDeltaPct(g.current.bars!.sigma['30'], p.lossRate, s.openMarker!.leverage, s.openMarker!.direction); return `${d >= 0 ? '+' : ''}${d.toFixed(2)}%`; })()}
+                  </span>
+                </div>
+                <div className="pr">
                   <span>P&amp;L</span>
                   <span className={`upnl ${hud.upnl != null && hud.upnl < 0 ? 'neg' : 'pos'}`}>
                     {hud.upnl != null ? `${hud.upnl >= 0 ? '+' : ''}${hud.upnl.toLocaleString()} AUM` : '…'}
@@ -487,11 +494,13 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         {banner && <div className={`banner ${banner.kind}`}>{banner.text}</div>}
         {popup && (
           <div className={`popup ${popup.outcome}`}>
-            {popup.outcome === 'win'
-              ? `WIN +${popup.goldGain.toLocaleString()} G 입금`
-              : popup.outcome === 'lose'
-                ? `LOSE ${popup.amount.toLocaleString()} AUM`
-                : `DRAW ${popup.goldGain > 0 ? `+${popup.goldGain.toLocaleString()} G` : `${popup.amount.toLocaleString()} AUM`}`}
+            {popup.liquidated
+              ? `⚠ 강제청산 ${popup.amount.toLocaleString()} AUM 전액 소멸`
+              : popup.outcome === 'win'
+                ? `WIN +${popup.goldGain.toLocaleString()} G 입금`
+                : popup.outcome === 'lose'
+                  ? `LOSE ${popup.amount.toLocaleString()} AUM`
+                  : `DRAW ${popup.goldGain > 0 ? `+${popup.goldGain.toLocaleString()} G` : `${popup.amount.toLocaleString()} AUM`}`}
           </div>
         )}
         {slotMenu != null && (
