@@ -20,7 +20,7 @@ const MODE_LABEL = { first: '선두', last: '후미', strong: '강적', close: '
 const HIT_DUR = 0.4; // 피격 경직 연출 길이
 const UNIT_ATK_DUR = 0.8; // 유닛 발사 주기(shotCd 리셋값)에 공격 모션을 맞춘다
 const DEATH_DUR = 1.4; // 사망 붕괴 (저작 3s를 압축)
-const CLERIC_SKILL_CYCLE = 5; // 배당 사제(리스크 매니저) 주기 시전 — 앞 2초 skill 모션+goldRing
+const SKILL_DUR = 1.3; // 자동 스킬 시전 연출 길이 (저작 2s를 압축)
 
 /** 리그 캔버스 VFX를 엔티티 발밑 기준 박스로 그린다 (fxDraw 좌표계: cx=W/2, 지면=H*0.78) */
 function drawRigVfx(ctx: CanvasRenderingContext2D, idx: number, motion: string, phase: number, feetX: number, feetY: number, scale: number) {
@@ -372,11 +372,11 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const hitEl = b.t - (st.hitT.get(`u${u.id}`) ?? -9);
     const moved = Math.abs(u.x - (st.prevUnits.get(u.id)?.x ?? u.x)) > 0.01;
     const atkEl = UNIT_ATK_DUR - u.shotCd; // 발사 시 shotCd=0.8 리셋 → 경과 위상
-    const castLocal = u.key === 'riskmgr' ? (b.t + u.id * 1.7) % CLERIC_SKILL_CYCLE : Infinity; // 사제 주기 시전
+    const skillEl = b.t - u.lastSkillAt; // FR-6.5b 자동 스킬 시전 연출
     let img: HTMLCanvasElement | null = null;
     if (hitEl < HIT_DUR) img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
+    else if (skillEl >= 0 && skillEl < SKILL_DUR) img = rigFrame(rigIdx, 'skill', skillEl / SKILL_DUR, true);
     else if (u.shotCd > 0 && atkEl < UNIT_ATK_DUR) img = rigFrame(rigIdx, 'attack', atkEl / UNIT_ATK_DUR, true);
-    else if (castLocal < 2 && !moved) img = rigFrame(rigIdx, 'skill', castLocal / 2, true);
     else if (moved) img = rigFrame(rigIdx, 'walk', (b.t * 0.6 + u.id * 0.37) % 1, false); // 이동속도 절반에 맞춘 보폭
     else img = rigFrame(rigIdx, 'walk', (b.t * 0.35 + u.id * 0.37) % 1, false); // 대기 = 저속 제자리 걸음
     if (img) {
@@ -388,9 +388,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.arc(ux, groundTop - 10, 8, 0, Math.PI * 2);
       ctx.fill();
     }
-    if (u.key === 'riskmgr' && castLocal < 2 && !moved) { // 헤지 시전 — 리그 goldRing VFX
-      drawRigVfx(ctx, rigIdx, 'skill', castLocal / 2, ux, groundTop, 0.55);
-    }
+    if (skillEl >= 0 && skillEl < SKILL_DUR) drawRigVfx(ctx, rigIdx, 'skill', skillEl / SKILL_DUR, ux, groundTop, 0.55);
     hpBar(ctx, ux - 9, groundTop - hh - 8, 18, u.hp / u.maxHp, '#7BD8A0');
     st.prevUnits.set(u.id, { key: u.key, x: u.x });
   }
@@ -420,9 +418,11 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const hitEl = b.t - (st.hitT.get(`e${e.id}`) ?? -9);
     const prevX = st.prevEnemies.get(e.id)?.x;
     const moved = prevX == null || Math.abs(e.x - prevX) > 0.01;
+    const eSkillEl = b.t - (e.lastSkillAt ?? -9); // FR-6.7b 적 자동 스킬 연출
     let img: HTMLCanvasElement | null = null;
     if (stunned) img = rigFrame(rigIdx, 'hit', 0.55, true); // 경직 프레임 고정
     else if (hitEl < HIT_DUR) img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
+    else if (eSkillEl >= 0 && eSkillEl < SKILL_DUR) img = rigFrame(rigIdx, 'skill', eSkillEl / SKILL_DUR, true);
     else if (!moved) img = rigFrame(rigIdx, 'attack', ((b.t + e.id * 0.41) % 1.25) / 1.25, false); // 교전 루프 (저작 1.25s)
     else img = rigFrame(rigIdx, 'walk', (b.t + e.id * 0.41) % 1, false);
     if (img) {
@@ -449,6 +449,9 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('✶', ex, topY - 10);
+    }
+    if (!stunned && eSkillEl >= 0 && eSkillEl < SKILL_DUR) {
+      drawRigVfx(ctx, rigIdx, 'skill', eSkillEl / SKILL_DUR, ex, e.air ? AIR_Y + hh / 2 : groundTop, hh / 95);
     }
     const bw = e.type === 'boss' ? 34 : 18;
     hpBar(ctx, ex - bw / 2, topY - 7, bw, e.hp / e.maxHp, col);

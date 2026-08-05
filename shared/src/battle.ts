@@ -6,7 +6,7 @@
 //  - Bloons TD: 타워 타겟팅 모드 first/last/strong/close
 //  - Age of War: 블로커+원거리 역할 조합, 본진 자동 포탑, 화면 클리어 스킬
 import {
-  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_TYPES, TOWERS, UNITS, WAVE_COMPS,
+  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
   type DmgType, type EnemyTypeSpec, type TargetingMode, type TowerSpec, type UnitSpec,
 } from './balance.js';
 import type { MarketEvent, RegionId, StageParams } from './types.js';
@@ -38,6 +38,10 @@ export interface Enemy {
   slowPct: number;
   stunUntil: number;
   leaked: boolean; // 본진 도달로 소멸 (처치 아님 → AUM 보상 없음)
+  nextSkillAt: number; // FR-6.7b 자동 스킬 다음 시전 시각
+  lastSkillAt: number; // 최근 시전 시각 (렌더 재생 기준)
+  shieldUntil: number; // 실드베어러 육각 실드 — 받는 피해 −70% 만료 시각
+  hasteUntil: number; // 러너 질주·탱커 독려 — 이속 ×1.5 만료 시각
 }
 
 export interface Unit {
@@ -48,6 +52,9 @@ export interface Unit {
   maxHp: number;
   spec: UnitSpec;
   shotCd: number;
+  nextSkillAt: number; // FR-6.5b 자동 스킬 다음 시전 시각
+  lastSkillAt: number; // 최근 시전 시각 (렌더 skill 모션·VFX 재생 기준)
+  shieldUntil: number; // 인턴 원금 보장 — 받는 피해 −60% 만료 시각
 }
 
 export interface Tower {
@@ -215,7 +222,10 @@ export class Battle {
     const spec = UNITS.find((s) => s.key === key)!;
     if (!this.spend(this.unitCost(key))) return false;
     const hp = Math.round(spec.hp * this.params.unitHpMult);
-    this.units.push({ id: this.nextId++, key, x: UNIT_SPAWN_X, hp, maxHp: hp, spec, shotCd: 0 });
+    this.units.push({
+      id: this.nextId++, key, x: UNIT_SPAWN_X, hp, maxHp: hp, spec, shotCd: 0,
+      nextSkillAt: this.t + UNIT_SKILL_PERIOD[key], lastSkillAt: -9, shieldUntil: 0,
+    });
     return true;
   }
 
@@ -258,6 +268,7 @@ export class Battle {
 
   /** 피해 적용 — Kingdom Rush식: 물리는 armor, 마법은 mr에만 감소 */
   private damage(e: Enemy, raw: number, type: DmgType) {
+    if (this.t < e.shieldUntil) raw *= 0.3; // FR-6.7b 육각 실드 — 받는 피해 −70%
     const mult = type === 'physical' ? 1 - e.armor : 1 - e.mr;
     const dealt = raw * mult;
     e.hp -= dealt;
@@ -361,11 +372,106 @@ export class Battle {
       armor: et.armor, mr: et.mr, air: et.isAir, size: et.size,
       wave: p.wave, baseDmg: et.baseDmg, healPerSec: et.healPerSec,
       slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false,
+      nextSkillAt: this.t + ENEMY_SKILL_PERIOD[p.type], lastSkillAt: -9, shieldUntil: 0, hasteUntil: 0,
     });
   }
 
+  /** FR-6.5b 유닛 자동 스킬 — 주기마다 조건 충족 시 시전 (대상 없으면 1.5초 후 재시도) */
+  private castUnitSkills(atkMult: number) {
+    const t = this.t;
+    for (const u of this.units) {
+      if (t < u.nextSkillAt) continue;
+      const inRange = (r: number) =>
+        this.enemies.filter((e) => e.hp > 0 && e.x >= u.x - 6 && e.x - u.x <= r && (!e.air || u.spec.antiAirPct > 0));
+      let cast = false;
+      if (u.key === 'intern') { // 원금 보장 — 교전 중일 때만
+        if (this.enemies.some((e) => !e.air && e.hp > 0 && e.x - u.x >= -6 && e.x - u.x <= 30)) {
+          u.shieldUntil = t + 3;
+          cast = true;
+        }
+      } else if (u.key === 'trader') { // 복리 참격 — 주변 지상 광역
+        const ts = this.enemies.filter((e) => !e.air && e.hp > 0 && Math.abs(e.x - u.x) <= 60);
+        if (ts.length) {
+          for (const e of ts) this.damage(e, u.spec.dps * 2.5 * atkMult, 'physical');
+          cast = true;
+        }
+      } else if (u.key === 'analyst') { // 화살 세례 — 최대 4기 다중 사격
+        const ts = inRange(u.spec.range).slice(0, 4);
+        if (ts.length) {
+          for (const e of ts) {
+            this.fireProjectile(u.x, e, u.spec.dps * 1.2 * atkMult * (e.air ? u.spec.antiAirPct : 1),
+              { dmgType: 'physical', projSpeed: 560, splashRadius: 0, slowPct: 0, slowDur: 0 }, false);
+          }
+          cast = true;
+        }
+      } else if (u.key === 'lancer') { // 리밸런싱 — 확장 사거리 전원 관통 (2기 이상일 때)
+        const ts = this.enemies.filter((e) => !e.air && e.hp > 0 && e.x >= u.x - 6 && e.x - u.x <= u.spec.range + 36);
+        if (ts.length >= 2) {
+          for (const e of ts) this.damage(e, u.spec.dps * 1.8 * atkMult, 'physical');
+          cast = true;
+        }
+      } else if (u.key === 'mage') { // 레버리지 오브 — 마법 광역탄
+        const ts = inRange(u.spec.range);
+        if (ts.length) {
+          this.fireProjectile(u.x, ts[0], u.spec.dps * 2.2 * atkMult,
+            { dmgType: 'magic', projSpeed: 480, splashRadius: 70, slowPct: 0, slowDur: 0 }, false);
+          cast = true;
+        }
+      } else if (u.key === 'riskmgr') { // 헤지 커버 — 사옥 즉시 회복 버스트
+        this.baseHP = Math.min(BALANCE.BASE_HP, this.baseHP + 3);
+        cast = true;
+      }
+      if (cast) {
+        u.lastSkillAt = t;
+        u.nextSkillAt = t + UNIT_SKILL_PERIOD[u.key];
+      } else {
+        u.nextSkillAt = t + 1.5;
+      }
+    }
+  }
+
+  /** FR-6.7b 적 자동 스킬 — 유형별 주기 시전 (스턴 중 불가) */
+  private castEnemySkills() {
+    const t = this.t;
+    for (const e of this.enemies) {
+      if (e.hp <= 0 || t < e.stunUntil || t < (e.nextSkillAt ?? Infinity)) continue;
+      let cast = false;
+      if (e.type === 'grunt') { // 3점사 — 블로킹 중 추가 일격
+        const u = this.units.find((u2) => e.x - u2.x >= -6 && e.x - u2.x <= 30);
+        if (u) { u.hp -= e.dps * 1.5; cast = true; }
+      } else if (e.type === 'runner') { // 질주
+        e.hasteUntil = t + 2;
+        cast = true;
+      } else if (e.type === 'tank') { // 전진 독려 — 주변 지상 적 가속
+        for (const o of this.enemies) if (o !== e && !o.air && o.hp > 0 && Math.abs(o.x - e.x) <= 90) o.hasteUntil = t + 2;
+        cast = true;
+      } else if (e.type === 'shield') { // 육각 실드
+        e.shieldUntil = t + 2.5;
+        cast = true;
+      } else if (e.type === 'healer') { // 응급 수리 — 주변 즉시 회복
+        for (const o of this.enemies) {
+          if (o !== e && !o.air && o.hp > 0 && Math.abs(o.x - e.x) <= HEAL_RADIUS) o.hp = Math.min(o.maxHp, o.hp + 30);
+        }
+        this.pushFx('heal', e.x, e.air, 30);
+        cast = true;
+      } else if (e.type === 'air') { // 광학 볼트 — 아군 유닛 저격
+        const u = this.units.filter((u2) => Math.abs(u2.x - e.x) <= 260).sort((a, b) => Math.abs(a.x - e.x) - Math.abs(b.x - e.x))[0];
+        if (u) { u.hp -= 14; cast = true; }
+      } else if (e.type === 'boss') { // 마진콜 충격파 — 주변 유닛 전체 타격
+        const ts = this.units.filter((u2) => Math.abs(u2.x - e.x) <= 130);
+        if (ts.length) { for (const u of ts) u.hp -= 22; cast = true; }
+      }
+      if (cast) {
+        e.lastSkillAt = t;
+        e.nextSkillAt = t + ENEMY_SKILL_PERIOD[e.type];
+      } else {
+        e.nextSkillAt = t + 1.5;
+      }
+    }
+  }
+
   private enemySpeed(e: Enemy): number {
-    return e.baseSpeed * (this.t < e.slowUntil ? 1 - e.slowPct : 1);
+    return e.baseSpeed * (this.t < e.slowUntil ? 1 - e.slowPct : 1) * (this.t < e.hasteUntil ? 1.5 : 1); // 질주·독려
   }
 
   private fireProjectile(fromX: number, target: Enemy, dmg: number, spec: { dmgType: DmgType; projSpeed: number; splashRadius: number; slowPct: number; slowDur: number }, fromTower: boolean) {
@@ -509,6 +615,8 @@ export class Battle {
       }
     }
     this.checkRage(); // FR-6.10b 본진 위기 → 반격 분대
+    this.castUnitSkills(atkMult); // FR-6.5b 유닛 자동 스킬
+    this.castEnemySkills(); // FR-6.7b 적 자동 스킬
 
     // 적 행동
     for (const e of this.enemies) {
@@ -519,7 +627,8 @@ export class Battle {
         // 리스크 매니저 가드: 근처 서포터가 있으면 아군이 받는 피해 감소
         const guard = this.units.some((u) => u.spec.guardPct > 0 && Math.abs(u.x - blocker.x) <= u.spec.guardRadius)
           ? 1 - UNITS.find((s) => s.key === 'riskmgr')!.guardPct : 1;
-        blocker.hp -= e.dps * guard * dt; // 블로킹된 적은 유닛과 교전 (공중은 배정 자체가 안 됨)
+        const shield = this.t < blocker.shieldUntil ? 0.4 : 1; // FR-6.5b 원금 보장 돔
+        blocker.hp -= e.dps * guard * shield * dt; // 블로킹된 적은 유닛과 교전 (공중은 배정 자체가 안 됨)
       } else {
         // 손절 방벽: 지상 적의 경로를 물리적으로 막는다 — 파괴될 때까지 정지·공격
         const bar = this.towers.find((tw) => {

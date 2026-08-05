@@ -187,6 +187,32 @@ describe('Battle 엔진', () => {
     advanceAlive(b, 2);
     expect(b.rageStage).toBe(2);
   });
+  it('자동 스킬: 실드베어러 육각 실드 시전 → 받는 피해 감소 (FR-6.7b)', () => {
+    const b = new Battle(params(), []);
+    const anyB = b as unknown as { enemies: unknown[] };
+    anyB.enemies.push({ id: 910, type: 'shield', x: 500, hp: 200, maxHp: 200, baseSpeed: 0, dps: 0, armor: 0, mr: 0, air: false, size: 9, wave: 1, baseDmg: 0, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false, nextSkillAt: 0, lastSkillAt: -9, shieldUntil: 0, hasteUntil: 0 } as never);
+    advanceAlive(b, 1);
+    const sh = b.enemies[0] as unknown as { shieldUntil: number };
+    expect(sh.shieldUntil).toBeGreaterThan(0); // 시전됨
+    b.addGold(500);
+    b.useSkill(); // 마법 80 — 실드로 30%만 적용 (mr 0 가정)
+    expect(b.enemies[0].hp).toBeCloseTo(200 - 80 * 0.3, 3);
+  });
+  it('자동 스킬: 트레이더 복리 참격 — 주기 도달 시 주변 광역 피해 (FR-6.5b)', () => {
+    const b = new Battle(params(), []);
+    b.addGold(100);
+    b.spawnUnit('trader');
+    const u = b.units[0];
+    u.x = 500;
+    u.nextSkillAt = 0.2;
+    const anyB = b as unknown as { enemies: unknown[] };
+    for (let i = 0; i < 3; i++) {
+      anyB.enemies.push({ id: 920 + i, type: 'grunt', x: 520 + i * 10, hp: 500, maxHp: 500, baseSpeed: 0, dps: 0, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 0, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false } as never);
+    }
+    advanceAlive(b, 1);
+    expect(u.lastSkillAt).toBeGreaterThan(0); // 시전됨
+    for (const e of b.enemies) expect(e.hp).toBeLessThan(500); // 광역 3기 전부 피격
+  });
   it('heat 반영: 점령 2개(1.04) → 적 수 ceil(count×1.04)', () => {
     const b = new Battle(params({ heat: 1.04 }), []);
     b.advanceTo(11); // 웨이브 1 (base 2) 스폰 직후

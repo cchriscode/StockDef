@@ -141,6 +141,25 @@ export const UNITS: UnitSpec[] = [
   { key: 'riskmgr', name: '리스크 매니저', cost: 90, hp: 80, dps: 0, speed: 20, range: 0, cleave: 0, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0.5, guardPct: 0.2, guardRadius: 120 },
 ];
 
+// FR-6.5b/6.7b 자동 스킬 주기 (초) — 유닛·적이 일정 주기마다 고유 스킬을 자동 시전 (리그 skill 모션+VFX 재생)
+export const UNIT_SKILL_PERIOD: Record<UnitSpec['key'], number> = {
+  intern: 12, // 원금 보장 — 3초간 받는 피해 −60% 돔
+  analyst: 12, // 화살 세례 — 사거리 내 최대 4기 다중 사격 (dps×1.2/발)
+  lancer: 10, // 리밸런싱 — 확장 사거리 일직선 전원 관통 (dps×1.8)
+  trader: 9, // 복리 참격 — 주변 지상 광역 일격 (dps×2.5)
+  mage: 14, // 레버리지 오브 — 마법 광역탄 (dps×2.2, 폭발 70)
+  riskmgr: 5, // 헤지 커버 — 사옥 즉시 +3 회복 (오라 패시브와 별도 버스트)
+};
+export const ENEMY_SKILL_PERIOD: Record<EnemyTypeSpec['key'], number> = {
+  grunt: 9, // 3점사 — 블로킹 중 추가 일격 (dps×1.5)
+  runner: 8, // 질주 — 2초간 이속 ×1.5
+  tank: 11, // 전진 독려 — 주변 지상 적 2초 가속
+  shield: 12, // 육각 실드 — 2.5초간 받는 피해 −70%
+  healer: 10, // 응급 수리 — 주변 적 즉시 +30 회복
+  air: 11, // 광학 볼트 — 사거리 내 아군 유닛 저격 (14)
+  boss: 15, // 마진콜 충격파 — 주변 아군 유닛 전체 22 피해
+};
+
 // 사옥 자동 포탑 (Age of War 본진 방어) — 최후 방어선
 export const BASE_TURRET = { dmg: 4.5, rate: 1.0, range: 260, dmgType: 'physical' as DmgType }; // 2026-08-05 난이도 개편: 아군 공격력 −20%
 
