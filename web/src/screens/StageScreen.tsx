@@ -602,7 +602,11 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           <div className="overlay center" onClick={() => setInfoKey(null)}>
             <div className="card info-card" onClick={(e) => e.stopPropagation()}>
               <h3>{name} <span className="small dim">{card.role}</span></h3>
-              <RigPreview unit={rigIdx} height={150} />
+              {rigIdx != null ? (
+                <RigPreview unit={rigIdx} height={150} />
+              ) : (
+                <img src="/assets/units/cane/wk-strip.png" alt="" style={{ width: 100, imageRendering: 'pixelated', objectFit: 'cover', objectPosition: 'left', height: 140, margin: '0 auto' }} />
+              )}
               <p>{card.desc}</p>
               <p className="skill-line">✦ {card.skill}</p>
               <p className="small mono dim">{stats}</p>

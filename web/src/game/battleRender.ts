@@ -12,7 +12,7 @@ const ENEMY_COLORS: Record<Enemy['type'], string> = {
   grunt: '#E8654F', runner: '#FF9E86', tank: '#A83A2E', shield: '#C9A84A',
   healer: '#8FD8B0', air: '#E8A0B4', boss: '#C22A2A',
 };
-const UNIT_COLORS: Record<string, string> = { intern: '#7BD8A0', analyst: '#46A574', trader: '#3E8C68', lancer: '#6BAF8C', mage: '#9B6BFF', riskmgr: '#5EC0B0' };
+const UNIT_COLORS: Record<string, string> = { intern: '#7BD8A0', analyst: '#46A574', trader: '#3E8C68', lancer: '#6BAF8C', mage: '#9B6BFF', riskmgr: '#5EC0B0', cane: '#D8C4A8' };
 const TOWER_COLORS: Record<string, string> = { limit: '#4E7FB8', cannon: '#B85A4E', spire: '#9B6BFF', flame: '#E8A54F', dividend: '#FFC53D', barrier: '#7C89A3' };
 const MODE_LABEL = { first: '선두', last: '후미', strong: '강적', close: '근접' };
 
@@ -43,6 +43,36 @@ function vspr(path: string): HTMLImageElement | null {
     vCache.set(path, img);
   }
   return img.complete && img.naturalWidth > 0 ? img : null;
+}
+
+// 지팡이 신사 (임시 PNG 시트 유닛, handoff-walk-cane) — 150×210 프레임, 발끝 = 하단 18px 위
+const CANE = { fw: 150, fh: 210, footPad: 18, walk: { frames: 4, ms: 140 }, atk: { frames: 5, ms: 120 } };
+function pngImg(src: string): HTMLImageElement | null {
+  let img = vCache.get(src);
+  if (!img) {
+    img = new Image();
+    img.src = src;
+    vCache.set(src, img);
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
+
+/** 임시 유닛 전용 시트 드로잉 — 공격 원샷(0.6s) 아니면 걷기 루프 */
+function drawCane(ctx: CanvasRenderingContext2D, t: number, shotCd: number, ux: number, groundTop: number): boolean {
+  const atkEl = 0.8 - shotCd; // UNIT_ATK_DUR 사이클
+  const attacking = shotCd > 0 && atkEl < (CANE.atk.frames * CANE.atk.ms) / 1000;
+  const img = pngImg(attacking ? '/assets/units/cane/atk-strip.png' : '/assets/units/cane/wk-strip.png');
+  if (!img) return false;
+  const f = attacking
+    ? Math.min(Math.floor((atkEl * 1000) / CANE.atk.ms), CANE.atk.frames - 1)
+    : Math.floor((t * 1000) / CANE.walk.ms) % CANE.walk.frames;
+  const hh = 56;
+  const ww = (hh * CANE.fw) / CANE.fh;
+  const yBottom = groundTop + (CANE.footPad * hh) / CANE.fh; // 발끝 앵커 정합
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, f * CANE.fw, 0, CANE.fw, CANE.fh, ux - ww / 2, yBottom - hh, ww, hh);
+  ctx.imageSmoothingEnabled = true;
+  return true;
 }
 
 // 구 스프라이트 로더 — 기지(사옥/베어 본진)는 벡터 팩에 없어 Bases 시트 유지
@@ -372,6 +402,17 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const hitEl = b.t - (st.hitT.get(`u${u.id}`) ?? -9);
     const moved = Math.abs(u.x - (st.prevUnits.get(u.id)?.x ?? u.x)) > 0.01;
     const atkEl = UNIT_ATK_DUR - u.shotCd; // 발사 시 shotCd=0.8 리셋 → 경과 위상
+    if (u.key === 'cane') { // 임시 PNG 시트 유닛 — 리그 경로 대신 전용 드로잉
+      if (!drawCane(ctx, b.t, u.shotCd, ux, groundTop)) {
+        ctx.fillStyle = UNIT_COLORS.cane;
+        ctx.beginPath();
+        ctx.arc(ux, groundTop - 10, 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      hpBar(ctx, ux - 9, groundTop - hh - 8, 18, u.hp / u.maxHp, '#D8C4A8');
+      st.prevUnits.set(u.id, { key: u.key, x: u.x });
+      continue;
+    }
     const skillEl = b.t - u.lastSkillAt; // FR-6.5b 자동 스킬 시전 연출
     let img: HTMLCanvasElement | null = null;
     if (hitEl < HIT_DUR) img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);

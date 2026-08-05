@@ -159,7 +159,13 @@ export function RevealScreen({ sessionId, finish, regionId, onDone }: Props) {
         <div className={`rank-badge ${failed ? 'fail' : ''}`}><i>{failed ? '✕' : finish.grade}</i></div>
         <h2>{failed ? '패배 — 다시 도전하세요' : '방어 성공'}</h2>
         <div className="card settle">
-          <p>적중률 {(finish.accuracy * 100).toFixed(0)}% · 잔여골드율 {(finish.goldLeftRate * 100).toFixed(0)}%</p>
+          <p>
+            적중률 {(finish.accuracy * 100).toFixed(0)}% · 수익률{' '}
+            <b className={finish.returnPct >= 0 ? 'up' : 'down'}>
+              {finish.returnPct >= 0 ? '+' : ''}{(finish.returnPct * 100).toFixed(1)}%
+            </b>{' '}
+            · 잔여골드율 {(finish.goldLeftRate * 100).toFixed(0)}%
+          </p>
           <p className="big">자본금 +{finish.capitalAwarded.toLocaleString()}{finish.isRetry ? ' (재도전 50%)' : ''}</p>
           <p>보유 자본금 {finish.capitalTotal.toLocaleString()}</p>
         </div>

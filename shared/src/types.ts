@@ -107,6 +107,7 @@ export interface FinishRes {
   status: 'cleared' | 'failed' | 'invalid';
   grade: Grade | null;
   accuracy: number;
+  returnPct: number; // 트레이딩 수익률 = (총 payout − 총 투입) / 총 투입 (포지션 없으면 0)
   goldLeftRate: number;
   capitalAwarded: number;
   eligibleLines: RewardLine[];

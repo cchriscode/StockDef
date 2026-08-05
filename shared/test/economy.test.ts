@@ -39,10 +39,15 @@ describe('FR-5.5 청산 손익 (선물식 연속 PnL)', () => {
     expect(r.outcome).toBe('lose');
     expect(r.payout).toBe(325);
   });
-  it('|g| < 0.25 → 통계상 DRAW지만 손익은 연속 (g=+0.1 → payout 545)', () => {
+  it('승패는 실현 손익 부호 기준 — 작은 수익도 WIN (2026-08-05 DRAW_BAND 폐지)', () => {
     const r = judge(10000, 10010, 1.0, 'long', 500, 0.6);
-    expect(r.outcome).toBe('draw');
+    expect(r.outcome).toBe('win');
     expect(r.payout).toBe(545); // 500 × (1 + 0.9×0.1)
+  });
+  it('pnl = 0 (가격 무변동) → DRAW', () => {
+    const r = judge(10000, 10000, 1.0, 'long', 500, 0.6);
+    expect(r.outcome).toBe('draw');
+    expect(r.pnl).toBe(0);
   });
   it('상방은 Z_CAP=3.0에서 클램프: g=+10 → payout = stake × 3.7', () => {
     const r = judge(10000, 11000, 1.0, 'long', 100, 0.6);

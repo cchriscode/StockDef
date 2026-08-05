@@ -171,7 +171,7 @@ router.post('/stage/finish', (req, res) => {
   if (cleared && elapsed < stageMs * (enemyBaseDestroyed ? 0.1 : 0.95)) {
     db.prepare("UPDATE stage_sessions SET status = 'abandoned', ended_at = datetime('now') WHERE id = ?").run(sessionId);
     dropLive(sessionId);
-    return res.json({ status: 'invalid', grade: null, accuracy: 0, goldLeftRate: 0, capitalAwarded: 0, eligibleLines: [], alreadyOwnedLines: [], isRetry: !!row.is_retry, capitalTotal: accountRow(accountId).capital } satisfies FinishRes);
+    return res.json({ status: 'invalid', grade: null, accuracy: 0, returnPct: 0, goldLeftRate: 0, capitalAwarded: 0, eligibleLines: [], alreadyOwnedLines: [], isRetry: !!row.is_retry, capitalTotal: accountRow(accountId).capital } satisfies FinishRes);
   }
 
   // 골드 독립 재계산 검증 (§11): 총 획득 = 기본 수입(시계 기준) + 골드 환전 순수익 합 (FR-5.5b)
@@ -184,7 +184,7 @@ router.post('/stage/finish', (req, res) => {
   if (!valid) {
     db.prepare("UPDATE stage_sessions SET status = 'abandoned', ended_at = datetime('now') WHERE id = ?").run(sessionId);
     dropLive(sessionId);
-    return res.json({ status: 'invalid', grade: null, accuracy: 0, goldLeftRate: 0, capitalAwarded: 0, eligibleLines: [], alreadyOwnedLines: [], isRetry: !!row.is_retry, capitalTotal: accountRow(accountId).capital } satisfies FinishRes);
+    return res.json({ status: 'invalid', grade: null, accuracy: 0, returnPct: 0, goldLeftRate: 0, capitalAwarded: 0, eligibleLines: [], alreadyOwnedLines: [], isRetry: !!row.is_retry, capitalTotal: accountRow(accountId).capital } satisfies FinishRes);
   }
 
   const depts = getDeptLevels(accountId);
@@ -238,8 +238,9 @@ router.post('/stage/finish', (req, res) => {
   }
 
   dropLive(sessionId);
+  const returnPct = live.stakeSum > 0 ? Math.round(((live.payoutSum - live.stakeSum) / live.stakeSum) * 1000) / 1000 : 0;
   const out: FinishRes = {
-    status, grade: cleared ? s.grade : null, accuracy: s.accuracy, goldLeftRate: s.goldLeftRate,
+    status, grade: cleared ? s.grade : null, accuracy: s.accuracy, returnPct, goldLeftRate: s.goldLeftRate,
     capitalAwarded, eligibleLines: selectable, alreadyOwnedLines: eligible.filter((l) => owned.includes(l)),
     isRetry: !!row.is_retry, capitalTotal: accountRow(accountId).capital,
   };

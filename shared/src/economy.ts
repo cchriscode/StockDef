@@ -16,9 +16,9 @@ export function heatOf(capturedCount: number): number {
 }
 
 // FR-5.5 청산 손익 수식 (선물식 연속 PnL, 비대칭 계수)
-// g = 방향 × (Δ%/σ30) — 부호 있는 정규화 수익.
+// g = 방향 × (Δ%/σ30) × 배율 — 부호 있는 정규화 수익.
 // 상방은 B×g (전 지역 0.9), 하방은 L×g (지역 난이도 노브) — 손실은 stake×MAX_LOSS_RATE에서 클램프.
-// outcome은 통계·등급용 분류일 뿐이며 손익은 연속이다 (|g| < DRAW_BAND → draw).
+// outcome은 실현 손익 부호 기준 (2026-08-05 개정: DRAW_BAND 폐지 — pnl>0 승 / pnl<0 패 / pnl=0 무).
 export function judge(
   basePrice: number,
   closePrice: number,
@@ -35,8 +35,9 @@ export function judge(
   const capped = Math.min(Math.max(raw, -BALANCE.MAX_LOSS_RATE), BALANCE.PAYOUT_BASE * BALANCE.Z_CAP);
   // 1e-6 가드: 부동소수점 오차로 정수 경계가 내려앉는 것 방지 (예: 1000×0.1 = 99.999…)
   const payout = Math.max(0, Math.floor(stake * (1 + capped) + 1e-6));
-  const outcome: Outcome = Math.abs(g) < BALANCE.DRAW_BAND ? 'draw' : g > 0 ? 'win' : 'lose';
-  return { outcome, deltaPct, g, payout, pnl: payout - stake };
+  const pnl = payout - stake;
+  const outcome: Outcome = pnl > 0 ? 'win' : pnl < 0 ? 'lose' : 'draw';
+  return { outcome, deltaPct, g, payout, pnl };
 }
 
 // FR-5.12 마진콜 강제청산 — 손실률이 MAX_LOSS_RATE에 도달하는 진입 대비 Δ% (부호 = 손실 방향)

@@ -116,7 +116,7 @@ export const TOWERS: TowerSpec[] = [
 
 // FR-6.5 유닛 — handoff 리그 팩 6직군: 블로커 / 원거리 / 근접 브루저 / 관통 창병 / 마법 원거리 / 서포터
 export interface UnitSpec {
-  key: 'intern' | 'analyst' | 'trader' | 'lancer' | 'mage' | 'riskmgr';
+  key: 'intern' | 'analyst' | 'trader' | 'lancer' | 'mage' | 'riskmgr' | 'cane';
   name: string;
   cost: number;
   hp: number;
@@ -139,6 +139,8 @@ export const UNITS: UnitSpec[] = [
   { key: 'trader', name: '트레이더', cost: 90, hp: 170, dps: 18, speed: 20, range: 26, cleave: 2, antiAirPct: 0, block: 2, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'mage', name: '술사', cost: 110, hp: 55, dps: 14, speed: 20, range: 130, cleave: 1, antiAirPct: 0.6, block: 1, dmgType: 'magic', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'riskmgr', name: '리스크 매니저', cost: 90, hp: 80, dps: 0, speed: 20, range: 0, cleave: 0, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0.5, guardPct: 0.2, guardRadius: 120 },
+  // 임시 테스트 유닛 (PNG 스프라이트 프리뷰용, handoff-walk-cane) — 확정 시 정식 스탯·비용 책정
+  { key: 'cane', name: '지팡이 신사', cost: 1, hp: 100, dps: 15, speed: 20, range: 30, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
 ];
 
 // FR-6.5b/6.7b 자동 스킬 주기 (초) — 유닛·적이 일정 주기마다 고유 스킬을 자동 시전 (리그 skill 모션+VFX 재생)
@@ -149,6 +151,7 @@ export const UNIT_SKILL_PERIOD: Record<UnitSpec['key'], number> = {
   trader: 9, // 복리 참격 — 주변 지상 광역 일격 (dps×2.5)
   mage: 14, // 레버리지 오브 — 마법 광역탄 (dps×2.2, 폭발 70)
   riskmgr: 5, // 헤지 커버 — 사옥 즉시 +3 회복 (오라 패시브와 별도 버스트)
+  cane: 9999, // 임시 유닛 — 스킬 없음
 };
 export const ENEMY_SKILL_PERIOD: Record<EnemyTypeSpec['key'], number> = {
   grunt: 9, // 3점사 — 블로킹 중 추가 일격 (dps×1.5)

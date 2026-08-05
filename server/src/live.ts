@@ -18,6 +18,7 @@ export class LiveSession {
   t0: number | null = null;
   aum: number;
   payoutSum = 0;
+  stakeSum = 0; // 정산된 포지션의 총 투입 (수익률 = (payoutSum − stakeSum) / stakeSum)
   goldSum = 0; // 골드로 환전된 순수익 누적 (payout − 반환 스테이크)
   wins = 0; loses = 0; draws = 0;
   open: { seq: number; direction: Direction; stake: number; openBarIdx: number; basePrice: number; leverage: number } | null = null;
@@ -151,6 +152,7 @@ export class LiveSession {
     else if (r.outcome === 'lose') this.loses += 1;
     else this.draws += 1;
     this.payoutSum += r.payout;
+    this.stakeSum += stake;
     // FR-5.5b 정산 분해: 스테이크(−손실)는 AUM으로 반환, 순수익만 골드로 자동 환전 (1:1)
     const returnToAum = Math.min(r.payout, stake);
     const goldGain = r.payout - returnToAum;

@@ -38,6 +38,11 @@ export const UNIT_INFO: Record<UnitSpec['key'], InfoCard> = {
     desc: '전열 뒤를 따라다니며 사옥 체력을 회복시키고 주변 아군이 받는 피해를 20% 줄입니다. 공격하지 않습니다.',
     skill: '헤지 커버 (자동, 5초) — 황금 링 시전마다 사옥 +3 즉시 회복. 패시브: +0.5HP/s + 반경 내 아군 피해 −20%.',
   },
+  cane: {
+    role: '임시 테스트 유닛',
+    desc: '신규 아트 스타일 프리뷰용 임시 캐릭터입니다 (PNG 스프라이트). 느낌 확인 후 정식 편입 여부·스탯을 결정합니다.',
+    skill: '지팡이 내려침 — 근접 단일 타격. 자동 스킬 없음.',
+  },
 };
 
 export const TOWER_INFO: Record<TowerSpec['key'], InfoCard> = {
