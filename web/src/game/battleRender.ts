@@ -98,8 +98,24 @@ function pushVfx(st: RenderFxState, name: string, x: number, y: number, t0: numb
   if (st.vfx.length > 60) st.vfx.splice(0, st.vfx.length - 60);
 }
 
-// ─── 도시별 전장 배경 (Backgrounds 목업 트레이스 세트) — 오프스크린 1회 렌더 후 재사용 ───
+// ─── 도시별 전장 배경 — 이미지 배경(있으면 우선) 또는 목업 트레이스, 오프스크린 1회 렌더 후 재사용 ───
 const backdropCache = new Map<string, HTMLCanvasElement>();
+
+// 지역별 픽셀아트 배경 이미지 (높이를 지면선에 맞추고 가로 타일링)
+const IMAGE_BACKDROPS: Record<string, string> = { R1: '/assets/backdrops/r1.png' };
+const bdImgCache = new Map<string, HTMLImageElement>();
+
+function backdropImage(regionId: string): HTMLImageElement | null {
+  const src = IMAGE_BACKDROPS[regionId];
+  if (!src) return null;
+  let img = bdImgCache.get(regionId);
+  if (!img) {
+    img = new Image();
+    img.src = src;
+    bdImgCache.set(regionId, img);
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
 
 function drawStripes(ctx: CanvasRenderingContext2D, r: { xx: number; yy: number; ww: number; hh: number }, layer: Backdrop['rects'][number]['g'], sx2: number, sy2: number) {
   if (!layer) return;
@@ -130,6 +146,31 @@ function backdropFor(regionId: string, W: number, H: number, groundTop: number):
   const key = `${regionId}:${W}x${H}`;
   const hit = backdropCache.get(key);
   if (hit) return hit;
+  // 이미지 배경: 높이를 지면선에 정합시키고 가로 타일링 (픽셀아트 크리스프 유지)
+  const bimg = backdropImage(regionId);
+  if (bimg) {
+    const icv = document.createElement('canvas');
+    icv.width = W;
+    icv.height = H;
+    const ictx = icv.getContext('2d')!;
+    ictx.imageSmoothingEnabled = false;
+    const tw = (groundTop / bimg.naturalHeight) * bimg.naturalWidth;
+    for (let x = 0, i = 0; x < W; x += tw, i += 1) {
+      if (i % 2) { // 미러 타일링 — 하늘 그라데이션 이음새 제거
+        ictx.save();
+        ictx.translate(x + tw, 0);
+        ictx.scale(-1, 1);
+        ictx.drawImage(bimg, 0, 0, tw, groundTop);
+        ictx.restore();
+      } else {
+        ictx.drawImage(bimg, x, 0, tw, groundTop);
+      }
+    }
+    ictx.fillStyle = '#1A2740'; // 지면 아래는 기존 지면 톤
+    ictx.fillRect(0, groundTop, W, H - groundTop);
+    backdropCache.set(key, icv);
+    return icv;
+  }
   const bd = BACKDROPS[regionId] ?? BACKDROPS.R1;
   const cv = document.createElement('canvas');
   cv.width = W;
@@ -171,7 +212,7 @@ function backdropFor(regionId: string, W: number, H: number, groundTop: number):
     drawStripes(ctx, { xx, yy, ww, hh }, r.g, sx2, sy2);
     ctx.globalAlpha = 1;
   }
-  backdropCache.set(key, cv);
+  if (!IMAGE_BACKDROPS[regionId]) backdropCache.set(key, cv); // 이미지 로딩 중엔 캐시하지 않고 다음 프레임에 재시도
   return cv;
 }
 
