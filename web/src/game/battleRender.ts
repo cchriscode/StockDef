@@ -216,11 +216,13 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const tx = sx(b.towerSlotX(s));
     const tw = b.towers[s];
     if (!tw) {
-      ctx.strokeStyle = s === selectedSlot ? '#7BD8A0' : '#3E5570';
+      ctx.fillStyle = 'rgba(110,143,181,0.14)';
+      ctx.fillRect(tx - 12, groundTop - 40, 24, 38);
+      ctx.strokeStyle = s === selectedSlot ? '#7BD8A0' : '#6E8FB5';
       ctx.setLineDash([3, 3]);
       ctx.strokeRect(tx - 12, groundTop - 40, 24, 38);
       ctx.setLineDash([]);
-      ctx.fillStyle = '#4E5B72';
+      ctx.fillStyle = '#8FA8C7';
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(`${s + 1}`, tx, groundTop - 18);

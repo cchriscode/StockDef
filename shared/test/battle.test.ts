@@ -56,12 +56,12 @@ describe('Battle 엔진', () => {
   it('손절 방벽: 지상 적을 정지시키고 내구가 깎인다', () => {
     const b = new Battle(params(), []);
     b.addGold(70);
-    expect(b.buildTower(0, 'barrier')).toBe(true); // slot0 x=150
+    expect(b.buildTower(0, 'barrier')).toBe(true); // slot0 x=90
     const anyB = b as unknown as { enemies: unknown[] };
-    anyB.enemies.push({ id: 700, type: 'grunt', x: 162, hp: 500, maxHp: 500, baseSpeed: 30, dps: 10, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 10, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false } as never);
+    anyB.enemies.push({ id: 700, type: 'grunt', x: 102, hp: 500, maxHp: 500, baseSpeed: 30, dps: 10, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 10, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false } as never);
     const tw0 = b.towers[0]!;
     b.advanceTo(b.t + 2);
-    expect(b.enemies[0].x).toBeGreaterThan(150); // 방벽에 막혀 통과 못 함
+    expect(b.enemies[0].x).toBeGreaterThan(90); // 방벽에 막혀 통과 못 함
     expect(tw0.hp).toBeLessThan(tw0.maxHp); // 내구 감소
   });
   it('리스크 매니저: 사옥 체력을 회복시킨다 (BASE_HP 상한)', () => {

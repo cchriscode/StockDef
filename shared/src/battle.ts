@@ -233,8 +233,8 @@ export class Battle {
   }
 
   towerSlotX(slot: number): number {
-    // 기지 앞(150)부터 중원까지 분산 배치 — 방벽 전진 설치·사거리 커버 선택이 의미를 가진다
-    return 150 + slot * 90;
+    // 일자형 TD 관례: 기지 주변(90~365)에 밀집 배치 — 사옥 앞 방어선을 이룬다
+    return 90 + slot * 55;
   }
 
   /** 준비 페이즈 UI용: 다음 웨이브 조합 미리보기 */

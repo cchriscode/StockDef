@@ -101,7 +101,7 @@ export interface TowerSpec {
 }
 
 export const TOWERS: TowerSpec[] = [
-  { key: 'limit', name: '지정가 포탑', cost: 110, upgradeCost: 160, target: 'both', dmgType: 'physical', dmg: 20, rate: 1.4, range: 430, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0 },
+  { key: 'limit', name: '지정가 포탑', cost: 110, upgradeCost: 160, target: 'both', dmgType: 'physical', dmg: 20, rate: 1.4, range: 560, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0 },
   { key: 'dividend', name: '배당 파밍', cost: 130, upgradeCost: 190, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 8, incomePeriod: 10, barrierHP: 0 },
   { key: 'barrier', name: '손절 방벽', cost: 70, upgradeCost: 100, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 260 },
 ];
