@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+<defs><filter id="g" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="gb" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<linearGradient id="sg" x1="1" y1="0" x2="0" y2="0"><stop offset="0%" stop-color="#2DE2E6" stop-opacity="0"/><stop offset="70%" stop-color="#2DE2E6" stop-opacity=".85"/><stop offset="100%" stop-color="#EEFEFF"/></linearGradient>
+</defs>
+<g filter="url(#gb)"><path d="M188 88 L20 96 L20 112 L188 104 Z" fill="#2DE2E6" opacity=".25"/></g>
+<g fill="url(#sg)" filter="url(#g)">
+<path d="M186 58 L44 64 L44 72 L186 66 Z"/><path d="M192 92 L16 98 L16 110 L192 104 Z"/>
+<path d="M182 132 L56 138 L56 146 L182 140 Z"/><path d="M176 40 L92 44 L92 49 L176 46 Z" opacity=".6"/>
+<path d="M180 156 L100 160 L100 165 L180 162 Z" opacity=".55"/></g>
+<g opacity=".55"><path d="M96 60 L74 100 L88 100 L68 148 L96 104 L82 104 Z" fill="#2DE2E6" filter="url(#g)"/></g>
+<g opacity=".33"><path d="M126 60 L104 100 L118 100 L98 148 L126 104 L112 104 Z" fill="#2DE2E6"/></g>
+<g opacity=".16"><path d="M156 60 L134 100 L148 100 L128 148 L156 104 L142 104 Z" fill="#2DE2E6"/></g>
+<g fill="#EEFEFF" filter="url(#g)"><circle cx="30" cy="80" r="2.6"/><circle cx="24" cy="126" r="2.2"/><circle cx="48" cy="150" r="2"/><circle cx="40" cy="52" r="1.8"/></g>
+</svg>

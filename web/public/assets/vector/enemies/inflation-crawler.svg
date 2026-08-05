@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" width="160" height="200">
+<defs>
+<linearGradient id="nBody" x1="0" y1="0" x2="0.4" y2="1">
+    <stop offset="0%" stop-color="#2B3850"/><stop offset="100%" stop-color="#101724"/>
+  </linearGradient>
+<filter id="nGlow" x="-90%" y="-90%" width="280%" height="280%">
+    <feGaussianBlur stdDeviation="4" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+<filter id="nGlowBig" x="-90%" y="-90%" width="280%" height="280%">
+    <feGaussianBlur stdDeviation="8" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+</defs>
+<ellipse cx="80" cy="188" rx="46" ry="5.5" fill="#FF3CAC" opacity=".2" filter="url(#nGlowBig)"/>
+          <path d="M44 128 L30 156 L38 182 L52 180 L44 156 L56 134 Z" fill="#131A28" stroke="#070A11" stroke-width="4.5" stroke-linejoin="round"/>
+          <path d="M112 126 L128 152 L122 180 L108 178 L114 154 L102 132 Z" fill="#131A28" stroke="#070A11" stroke-width="4.5" stroke-linejoin="round"/>
+          <path d="M62 132 L52 158 L60 182 L74 180 L64 158 L74 136 Z" fill="#1B2436" stroke="#070A11" stroke-width="4.5" stroke-linejoin="round"/>
+          <path d="M96 130 L108 156 L100 182 L86 180 L94 156 L86 134 Z" fill="#1B2436" stroke="#070A11" stroke-width="4.5" stroke-linejoin="round"/>
+          <path d="M28 118 L52 92 L112 88 L136 112 L132 138 L44 144 Z" fill="url(#nBody)" stroke="#070A11" stroke-width="5.5" stroke-linejoin="round"/>
+          <path d="M112 88 L136 112 L132 138 L118 140 L124 112 Z" fill="#4A5F82" opacity=".42"/>
+          <path d="M56 96 L108 92 L112 100 L58 104 Z" fill="#3B4C6B" opacity=".7"/>
+          <path d="M50 112 L114 106 L116 118 L50 124 Z" fill="#080D16" stroke="#FF3CAC" stroke-width="2.8"/>
+          <path d="M58 113 L108 109 L109 117 L58 121 Z" fill="#FF3CAC" opacity=".85" filter="url(#nGlow)"/>
+          <path d="M70 128 L78 118 L86 128 L82 128 L82 138 L74 138 L74 128 Z" fill="#FFB3DE" opacity=".9" filter="url(#nGlow)"/>
+          <path d="M92 128 L100 118 L108 128 L104 128 L104 138 L96 138 L96 128 Z" fill="#FFB3DE" opacity=".7" filter="url(#nGlow)"/>
+          <path d="M28 118 L14 108 L10 124 L26 130 Z" fill="#1B2436" stroke="#070A11" stroke-width="4.5" stroke-linejoin="round"/>
+          <circle cx="17" cy="118" r="4" fill="#FF3CAC" filter="url(#nGlow)"/>
+          <path d="M52 92 L44 76 L58 80 L66 90 Z" fill="#212D42" stroke="#070A11" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M98 88 L106 72 L114 82 L110 90 Z" fill="#212D42" stroke="#070A11" stroke-width="4" stroke-linejoin="round"/>
+</svg>

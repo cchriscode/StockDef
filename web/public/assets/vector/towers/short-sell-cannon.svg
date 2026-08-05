@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" width="160" height="200">
+<defs>
+<linearGradient id="gBronze" x1="0" y1="0" x2="0.6" y2="1">
+    <stop offset="0%" stop-color="#E0B776"/><stop offset="35%" stop-color="#9A6E33"/>
+    <stop offset="75%" stop-color="#5A3F1B"/><stop offset="100%" stop-color="#2A1D0C"/>
+  </linearGradient>
+<linearGradient id="gStone" x1="0.1" y1="0" x2="0.9" y2="1">
+    <stop offset="0%" stop-color="#A6AEBC"/><stop offset="30%" stop-color="#6E7788"/>
+    <stop offset="70%" stop-color="#3E4553"/><stop offset="100%" stop-color="#20242E"/>
+  </linearGradient>
+</defs>
+<ellipse cx="80" cy="191" rx="44" ry="6" fill="#000" opacity=".6"/>
+          <path d="M38 188 L44 148 L116 148 L122 188 Z" fill="url(#gStone)"/>
+          <path d="M38 188 L44 148 L58 148 L54 188 Z" fill="#000" opacity=".32"/>
+          <path d="M108 148 L116 148 L122 188 L112 188 Z" fill="#C3CBD8" opacity=".22"/>
+          <path d="M40 164 L120 164 M39 176 L121 176" stroke="#161A22" stroke-width="1.6" opacity=".5"/>
+          <path d="M70 158 L90 158 L90 172 L70 172 Z" fill="#3A1218"/>
+          <path d="M80 178 L72 164 L77 164 L77 154 L83 154 L83 164 L88 164 Z" fill="#D14A4A"/>
+          <path d="M52 148 L58 120 L102 120 L108 148 Z" fill="url(#gStone)"/>
+          <path d="M52 148 L58 120 L68 120 L64 148 Z" fill="#000" opacity=".3"/>
+          <path d="M96 120 L102 120 L108 148 L100 148 Z" fill="#C3CBD8" opacity=".2"/>
+          <g transform="rotate(-15 72 128)">
+            <path d="M66 116 L128 112 L130 134 L66 140 Z" fill="url(#gBronze)"/>
+            <path d="M66 118 L128 114 L128.6 120 L66.4 124 Z" fill="#F2D6A0" opacity=".45"/>
+            <path d="M66 134 L128 129 L128.4 133 L66.3 138 Z" fill="#000" opacity=".35"/>
+            <path d="M124 108 L134 107 L136 139 L124 138 Z" fill="url(#gBronze)"/>
+            <ellipse cx="135" cy="123" rx="3.6" ry="15" fill="#1A1206"/>
+            <path d="M84 112 L92 111.6 L93 140 L85 140 Z" fill="url(#gBronze)"/>
+          </g>
+          <circle cx="72" cy="128" r="13" fill="url(#gBronze)"/>
+          <circle cx="72" cy="128" r="5" fill="#2A1D0C"/>
+          <circle cx="69" cy="125" r="2.4" fill="#F2D6A0" opacity=".6"/>
+</svg>

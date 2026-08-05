@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" width="160" height="200">
+<defs>
+<linearGradient id="nBody" x1="0" y1="0" x2="0.4" y2="1">
+    <stop offset="0%" stop-color="#2B3850"/><stop offset="100%" stop-color="#101724"/>
+  </linearGradient>
+<filter id="nGlow" x="-90%" y="-90%" width="280%" height="280%">
+    <feGaussianBlur stdDeviation="4" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+<filter id="nGlowBig" x="-90%" y="-90%" width="280%" height="280%">
+    <feGaussianBlur stdDeviation="8" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+<linearGradient id="nHelm" x1="0.1" y1="0" x2="0.7" y2="1">
+    <stop offset="0%" stop-color="#3B4C6B"/><stop offset="45%" stop-color="#1E2839"/><stop offset="100%" stop-color="#0B0F18"/>
+  </linearGradient>
+</defs>
+<ellipse cx="80" cy="190" rx="40" ry="5.5" fill="#2DE2E6" opacity=".22" filter="url(#nGlowBig)"/>
+          <path d="M84 150 L88 172 L68 174 L64 150 Z" fill="#131A28" stroke="#070A11" stroke-width="4.5" stroke-linejoin="round"/>
+          <path d="M92 172 L64 172 L60 186 L96 186 Z" fill="#151D2C" stroke="#070A11" stroke-width="4.5" stroke-linejoin="round"/>
+          <path d="M68 186 L92 186 L90 191 L70 191 Z" fill="#2DE2E6" opacity=".5" filter="url(#nGlow)"/>
+          <path d="M96 116 L52 120 L44 146 L50 162 L104 158 L108 130 Z" fill="url(#nBody)" stroke="#070A11" stroke-width="5" stroke-linejoin="round"/>
+          <path d="M96 116 L108 130 L104 158 L94 159 L100 130 Z" fill="#4A5F82" opacity=".42"/>
+          <path d="M50 128 L78 124 L82 148 L52 152 Z" fill="#080D16" stroke="#FF3CAC" stroke-width="2.6"/>
+          <path d="M56 132 L68 130 L70 144 L58 146 Z" fill="#FF3CAC" opacity=".9" filter="url(#nGlow)"/>
+          <path d="M100 112 L128 122 L122 142 L96 132 Z" fill="#212D42" stroke="#070A11" stroke-width="5" stroke-linejoin="round"/>
+          <path d="M104 118 L124 126" stroke="#2DE2E6" stroke-width="2.6" opacity=".7"/>
+          <path d="M52 118 L28 128 L24 146 L44 142 Z" fill="#1B2436" stroke="#070A11" stroke-width="4.5" stroke-linejoin="round"/>
+          <ellipse cx="26" cy="137" rx="5" ry="8" fill="#050A11" stroke="#070A11" stroke-width="3"/>
+          <circle cx="27" cy="137" r="3" fill="#FF3CAC" filter="url(#nGlow)"/>
+          <path d="M104 88 L100 58 L80 40 L48 38 L24 56 L14 84 L18 110 L38 128 L82 126 Z" fill="url(#nHelm)" stroke="#070A11" stroke-width="5" stroke-linejoin="round"/>
+          <path d="M98 70 L80 46 L50 44 L28 60 L36 66 L56 54 L82 58 Z" fill="#5A729B" opacity=".4"/>
+          <path d="M74 42 L104 16 L84 24 L58 38 Z" fill="#FF3CAC" opacity=".95" filter="url(#nGlow)"/>
+          <path d="M96 92 L98 108 L104 88 L100 74 Z" fill="#0B1019" stroke="#070A11" stroke-width="3.5" stroke-linejoin="round"/>
+          <path d="M60 62 L22 74 L12 96 L58 84 Z" fill="#26344B" stroke="#070A11" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M62 84 L14 92 L12 110 L64 104 Z" fill="#050A11" stroke="#070A11" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M60 89 L18 96 L17 106 L61 100 Z" fill="#2DE2E6" filter="url(#nGlow)"/>
+          <path d="M20 95 L38 92 L39 100 L21 103 Z" fill="#EEFEFF" opacity=".8"/>
+          <path d="M62 108 L18 114 L26 128 L44 134 L64 126 Z" fill="#151E2D" stroke="#070A11" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M30 116 L48 113 M32 122 L46 120" stroke="#2DE2E6" stroke-width="2.2" opacity=".8"/>
+</svg>

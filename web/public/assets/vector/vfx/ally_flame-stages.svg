@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+<defs><filter id="g" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="gb" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<linearGradient id="f1" x1="0" y1="1" x2="0.2" y2="0"><stop offset="0%" stop-color="#E24E1B"/><stop offset="60%" stop-color="#FFA53C"/><stop offset="100%" stop-color="#FFD98A" stop-opacity=".3"/></linearGradient>
+<linearGradient id="f2" x1="0" y1="1" x2="0.2" y2="0"><stop offset="0%" stop-color="#FF8A2B"/><stop offset="55%" stop-color="#FFD24A"/><stop offset="100%" stop-color="#FFF3B0" stop-opacity=".4"/></linearGradient>
+<linearGradient id="f3" x1="0" y1="1" x2="0.2" y2="0"><stop offset="0%" stop-color="#5AA8FF"/><stop offset="30%" stop-color="#FFF3B0"/><stop offset="70%" stop-color="#FFFFFF"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity=".5"/></linearGradient>
+</defs>
+<g transform="translate(0,4)">
+<g filter="url(#gb)"><path d="M18 44 C 60 30, 110 36, 150 46 C 118 54, 76 58, 30 56 Z" fill="#E24E1B" opacity=".4"/></g>
+<path d="M20 44 C 58 32, 104 38, 142 46 C 112 52, 74 56, 30 54 Z" fill="url(#f1)"/>
+<circle cx="150" cy="40" r="3" fill="#FFC061" filter="url(#g)"/><circle cx="162" cy="50" r="2.2" fill="#FF8A2B" filter="url(#g)" opacity=".8"/>
+</g>
+<g transform="translate(0,72)">
+<g filter="url(#gb)"><path d="M18 44 C 66 26, 126 34, 172 46 C 132 56, 82 60, 30 58 Z" fill="#FFA53C" opacity=".45"/></g>
+<path d="M20 44 C 64 28, 120 36, 164 46 C 126 54, 80 58, 30 55 Z" fill="url(#f2)"/>
+<path d="M26 45 C 60 36, 104 40, 134 46 C 106 50, 68 52, 32 50 Z" fill="#FFF3B0" opacity=".7"/>
+<circle cx="174" cy="38" r="3.4" fill="#FFD98A" filter="url(#g)"/><circle cx="184" cy="52" r="2.4" fill="#FFC061" filter="url(#g)" opacity=".85"/>
+</g>
+<g transform="translate(0,138)">
+<g filter="url(#gb)"><path d="M14 44 C 70 22, 140 32, 192 46 C 142 58, 84 62, 26 60 Z" fill="#FFF3B0" opacity=".5"/></g>
+<path d="M18 44 C 68 24, 134 34, 186 46 C 136 56, 80 60, 28 56 Z" fill="url(#f3)"/>
+<path d="M24 45 C 66 34, 116 40, 152 46 C 116 51, 70 54, 30 51 Z" fill="#FFFFFF" opacity=".85"/>
+<circle cx="192" cy="36" r="3.4" fill="#FFFFFF" filter="url(#g)"/><circle cx="10" cy="52" r="2.6" fill="#5AA8FF" filter="url(#g)" opacity=".8"/>
+</g>
+</svg>

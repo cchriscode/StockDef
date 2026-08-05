@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" width="160" height="200">
+<defs>
+<linearGradient id="gGold" x1="0" y1="0" x2="0.6" y2="1">
+    <stop offset="0%" stop-color="#F4E2AC"/><stop offset="32%" stop-color="#C39C4C"/>
+    <stop offset="68%" stop-color="#82641F"/><stop offset="100%" stop-color="#4A3712"/>
+  </linearGradient>
+<linearGradient id="gRed" x1="0.1" y1="0" x2="0.9" y2="1">
+    <stop offset="0%" stop-color="#C24551"/><stop offset="45%" stop-color="#7E1F28"/><stop offset="100%" stop-color="#2A0A0F"/>
+  </linearGradient>
+<linearGradient id="gStone" x1="0.1" y1="0" x2="0.9" y2="1">
+    <stop offset="0%" stop-color="#A6AEBC"/><stop offset="30%" stop-color="#6E7788"/>
+    <stop offset="70%" stop-color="#3E4553"/><stop offset="100%" stop-color="#20242E"/>
+  </linearGradient>
+<linearGradient id="gWood" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#8A6236"/><stop offset="40%" stop-color="#5B3E1E"/><stop offset="100%" stop-color="#2A1B0B"/>
+  </linearGradient>
+</defs>
+<ellipse cx="80" cy="191" rx="44" ry="6" fill="#000" opacity=".6"/>
+          <path d="M44 188 L48 150 L112 150 L116 188 Z" fill="url(#gStone)"/>
+          <path d="M44 188 L48 150 L60 150 L58 188 Z" fill="#000" opacity=".32"/>
+          <path d="M104 150 L112 150 L116 188 L108 188 Z" fill="#C3CBD8" opacity=".22"/>
+          <path d="M46 166 L114 166 M45 178 L115 178" stroke="#161A22" stroke-width="1.6" opacity=".55"/>
+          <path d="M52 150 L54 106 L106 106 L108 150 Z" fill="url(#gStone)"/>
+          <path d="M52 150 L54 106 L64 106 L62 150 Z" fill="#000" opacity=".32"/>
+          <path d="M98 106 L106 106 L108 150 L100 150 Z" fill="#C3CBD8" opacity=".24"/>
+          <path d="M53 122 L107 122 M53 136 L108 136" stroke="#161A22" stroke-width="1.5" opacity=".5"/>
+          <path d="M48 106 L112 106 L112 94 L104 94 L104 99 L94 99 L94 94 L86 94 L86 99 L74 99 L74 94 L66 94 L66 99 L56 99 L56 94 L48 94 Z" fill="url(#gStone)"/>
+          <path d="M48 106 L112 106 L112 102 L48 102 Z" fill="#161A22" opacity=".35"/>
+          <path d="M50 94 L110 94 L110 88 L50 88 Z" fill="url(#gWood)"/>
+          <path d="M78 70 L106 58 L108 65 L82 77 Z" fill="url(#gWood)"/>
+          <path d="M100 48 C 114 60, 114 88, 100 100" stroke="url(#gWood)" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <path d="M100 48 C 111 60, 111 88, 100 100" stroke="#C79556" stroke-width="1.4" fill="none" opacity=".5"/>
+          <path d="M100 48 L 76 74 L 100 100" stroke="#D8D2C0" stroke-width="1.7" fill="none"/>
+          <path d="M76 74 L 128 72" stroke="url(#gWood)" stroke-width="3.6"/>
+          <path d="M128 72 L 142 74 L 128 77 Z" fill="#C0CAD8"/>
+          <path d="M74 68 L83 74 L74 80 Z" fill="#B0442F"/>
+          <circle cx="76" cy="74" r="5" fill="url(#gGold)"/>
+          <path d="M36 110 L58 114 L56 150 L34 144 Z" fill="url(#gRed)"/>
+          <path d="M36 110 L44 111.5 L42 146 L34 144 Z" fill="#000" opacity=".3"/>
+          <rect x="40" y="134" width="3.2" height="9" fill="url(#gGold)"/>
+          <rect x="45.5" y="128" width="3.2" height="13" fill="url(#gGold)"/>
+          <rect x="51" y="122" width="3.2" height="16" fill="url(#gGold)"/>
+</svg>

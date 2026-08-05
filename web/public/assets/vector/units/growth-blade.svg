@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" width="160" height="200">
+<defs>
+<linearGradient id="gBlade" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#3B4250"/><stop offset="24%" stop-color="#9BA7B9"/>
+    <stop offset="44%" stop-color="#F4F9FF"/><stop offset="62%" stop-color="#B4BFD0"/>
+    <stop offset="86%" stop-color="#525A68"/><stop offset="100%" stop-color="#282D37"/>
+  </linearGradient>
+<linearGradient id="gGold" x1="0" y1="0" x2="0.6" y2="1">
+    <stop offset="0%" stop-color="#F4E2AC"/><stop offset="32%" stop-color="#C39C4C"/>
+    <stop offset="68%" stop-color="#82641F"/><stop offset="100%" stop-color="#4A3712"/>
+  </linearGradient>
+<linearGradient id="gHair" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#6B4A2A"/><stop offset="55%" stop-color="#3A2614"/><stop offset="100%" stop-color="#150D06"/>
+  </linearGradient>
+<linearGradient id="gLeather" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#5D4429"/><stop offset="100%" stop-color="#231708"/>
+  </linearGradient>
+<linearGradient id="gRed" x1="0.1" y1="0" x2="0.9" y2="1">
+    <stop offset="0%" stop-color="#C24551"/><stop offset="45%" stop-color="#7E1F28"/><stop offset="100%" stop-color="#2A0A0F"/>
+  </linearGradient>
+<linearGradient id="gSkin" x1="0.2" y1="0" x2="0.9" y2="1">
+    <stop offset="0%" stop-color="#F0CFAA"/><stop offset="55%" stop-color="#C79B70"/><stop offset="100%" stop-color="#7A5334"/>
+  </linearGradient>
+<linearGradient id="gSteel" x1="0.1" y1="0" x2="0.85" y2="1">
+    <stop offset="0%" stop-color="#D2DAE7"/><stop offset="16%" stop-color="#98A3B6"/>
+    <stop offset="46%" stop-color="#5A6376"/><stop offset="76%" stop-color="#2E3441"/><stop offset="100%" stop-color="#171B24"/>
+  </linearGradient>
+<linearGradient id="gSteelD" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#5C6578"/><stop offset="55%" stop-color="#2A3040"/><stop offset="100%" stop-color="#10131b"/>
+  </linearGradient>
+</defs>
+<ellipse cx="78" cy="190" rx="40" ry="5.5" fill="#000" opacity=".6"/>
+          <g transform="rotate(38 46 120)">
+            <path d="M40 4 L54 8 L56 104 L42 104 Z" fill="url(#gBlade)"/>
+            <path d="M47.4 8 L49 104" stroke="#1C212A" stroke-width="2.4" opacity=".7"/>
+            <path d="M48.4 10 L50 102" stroke="#fff" stroke-width="1" opacity=".5"/>
+            <path d="M40 4 L54 8 L47 -4 Z" fill="#EDF3FC"/>
+            <path d="M30 104 L66 107 L64 115 L32 112 Z" fill="url(#gGold)"/>
+            <rect x="42" y="115" width="12" height="20" rx="4" fill="url(#gLeather)"/>
+            <circle cx="48" cy="138" r="6" fill="url(#gGold)"/>
+          </g>
+          <path d="M62 148 L58 166 L74 168 L76 150 Z" fill="url(#gSteelD)"/>
+          <path d="M54 166 L74 168 L72 180 L52 178 Z" fill="#12161e"/>
+          <path d="M58 116 C64 108, 94 106, 102 116 L106 142 C104 154, 92 160, 79 160 C65 160, 57 152, 55 142 Z" fill="url(#gSteel)"/>
+          <path d="M98 114 C104 124, 106 138, 102 152 C99 158, 92 160, 86 160 C96 154, 100 140, 97 126 Z" fill="#DCE5F2" opacity=".25"/>
+          <path d="M60 114 C54 126, 53 144, 58 155 C50 147, 50 126, 60 114 Z" fill="#000" opacity=".33"/>
+          <path d="M74 110 C 78 128, 78 146, 74 158" stroke="#12151d" stroke-width="2" fill="none" opacity=".5"/>
+          <path d="M56 154 L106 152 L108 164 L54 166 Z" fill="url(#gRed)"/>
+          <rect x="55" y="148" width="50" height="7" rx="2" fill="url(#gLeather)"/>
+          <rect x="82" y="146" width="13" height="10" rx="2" fill="url(#gGold)"/>
+          <path d="M48 120 C48 106, 70 100, 80 110 L 76 122 C 68 114, 55 116, 52 126 Z" fill="url(#gSteel)"/>
+          <path d="M48 120 C48 106, 70 100, 80 110 L78 113 C68 104, 53 110, 51 122 Z" fill="#E4EBF7" opacity=".38"/>
+          <path d="M80 156 L78 174 L96 176 L98 156 Z" fill="url(#gSteel)"/>
+          <path d="M74 174 L98 176 L110 184 L110 189 L72 187 Z" fill="url(#gSteelD)"/>
+          <path d="M92 122 L74 118 L64 124 L70 132 L84 130 L94 132 Z" fill="url(#gSteel)"/>
+          <!-- head : bare -->
+          <path d="M42 78 C42 48, 60 34, 80 34 C100 34, 114 46, 117 66 C119 78, 116 90, 110 96 C104 102, 96 110, 86 114 C70 118, 54 112, 47 100 C43 93, 42 86, 42 78 Z" fill="url(#gSkin)"/>
+          <path d="M108 74 C114 72, 118 76, 117 82 C116 88, 111 90, 108 88 Z" fill="url(#gSkin)"/>
+          <path d="M100 84 L112 82 L110 88 L101 89 Z" fill="#C08F62" opacity=".5"/>
+          <ellipse cx="99" cy="74" rx="5.5" ry="4" fill="#2A1B10"/>
+          <ellipse cx="100.6" cy="72.8" rx="1.6" ry="1.2" fill="#fff" opacity=".8"/>
+          <path d="M92 64 C97 61, 105 62, 109 66" stroke="#2A1B10" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <path d="M96 98 C101 96, 106 96, 109 98" stroke="#8B5A38" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+          <path d="M42 78 C42 44, 66 30, 88 36 C104 40, 112 52, 114 62 C104 50, 86 44, 70 50 C56 55, 48 66, 46 84 Z" fill="url(#gHair)"/>
+          <path d="M50 60 C34 62, 22 76, 26 92 C34 82, 44 76, 54 76 Z" fill="url(#gHair)"/>
+          <path d="M50 60 C36 64, 27 76, 29 88 C36 79, 45 74, 54 74 Z" fill="#8C6236" opacity=".35"/>
+          <path d="M46 84 C42 96, 44 106, 52 112 C46 100, 47 92, 50 84 Z" fill="#000" opacity=".3"/>
+          <path d="M56 112 C70 122, 94 120, 106 110 L106 120 C94 132, 68 132, 55 121 Z" fill="url(#gSteelD)"/>
+          <path d="M56 112 C70 122, 94 120, 106 110 L105.6 112.5 C93 121.5, 70 123, 57 114 Z" fill="#A3AEC0" opacity=".45"/>
+</svg>

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" width="160" height="200">
+<defs>
+<linearGradient id="gBlade" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#3B4250"/><stop offset="24%" stop-color="#9BA7B9"/>
+    <stop offset="44%" stop-color="#F4F9FF"/><stop offset="62%" stop-color="#B4BFD0"/>
+    <stop offset="86%" stop-color="#525A68"/><stop offset="100%" stop-color="#282D37"/>
+  </linearGradient>
+<linearGradient id="gGold" x1="0" y1="0" x2="0.6" y2="1">
+    <stop offset="0%" stop-color="#F4E2AC"/><stop offset="32%" stop-color="#C39C4C"/>
+    <stop offset="68%" stop-color="#82641F"/><stop offset="100%" stop-color="#4A3712"/>
+  </linearGradient>
+<linearGradient id="gLeather" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#5D4429"/><stop offset="100%" stop-color="#231708"/>
+  </linearGradient>
+<linearGradient id="gSkin" x1="0.2" y1="0" x2="0.9" y2="1">
+    <stop offset="0%" stop-color="#F0CFAA"/><stop offset="55%" stop-color="#C79B70"/><stop offset="100%" stop-color="#7A5334"/>
+  </linearGradient>
+<linearGradient id="gSteel" x1="0.1" y1="0" x2="0.85" y2="1">
+    <stop offset="0%" stop-color="#D2DAE7"/><stop offset="16%" stop-color="#98A3B6"/>
+    <stop offset="46%" stop-color="#5A6376"/><stop offset="76%" stop-color="#2E3441"/><stop offset="100%" stop-color="#171B24"/>
+  </linearGradient>
+<linearGradient id="gSteelD" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#5C6578"/><stop offset="55%" stop-color="#2A3040"/><stop offset="100%" stop-color="#10131b"/>
+  </linearGradient>
+<linearGradient id="gWood" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#8A6236"/><stop offset="40%" stop-color="#5B3E1E"/><stop offset="100%" stop-color="#2A1B0B"/>
+  </linearGradient>
+<pattern id="pMail" width="5" height="5" patternUnits="userSpaceOnUse">
+    <rect width="5" height="5" fill="#1A1F28"/>
+    <circle cx="1.6" cy="1.6" r="1.5" fill="#3B4353"/><circle cx="4" cy="4" r="1.5" fill="#323A48"/>
+  </pattern>
+</defs>
+<ellipse cx="78" cy="190" rx="40" ry="5.5" fill="#000" opacity=".6"/>
+          <path d="M28 178 L128 24" stroke="url(#gWood)" stroke-width="7" stroke-linecap="round"/>
+          <path d="M30 176 L126 26" stroke="#C79556" stroke-width="1.6" opacity=".4"/>
+          <path d="M128 24 L136 8 L140 26 L132 34 Z" fill="url(#gBlade)"/>
+          <path d="M120 38 C 136 34, 146 44, 142 58 C 132 50, 126 46, 116 46 Z" fill="url(#gBlade)"/>
+          <path d="M120 38 C 133 35, 142 42, 141 52 C 132 45, 126 43, 117 43 Z" fill="#F2F7FF" opacity=".45"/>
+          <path d="M112 48 L104 58 L110 62 L118 52 Z" fill="url(#gSteelD)"/>
+          <path d="M62 148 L58 166 L74 168 L76 150 Z" fill="url(#gSteelD)"/>
+          <path d="M54 166 L74 168 L72 180 L52 178 Z" fill="#12161e"/>
+          <path d="M58 118 L106 116 L108 146 L56 148 Z" fill="url(#pMail)"/>
+          <path d="M58 116 C64 108, 94 106, 102 116 L106 142 C104 154, 92 160, 79 160 C65 160, 57 152, 55 142 Z" fill="url(#gSteel)"/>
+          <path d="M98 114 C104 124, 106 138, 102 152 C99 158, 92 160, 86 160 C96 154, 100 140, 97 126 Z" fill="#DCE5F2" opacity=".25"/>
+          <path d="M60 114 C54 126, 53 144, 58 155 C50 147, 50 126, 60 114 Z" fill="#000" opacity=".33"/>
+          <path d="M56 154 L106 152 L108 164 L54 166 Z" fill="url(#gSteelD)"/>
+          <rect x="55" y="148" width="50" height="7" rx="2" fill="url(#gLeather)"/>
+          <rect x="82" y="146" width="12" height="10" rx="2" fill="url(#gGold)"/>
+          <path d="M48 122 C48 106, 72 100, 82 110 L 78 122 C 70 114, 55 116, 52 128 Z" fill="url(#gSteel)"/>
+          <path d="M48 122 C48 106, 72 100, 82 110 L80 113 C70 104, 53 110, 51 124 Z" fill="#E4EBF7" opacity=".38"/>
+          <path d="M80 156 L78 174 L96 176 L98 156 Z" fill="url(#gSteel)"/>
+          <path d="M74 174 L98 176 L110 184 L110 189 L72 187 Z" fill="url(#gSteelD)"/>
+          <path d="M64 132 L82 122 L92 128 L86 138 L72 142 Z" fill="url(#gSteel)"/>
+          <!-- kettle hat head -->
+          <path d="M42 78 C42 48, 60 34, 80 34 C100 34, 114 46, 117 66 C120 80, 117 96, 106 106 C95 116, 70 119, 55 109 C45 102, 42 90, 42 78 Z" fill="url(#gSkin)"/>
+          <path d="M42 78 C42 66, 46 56, 52 48 C46 60, 44 72, 46 86 C48 98, 56 106, 68 111 C54 109, 44 94, 42 78 Z" fill="#000" opacity=".35"/>
+          <ellipse cx="98" cy="80" rx="5" ry="3.6" fill="#2A1B10"/>
+          <ellipse cx="99.4" cy="79" rx="1.4" ry="1" fill="#fff" opacity=".75"/>
+          <path d="M96 96 C102 94, 108 94, 111 96" stroke="#8B5A38" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <path d="M26 70 C 40 44, 74 32, 100 40 C 118 46, 128 58, 130 70 C 112 60, 96 56, 78 58 C 58 60, 40 64, 26 70 Z" fill="url(#gSteel)"/>
+          <path d="M34 66 C48 46, 76 38, 98 44 C110 48, 118 54, 122 62 C108 52, 90 48, 72 50 C56 52, 44 58, 34 66 Z" fill="#EAF0FB" opacity=".38"/>
+          <path d="M26 70 C 46 62, 78 56, 104 60 C 118 62, 126 66, 130 70 C 126 76, 112 78, 92 78 C 62 78, 38 76, 26 70 Z" fill="url(#gSteelD)"/>
+          <path d="M26 70 C 46 62, 78 56, 104 60 C 118 62, 126 66, 130 70 L 129 71.6 C 120 66, 100 62, 78 62 C 54 62, 34 66, 26.6 71 Z" fill="#A3AEC0" opacity=".45"/>
+          <path d="M55 109 C68 119, 92 117, 105 106 L106 118 C92 130, 66 130, 54 119 Z" fill="url(#gSteelD)"/>
+</svg>

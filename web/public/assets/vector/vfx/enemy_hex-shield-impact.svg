@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+<defs><filter id="g" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="gb" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<g filter="url(#gb)"><path d="M100 18 L156 52 L156 120 L100 154 L44 120 L44 52 Z" fill="#2DE2E6" opacity=".22"/></g>
+<path d="M100 18 L156 52 L156 120 L100 154 L44 120 L44 52 Z" fill="#2DE2E6" fill-opacity=".13" stroke="#2DE2E6" stroke-width="3.4" filter="url(#g)"/>
+<g fill="none" stroke="#2DE2E6" stroke-width="1.5" opacity=".45">
+<path d="M100 18 L100 154 M44 52 L156 120 M156 52 L44 120"/>
+<path d="M72 35 L128 35 M72 137 L128 137 M44 86 L156 86"/></g>
+<g fill="none" stroke="#EEFEFF" stroke-width="2.6" filter="url(#g)">
+<path d="M118 74 L128 80 L128 92 L118 98 L108 92 L108 80 Z"/>
+<path d="M118 60 L142 74 L142 98 L118 112 L94 98 L94 74 Z" opacity=".7"/>
+<path d="M118 46 L156 68 L156 104 L118 126 L80 104 L80 68 Z" opacity=".4"/></g>
+<circle cx="118" cy="86" r="6" fill="#FFFFFF" filter="url(#g)"/>
+<g fill="#FF3CAC" filter="url(#g)" opacity=".9">
+<path d="M164 40 L176 47 L176 61 L164 68 L152 61 L152 47 Z" opacity=".7"/>
+<path d="M30 108 L40 114 L40 126 L30 132 L20 126 L20 114 Z" opacity=".55"/>
+<path d="M150 132 L158 137 L158 147 L150 152 L142 147 L142 137 Z" opacity=".5"/></g>
+<g fill="#2DE2E6" opacity=".8"><circle cx="172" cy="90" r="2.6"/><circle cx="28" cy="66" r="2.2"/><circle cx="104" cy="170" r="2.4"/></g>
+</svg>

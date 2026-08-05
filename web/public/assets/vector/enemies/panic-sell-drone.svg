@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" width="160" height="200">
+<defs>
+<linearGradient id="nBody" x1="0" y1="0" x2="0.4" y2="1">
+    <stop offset="0%" stop-color="#2B3850"/><stop offset="100%" stop-color="#101724"/>
+  </linearGradient>
+<filter id="nGlow" x="-90%" y="-90%" width="280%" height="280%">
+    <feGaussianBlur stdDeviation="4" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+<filter id="nGlowBig" x="-90%" y="-90%" width="280%" height="280%">
+    <feGaussianBlur stdDeviation="8" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+</defs>
+<ellipse cx="80" cy="178" rx="26" ry="4" fill="#2DE2E6" opacity=".2" filter="url(#nGlowBig)"/>
+          <path d="M52 84 L96 72 L118 92 L114 122 L74 134 L50 116 Z" fill="url(#nBody)" stroke="#070A11" stroke-width="5" stroke-linejoin="round"/>
+          <path d="M96 72 L118 92 L114 122 L104 125 L110 94 Z" fill="#4A5F82" opacity=".4"/>
+          <path d="M50 100 L74 92 L78 110 L54 118 Z" fill="#050A11" stroke="#070A11" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M54 102 L72 96 L75 108 L57 114 Z" fill="#2DE2E6" filter="url(#nGlow)"/>
+          <ellipse cx="62" cy="104" rx="5" ry="2.6" fill="#EEFEFF" opacity=".85"/>
+          <path d="M100 78 L116 66 L122 72 L108 84 Z" fill="#1B2436" stroke="#070A11" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M86 132 L104 128 L100 148 L88 150 Z" fill="#141C2A" stroke="#070A11" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M64 130 L80 126 L78 146 L66 148 Z" fill="#141C2A" stroke="#070A11" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M68 146 L78 144 L76 156 L70 157 Z" fill="#2DE2E6" opacity=".6" filter="url(#nGlow)"/>
+          <path d="M90 148 L100 146 L98 158 L92 159 Z" fill="#2DE2E6" opacity=".6" filter="url(#nGlow)"/>
+          <path d="M92 96 L108 92 L110 108 L94 112 Z" fill="#080D16" stroke="#FF3CAC" stroke-width="2.4"/>
+          <path d="M98 98 L105 96.5 L106 106 L99 107.5 Z" fill="#FF3CAC" opacity=".9" filter="url(#nGlow)"/>
+</svg>

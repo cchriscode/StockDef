@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+<defs><filter id="g" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="gb" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<g filter="url(#gb)"><path d="M100 30 L120 58 L100 86 L80 58 Z" fill="#D14A4A" opacity=".5"/></g>
+<path d="M100 32 L118 58 L100 84 L82 58 Z" fill="#D14A4A" filter="url(#g)"/>
+<path d="M100 44 L110 58 L100 72 L90 58 Z" fill="#FFD9D9"/>
+<g stroke="#D14A4A" stroke-width="2" fill="none" opacity=".85">
+<path d="M100 96 L100 118"/><path d="M62 58 L44 58 M138 58 L156 58"/>
+<path d="M44 46 L44 70 M156 46 L156 70"/></g>
+<ellipse cx="100" cy="150" rx="56" ry="18" fill="none" stroke="#D14A4A" stroke-width="2.4" opacity=".7"/>
+<ellipse cx="100" cy="150" rx="36" ry="11" fill="none" stroke="#D14A4A" stroke-width="1.6" opacity=".45"/>
+<g stroke="#DCE4EF" stroke-width="2.6" stroke-linecap="round">
+<path d="M62 96 L70 132"/><path d="M84 84 L90 128"/><path d="M114 88 L118 134"/><path d="M136 100 L128 138"/><path d="M100 110 L102 142"/></g>
+<g fill="#B0442F"><path d="M60 92 L66 98 L58 100 Z"/><path d="M83 80 L89 86 L81 88 Z"/><path d="M113 84 L119 90 L111 92 Z"/><path d="M138 96 L140 104 L132 102 Z"/></g>
+<g fill="#8A9099" opacity=".8"><circle cx="70" cy="134" r="3"/><circle cx="90" cy="130" r="2.6"/><circle cx="118" cy="136" r="2.8"/><circle cx="128" cy="140" r="2.4"/></g>
+</svg>

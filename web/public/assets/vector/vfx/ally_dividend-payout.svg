@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+<defs><filter id="g" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="gb" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<radialGradient id="r" cx="50%" cy="50%" r="50%"><stop offset="55%" stop-color="#F4E2AC" stop-opacity="0"/><stop offset="88%" stop-color="#F4E2AC" stop-opacity=".55"/><stop offset="100%" stop-color="#F4E2AC" stop-opacity="0"/></radialGradient>
+</defs>
+<g filter="url(#gb)"><ellipse cx="100" cy="150" rx="80" ry="26" fill="#F4E2AC" opacity=".25"/></g>
+<ellipse cx="100" cy="150" rx="78" ry="25" fill="url(#r)"/>
+<ellipse cx="100" cy="150" rx="76" ry="24" fill="none" stroke="#FFF6D6" stroke-width="3" filter="url(#g)"/>
+<ellipse cx="100" cy="150" rx="52" ry="16" fill="none" stroke="#F4E2AC" stroke-width="2" opacity=".7"/>
+<ellipse cx="100" cy="150" rx="28" ry="8" fill="none" stroke="#F4E2AC" stroke-width="1.6" opacity=".45"/>
+<g filter="url(#g)">
+<ellipse cx="70" cy="106" rx="9" ry="11" fill="#F4E2AC"/><ellipse cx="70" cy="106" rx="4" ry="5" fill="#8A6A28"/>
+<ellipse cx="104" cy="80" rx="8" ry="10" fill="#FFF0C4"/><ellipse cx="104" cy="80" rx="3.4" ry="4.4" fill="#8A6A28"/>
+<ellipse cx="134" cy="112" rx="7.5" ry="9" fill="#F4E2AC"/><ellipse cx="134" cy="112" rx="3" ry="4" fill="#8A6A28"/>
+<ellipse cx="86" cy="54" rx="6" ry="7.5" fill="#FFF0C4" opacity=".9"/>
+<ellipse cx="122" cy="46" rx="5" ry="6.5" fill="#F4E2AC" opacity=".8"/></g>
+<g fill="#FFF6D6" filter="url(#g)"><circle cx="56" cy="76" r="2.6" opacity=".9"/><circle cx="150" cy="82" r="2.2" opacity=".8"/><circle cx="100" cy="30" r="2.8" opacity=".7"/><circle cx="42" cy="124" r="2" opacity=".7"/></g>
+</svg>

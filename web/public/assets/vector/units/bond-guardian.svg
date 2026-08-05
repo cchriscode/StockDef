@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" width="160" height="200">
+<defs>
+<linearGradient id="gGold" x1="0" y1="0" x2="0.6" y2="1">
+    <stop offset="0%" stop-color="#F4E2AC"/><stop offset="32%" stop-color="#C39C4C"/>
+    <stop offset="68%" stop-color="#82641F"/><stop offset="100%" stop-color="#4A3712"/>
+  </linearGradient>
+<linearGradient id="gLeather" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#5D4429"/><stop offset="100%" stop-color="#231708"/>
+  </linearGradient>
+<linearGradient id="gRed" x1="0.1" y1="0" x2="0.9" y2="1">
+    <stop offset="0%" stop-color="#C24551"/><stop offset="45%" stop-color="#7E1F28"/><stop offset="100%" stop-color="#2A0A0F"/>
+  </linearGradient>
+<linearGradient id="gSteel" x1="0.1" y1="0" x2="0.85" y2="1">
+    <stop offset="0%" stop-color="#D2DAE7"/><stop offset="16%" stop-color="#98A3B6"/>
+    <stop offset="46%" stop-color="#5A6376"/><stop offset="76%" stop-color="#2E3441"/><stop offset="100%" stop-color="#171B24"/>
+  </linearGradient>
+<linearGradient id="gSteelD" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#5C6578"/><stop offset="55%" stop-color="#2A3040"/><stop offset="100%" stop-color="#10131b"/>
+  </linearGradient>
+<pattern id="pMail" width="5" height="5" patternUnits="userSpaceOnUse">
+    <rect width="5" height="5" fill="#1A1F28"/>
+    <circle cx="1.6" cy="1.6" r="1.5" fill="#3B4353"/><circle cx="4" cy="4" r="1.5" fill="#323A48"/>
+  </pattern>
+</defs>
+<ellipse cx="78" cy="190" rx="40" ry="5.5" fill="#000" opacity=".6"/>
+          <path d="M84 34 C 68 12, 42 12, 34 26 C 50 22, 68 30, 78 46 Z" fill="url(#gRed)"/>
+          <path d="M62 148 L58 166 L74 168 L76 150 Z" fill="url(#gSteelD)"/>
+          <path d="M54 166 L74 168 L72 180 L52 178 Z" fill="#12161e"/>
+          <path d="M58 118 L106 116 L108 146 L56 148 Z" fill="url(#pMail)"/>
+          <path d="M58 116 C64 108, 94 106, 102 116 L106 142 C104 154, 92 160, 79 160 C65 160, 57 152, 55 142 Z" fill="url(#gSteel)"/>
+          <path d="M98 114 C104 124, 106 138, 102 152 C99 158, 92 160, 86 160 C96 154, 100 140, 97 126 Z" fill="#DCE5F2" opacity=".25"/>
+          <path d="M60 114 C54 126, 53 144, 58 155 C50 147, 50 126, 60 114 Z" fill="#000" opacity=".33"/>
+          <path d="M56 154 L106 152 L108 162 L54 164 Z" fill="url(#gSteelD)"/>
+          <path d="M56 154 L106 152 L106.4 154.6 L56.4 156.6 Z" fill="#A3AEC0" opacity=".4"/>
+          <rect x="55" y="149" width="50" height="6" rx="2" fill="url(#gLeather)"/>
+          <rect x="82" y="147" width="12" height="9" rx="2" fill="url(#gGold)"/>
+          <path d="M48 122 C48 106, 72 100, 82 110 L 78 122 C 70 114, 55 116, 52 128 Z" fill="url(#gSteel)"/>
+          <path d="M48 122 C48 106, 72 100, 82 110 L80 113 C70 104, 53 110, 51 124 Z" fill="#E4EBF7" opacity=".38"/>
+          <path d="M50 128 C52 114, 74 110, 82 120 L79 130 C 71 122, 57 124, 54 134 Z" fill="url(#gSteelD)"/>
+          <path d="M80 156 L78 174 L96 176 L98 156 Z" fill="url(#gSteel)"/>
+          <path d="M74 174 L98 176 L110 184 L110 189 L72 187 Z" fill="url(#gSteelD)"/>
+          <path d="M42 78 C42 48, 60 34, 80 34 C100 34, 114 46, 117 66 C120 80, 117 96, 106 106 C95 116, 70 119, 55 109 C45 102, 42 90, 42 78 Z" fill="url(#gSteel)"/>
+          <path d="M48 74 C48 50, 62 38, 80 38 C88 38, 95 40, 100 44 C90 40, 74 42, 63 54 C54 63, 50 72, 50 82 Z" fill="#F0F5FF" opacity=".4"/>
+          <path d="M42 78 C42 62, 48 50, 56 42 C48 54, 46 68, 48 82 C50 96, 58 106, 70 111 C56 109, 44 94, 42 78 Z" fill="#000" opacity=".33"/>
+          <path d="M62 50 C74 40, 96 42, 108 54 L 105 60 C 94 50, 76 48, 66 56 Z" fill="url(#gSteelD)"/>
+          <path d="M80 62 C94 57, 108 60, 117 68 L 116 76 C 106 68, 94 66, 82 71 Z" fill="url(#gSteel)"/>
+          <path d="M80 62 C94 57, 108 60, 117 68 L116.4 70.6 C107 62.6, 94 60.6, 81 65.6 Z" fill="#EAF0FB" opacity=".45"/>
+          <path d="M81 74 C94 69, 106 71, 116 78 L 115 85 C 105 79, 94 77, 82 82 Z" fill="#05070B"/>
+          <path d="M83 81 C94 77, 105 79, 114 84 L114 85.4 C105 80.4, 94 78.6, 83 82.4 Z" fill="#8E9BB0" opacity=".5"/>
+          <path d="M83 88 C94 83, 106 86, 113 93 C111 102, 102 110, 91 113 C83 114, 77 112, 74 109 Z" fill="url(#gSteelD)"/>
+          <path d="M92 94 L99 92 M94 100 L102 98 M96 105 L103 103" stroke="#05070B" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M55 109 C68 119, 92 117, 105 106 L106 116 C93 128, 68 129, 54 118 Z" fill="url(#gSteelD)"/>
+          <path d="M55 109 C68 119, 92 117, 105 106 L104.6 108.5 C92 118.5, 69 120, 56 111 Z" fill="#A3AEC0" opacity=".45"/>
+          <path d="M82 126 L96 124 L106 130 L102 138 L90 134 L82 136 Z" fill="url(#gSteel)"/>
+          <path d="M102 118 L134 129 L131 166 L114 183 L102 160 Z" fill="url(#gSteelD)"/>
+          <path d="M102 118 L134 129 L131 166 L114 183 L102 160 Z" fill="none" stroke="url(#gGold)" stroke-width="2.6"/>
+          <path d="M106 124 L128 132 L126 162 L113 174 L106 154 Z" fill="#6E212A"/>
+          <path d="M106 124 L128 132 L127 148 L106 141 Z" fill="#fff" opacity=".09"/>
+          <rect x="110" y="150" width="3.4" height="10" fill="url(#gGold)"/>
+          <rect x="116" y="144" width="3.4" height="14" fill="url(#gGold)"/>
+          <rect x="122" y="139" width="3.4" height="16" fill="url(#gGold)"/>
+</svg>

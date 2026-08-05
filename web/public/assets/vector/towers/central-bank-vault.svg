@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" width="160" height="200">
+<defs>
+<filter id="fSoft" x="-90%" y="-90%" width="280%" height="280%">
+    <feGaussianBlur stdDeviation="7" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+<filter id="fWarm" x="-90%" y="-90%" width="280%" height="280%">
+    <feGaussianBlur stdDeviation="4" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+<linearGradient id="gGold" x1="0" y1="0" x2="0.6" y2="1">
+    <stop offset="0%" stop-color="#F4E2AC"/><stop offset="32%" stop-color="#C39C4C"/>
+    <stop offset="68%" stop-color="#82641F"/><stop offset="100%" stop-color="#4A3712"/>
+  </linearGradient>
+<linearGradient id="gRed" x1="0.1" y1="0" x2="0.9" y2="1">
+    <stop offset="0%" stop-color="#C24551"/><stop offset="45%" stop-color="#7E1F28"/><stop offset="100%" stop-color="#2A0A0F"/>
+  </linearGradient>
+<linearGradient id="gSteelD" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#5C6578"/><stop offset="55%" stop-color="#2A3040"/><stop offset="100%" stop-color="#10131b"/>
+  </linearGradient>
+<linearGradient id="gStone" x1="0.1" y1="0" x2="0.9" y2="1">
+    <stop offset="0%" stop-color="#A6AEBC"/><stop offset="30%" stop-color="#6E7788"/>
+    <stop offset="70%" stop-color="#3E4553"/><stop offset="100%" stop-color="#20242E"/>
+  </linearGradient>
+</defs>
+<ellipse cx="80" cy="191" rx="44" ry="6" fill="#000" opacity=".6"/>
+          <g filter="url(#fSoft)"><ellipse cx="80" cy="140" rx="44" ry="30" fill="#FFE9A8" opacity=".18"/></g>
+          <path d="M40 188 L44 156 L116 156 L120 188 Z" fill="url(#gStone)"/>
+          <path d="M40 188 L44 156 L56 156 L52 188 Z" fill="#000" opacity=".32"/>
+          <path d="M42 174 L118 174" stroke="#161A22" stroke-width="1.6" opacity=".5"/>
+          <path d="M48 156 L50 96 L110 96 L112 156 Z" fill="url(#gStone)"/>
+          <path d="M48 156 L50 96 L60 96 L58 156 Z" fill="#000" opacity=".32"/>
+          <path d="M102 96 L110 96 L112 156 L104 156 Z" fill="#C3CBD8" opacity=".24"/>
+          <path d="M42 96 L118 96 L80 62 Z" fill="url(#gStone)"/>
+          <path d="M42 96 L80 62 L80 96 Z" fill="#000" opacity=".28"/>
+          <path d="M42 96 L118 96 L118 102 L42 102 Z" fill="url(#gGold)"/>
+          <path d="M58 96 L58 60 M72 96 L72 54 M88 96 L88 54 M102 96 L102 60" stroke="#20242E" stroke-width="0" />
+          <circle cx="80" cy="132" r="24" fill="url(#gSteelD)"/>
+          <circle cx="80" cy="132" r="19" fill="url(#gGold)"/>
+          <circle cx="80" cy="132" r="14" fill="#8A6A28"/>
+          <circle cx="80" cy="132" r="6" fill="url(#gGold)"/>
+          <path d="M80 118 L80 146 M66 132 L94 132 M70 122 L90 142 M90 122 L70 142" stroke="#5C4517" stroke-width="2.4"/>
+          <circle cx="74" cy="126" r="3" fill="#FFF0C4" opacity=".55"/>
+          <ellipse cx="52" cy="176" rx="9" ry="4" fill="url(#gGold)"/>
+          <ellipse cx="60" cy="172" rx="7" ry="3.4" fill="url(#gGold)"/>
+          <ellipse cx="108" cy="177" rx="8" ry="3.6" fill="url(#gGold)"/>
+          <circle cx="46" cy="150" r="3" fill="#FFE9A8" filter="url(#fWarm)" opacity=".9"/>
+          <circle cx="118" cy="138" r="2.4" fill="#FFE9A8" filter="url(#fWarm)" opacity=".8"/>
+          <path d="M118 66 L140 72 L118 78 Z" fill="url(#gRed)"/>
+          <path d="M118 60 L118 96" stroke="#8A9099" stroke-width="3"/>
+</svg>

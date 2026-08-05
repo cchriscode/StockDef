@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+<defs><filter id="g" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="gb" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<radialGradient id="fr" cx="50%" cy="50%" r="50%"><stop offset="60%" stop-color="#96D8EC" stop-opacity="0"/><stop offset="90%" stop-color="#EAFBFF" stop-opacity=".5"/><stop offset="100%" stop-color="#96D8EC" stop-opacity="0"/></radialGradient>
+</defs>
+<g filter="url(#gb)"><ellipse cx="100" cy="130" rx="84" ry="30" fill="#96D8EC" opacity=".25"/></g>
+<ellipse cx="100" cy="130" rx="82" ry="29" fill="url(#fr)"/>
+<ellipse cx="100" cy="130" rx="80" ry="28" fill="none" stroke="#EAFBFF" stroke-width="3.2" filter="url(#g)"/>
+<ellipse cx="100" cy="130" rx="54" ry="18" fill="none" stroke="#96D8EC" stroke-width="2" opacity=".7"/>
+<g fill="#EAFBFF">
+<path d="M28 122 L34 104 L40 124 Z"/><path d="M50 138 L56 116 L62 140 Z"/><path d="M144 136 L150 112 L156 138 Z"/>
+<path d="M168 124 L174 106 L180 126 Z"/><path d="M96 146 L102 122 L108 148 Z"/></g>
+<g fill="#3E7FA4" opacity=".45"><path d="M34 104 L38 118 L40 124 Z"/><path d="M56 116 L60 132 L62 140 Z"/><path d="M150 112 L154 130 L156 138 Z"/></g>
+<g filter="url(#g)" stroke="#C9F0FF" stroke-width="2" stroke-linecap="round">
+<g transform="translate(40,54)"><path d="M0 -9 L0 9 M-8 -5 L8 5 M-8 5 L8 -5"/></g>
+<g transform="translate(158,68) scale(.85)"><path d="M0 -9 L0 9 M-8 -5 L8 5 M-8 5 L8 -5"/></g>
+<g transform="translate(104,40) scale(.7)"><path d="M0 -9 L0 9 M-8 -5 L8 5 M-8 5 L8 -5"/></g>
+<g transform="translate(70,86) scale(.6)"><path d="M0 -9 L0 9 M-8 -5 L8 5 M-8 5 L8 -5"/></g></g>
+<g filter="url(#g)"><rect x="72" y="60" width="56" height="22" rx="4" fill="#0B1A22" stroke="#D14A4A" stroke-width="2.4"/>
+<text x="100" y="76" font-family="Arial Black, Arial, sans-serif" font-size="15" font-weight="900" fill="#D14A4A" text-anchor="middle">HALT</text></g>
+</svg>
