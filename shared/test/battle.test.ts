@@ -175,15 +175,15 @@ describe('Battle 엔진', () => {
     advanceAlive(b, 4); // 연사 2.2/s × ~4초
     expect(b.towers[0]!.rampN).toBeGreaterThanOrEqual(3);
   });
-  it('적 본진 위기 반격: HP 50%/25% 돌파 시 정예 분대 투입 (FR-6.10b)', () => {
+  it('적 본진 위기 반격: HP 40%/20% 돌파 시 정예 분대 투입 (FR-6.10b)', () => {
     const b = new Battle(params(), []);
-    b.enemyBaseHP = 140; // < 50% of 300
+    b.enemyBaseHP = 110; // < 40% of 300
     advanceAlive(b, 1);
     expect(b.rageStage).toBe(1);
     const anyB = b as unknown as { pending: { wave: number }[] };
     const squad1 = b.enemies.length + anyB.pending.length;
-    expect(squad1).toBeGreaterThanOrEqual(6); // 1단계 분대 6기
-    b.enemyBaseHP = 70; // < 25%
+    expect(squad1).toBeGreaterThanOrEqual(4); // 1단계 분대 4기
+    b.enemyBaseHP = 50; // < 20%
     advanceAlive(b, 2);
     expect(b.rageStage).toBe(2);
   });

@@ -299,18 +299,22 @@ export class Battle {
   /** FR-6.10b: 적 본진이 위기에 몰리면 정예 반격 분대 투입 (조기 파괴 러시 견제) */
   private checkRage() {
     if (this.params.regionId === 'TUT' || this.phase === 'done') return;
+    if (this.t >= this.stageEndT) return; // 오버타임(13웨이브 생존 확정 후) 마무리 러시엔 발동하지 않는다
     const rate = this.enemyBaseHP / BALANCE.ENEMY_BASE_HP;
-    if (this.rageStage < 1 && rate <= 0.5) { this.rageStage = 1; this.spawnRageSquad(1); }
-    if (this.rageStage < 2 && rate <= 0.25) { this.rageStage = 2; this.spawnRageSquad(2); }
+    if (this.rageStage < 1 && rate <= 0.4) { this.rageStage = 1; this.spawnRageSquad(1); }
+    if (this.rageStage < 2 && rate <= 0.2) { this.rageStage = 2; this.spawnRageSquad(2); }
   }
 
   private spawnRageSquad(stage: 1 | 2) {
+    // 유닛이 자동 전진하며 본진을 갉아먹는 구조라 사실상 매 판 발동 — 과하면 전 지역 클리어 불능 (봇심 검증)
+    // 러시(=이길 뻔한 판)만 발동하는 구조라 과하면 승리 경로가 통째로 막힌다 — 봇심으로 검증된 경량 구성
     const comps: EnemyTypeSpec['key'][] = stage === 1
-      ? ['tank', 'shield', 'healer', 'runner', 'runner', 'air']
-      : ['tank', 'tank', 'shield', 'shield', 'healer', 'air', 'air', 'runner', 'runner'];
+      ? ['tank', 'shield', 'runner', 'air']
+      : ['tank', 'shield', 'healer', 'air', 'runner'];
     const w = Math.min(Math.max(this.waveIdx, 1), this.params.waveTable.length);
-    const spec = this.params.waveTable[w - 1];
-    const eliteMult = (stage === 1 ? 1.2 : 1.4) * BALANCE.ENEMY_HP_MULT;
+    const hpW = Math.min(w, 6); // 체력 기준 웨이브 상한 — 후반 발동 시 지수 체력이 그대로 실리면 클리어 불능 (봇심 검증)
+    const spec = this.params.waveTable[hpW - 1];
+    const eliteMult = (stage === 1 ? 0.95 : 1.1) * BALANCE.ENEMY_HP_MULT;
     comps.forEach((type, i) => {
       const et = ENEMY_TYPES[type];
       this.pending.push({
