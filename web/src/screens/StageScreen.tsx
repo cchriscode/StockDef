@@ -7,6 +7,7 @@ import { api, getSettings, getToken, track } from '../net/api.js';
 import { StageWs } from '../net/stageWs.js';
 import { clockLabel, drawChart, interpPct, pctOf, type OpenMarker } from '../game/chart.js';
 import { drawBattle } from '../game/battleRender.js';
+import { bakeAllRigs } from '../game/rigFrames.js';
 import { sfx } from '../game/sfx.js';
 
 interface Props {
@@ -111,7 +112,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         const ws = new StageWs(start.sessionId, getToken());
         s.ws = ws;
         ws.onMsg = handleWs;
-        await ws.ready();
+        await Promise.all([ws.ready(), bakeAllRigs()]); // 리그 스프라이트 베이킹 (세션 1회)
         ws.start();
         ws.beginClockSync(() => Math.floor((Date.now() - s.t0) / s.barMs));
         track('stage_start', { region: regionId, speed: settings.speed, aum: start.params.aum, isTut });

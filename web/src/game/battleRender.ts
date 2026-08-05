@@ -1,7 +1,8 @@
 // FR-6.1 일자형 전투 렌더러 — Battle 엔진 상태를 그리기만 한다 (로직·렌더 분리, §11)
-// 스프라이트: game_vector_assets 팩 (관절 리그 모션 — idle/walk/hit/attack/death/destroy 프레임 시퀀스)
+// 스프라이트: handoff 리그 팩 — 로드 시 rigFrames가 고프레임으로 구워둔 시퀀스를 blit
 import { BASE_TURRET, ENEMY_TYPES, TOWERS, type Battle, type Enemy } from '@tf/shared';
 import { BACKDROPS, BACKDROP_GROUND, BACKDROP_H, BACKDROP_W, type Backdrop } from './battleBackdrops.js';
+import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 
 const AIR_Y = 96;
 const GROUND_Y = 258; // 캔버스 1400×300 기준 — 스프라이트는 고정 px, 레인만 길어진다
@@ -14,26 +15,12 @@ const UNIT_COLORS = { intern: '#7BD8A0', analyst: '#46A574', trader: '#3E8C68', 
 const TOWER_COLORS = { limit: '#4E7FB8', dividend: '#FFC53D', barrier: '#7C89A3' };
 const MODE_LABEL = { first: '선두', last: '후미', strong: '강적', close: '근접' };
 
-// ─── 벡터 팩 매핑 (역할 → 슬러그) ───
-const UNIT_SLUG: Record<string, string> = {
-  intern: 'bond-guardian', analyst: 'analyst-ranger', trader: 'growth-blade', riskmgr: 'dividend-cleric',
-};
-const TOWER_SLUG: Record<string, string> = {
-  limit: 'exchange-ballista', dividend: 'central-bank-vault', barrier: 'circuit-breaker',
-};
-const ENEMY_SLUG: Record<Enemy['type'], string> = {
-  grunt: 'bear-trooper', runner: 'flash-crash', tank: 'inflation-crawler', shield: 'hedge-shieldbearer',
-  healer: 'panic-sell-drone', air: 'algo-drone', boss: 'margin-call-titan',
-};
+// 렌더 모션 타이밍 (리그 저작 길이와 무관하게 게임 리듬에 맞춰 위상 스케일)
+const HIT_DUR = 0.4; // 피격 경직 연출 길이
+const UNIT_ATK_DUR = 0.8; // 유닛 발사 주기(shotCd 리셋값)에 공격 모션을 맞춘다
+const DEATH_DUR = 1.4; // 사망 붕괴 (저작 3s를 압축)
 
-// 모션별 [프레임 수, fps] — 팩 README 권장값
-const MOTIONS: Record<string, [number, number]> = {
-  idle: [4, 5], walk: [8, 12], hit: [3, 8], attack: [6, 12], death: [5, 7], skill: [5, 9], destroy: [5, 7],
-};
-const HIT_DUR = 3 / 8;
-const ATTACK_DUR = 6 / 12;
-const DEATH_DUR = 5 / 7;
-
+// vfx 단일 SVG 로더 (game_vector_assets 팩의 vfx/ — 배당·메테오·슬로우 등은 계속 사용)
 const vCache = new Map<string, HTMLImageElement>();
 function vspr(path: string): HTMLImageElement | null {
   let img = vCache.get(path);
@@ -43,19 +30,6 @@ function vspr(path: string): HTMLImageElement | null {
     vCache.set(path, img);
   }
   return img.complete && img.naturalWidth > 0 ? img : null;
-}
-
-/** 루프 모션 프레임 (idle/walk/attack 루프 재생) */
-function loopFrame(dir: string, motion: string, t: number, phase: number): HTMLImageElement | null {
-  const [n, fps] = MOTIONS[motion];
-  return vspr(`anim/${dir}/${motion}_${Math.floor(t * fps + phase) % n}`);
-}
-
-/** 원샷 모션 프레임 (hit/attack/death/destroy) — 경과 초과 시 null */
-function shotFrame(dir: string, motion: string, elapsed: number): HTMLImageElement | null {
-  const [n, fps] = MOTIONS[motion];
-  if (elapsed < 0 || elapsed >= n / fps) return null;
-  return vspr(`anim/${dir}/${motion}_${Math.min(Math.floor(elapsed * fps), n - 1)}`);
 }
 
 // 구 스프라이트 로더 — 기지(사옥/베어 본진)는 벡터 팩에 없어 Bases 시트 유지
@@ -71,7 +45,7 @@ function spr(name: string): HTMLImageElement | null {
 }
 
 // ─── 렌더 상태 (배틀 인스턴스별) — 피격/사망 감지·단발 연출 ───
-interface Corpse { dir: string; x: number; y: number; w: number; h: number; t0: number }
+interface Corpse { rigIdx: number; x: number; y: number; h: number; t0: number }
 interface VfxShot { name: string; x: number; y: number; t0: number; dur: number; s0: number; s1: number }
 interface RenderFxState {
   lastFxT: number;
@@ -79,7 +53,7 @@ interface RenderFxState {
   lastHp: Map<string, number>; // 'u3'/'e17'/'t0' → 지난 프레임 hp (피격 감지)
   hitT: Map<string, number>; // 피격 애니메이션 시작 시각
   prevUnits: Map<number, { key: string; x: number }>;
-  prevEnemies: Map<number, { type: Enemy['type']; x: number; air: boolean; w: number; h: number }>;
+  prevEnemies: Map<number, { type: Enemy['type']; x: number; air: boolean; h: number }>;
   prevTowers: (string | null)[]; // slot → key (파괴 감지)
   corpses: Corpse[];
   vfx: VfxShot[];
@@ -245,12 +219,12 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   }
   ctx.imageSmoothingEnabled = true; // 벡터 팩은 스무딩 렌더
 
-  // 사망·파괴 연출 (본체 아래 레이어) — death/destroy 프레임 원샷
+  // 사망·파괴 연출 (본체 아래 레이어) — death 모션 원샷
   st.corpses = st.corpses.filter((c) => {
-    const motion = c.dir.startsWith('towers/') ? 'destroy' : 'death';
-    const img = shotFrame(c.dir, motion, b.t - c.t0);
+    const img = rigFrame(c.rigIdx, 'death', (b.t - c.t0) / DEATH_DUR, true);
     if (!img) return b.t - c.t0 < 0;
-    ctx.drawImage(img, sx(c.x) - c.w / 2, c.y - c.h, c.w, c.h);
+    const w = (c.h * img.width) / img.height;
+    ctx.drawImage(img, sx(c.x) - w / 2, c.y - c.h, w, c.h);
     return true;
   });
 
@@ -258,10 +232,10 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   for (let s = 0; s < b.towers.length; s++) {
     const tx = sx(b.towerSlotX(s));
     const tw = b.towers[s];
-    // 파괴 감지 (방벽 소실 → destroy 연출)
+    // 파괴 감지 (방벽 소실 → death 연출)
     const prevKey = st.prevTowers[s] ?? null;
     if (prevKey && !tw) {
-      st.corpses.push({ dir: `towers/${TOWER_SLUG[prevKey]}`, x: b.towerSlotX(s), y: groundTop, w: 46, h: 58, t0: b.t });
+      st.corpses.push({ rigIdx: RIG_TOWER[prevKey], x: b.towerSlotX(s), y: groundTop, h: 58, t0: b.t });
       st.lastHp.delete(`t${s}`);
     }
     st.prevTowers[s] = tw ? tw.key : null;
@@ -279,18 +253,23 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       continue;
     }
     const spec = TOWERS.find((t) => t.key === tw.key)!;
-    const dir = `towers/${TOWER_SLUG[tw.key]}`;
+    const rigIdx = RIG_TOWER[tw.key];
     if (tw.maxHp > 0) trackHit(st, `t${s}`, tw.hp, b.t);
     const hitEl = b.t - (st.hitT.get(`t${s}`) ?? -9);
-    // 모션 선택: 발리스타=발사 직후 / 금고=지급 직후 attack, 방벽=피격 hit
-    let img: HTMLImageElement | null = null;
-    if (spec.rate > 0 && tw.cooldown > 0) img = shotFrame(dir, 'attack', 1 / spec.rate - tw.cooldown);
-    else if (spec.incomeAmount > 0) img = shotFrame(dir, 'attack', spec.incomePeriod - (tw.nextIncomeAt - b.t));
-    else if (hitEl < HIT_DUR) img = shotFrame(dir, 'hit', hitEl);
-    if (!img) img = loopFrame(dir, 'idle', b.t, s * 2);
+    // 모션 선택: 발리스타=발사 사이클에 attack 스케일 / 금고=지급 직후 attack / 방벽=피격 hit
+    let img: HTMLCanvasElement | null = null;
+    if (spec.rate > 0 && tw.cooldown > 0) {
+      const cycle = 1 / spec.rate;
+      img = rigFrame(rigIdx, 'attack', (cycle - tw.cooldown) / Math.min(cycle, 1.25), true);
+    } else if (spec.incomeAmount > 0) {
+      img = rigFrame(rigIdx, 'attack', (spec.incomePeriod - (tw.nextIncomeAt - b.t)) / 1.25, true);
+    } else if (hitEl < HIT_DUR) {
+      img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
+    }
+    if (!img) img = rigFrame(rigIdx, 'walk', (b.t + s * 0.29) % 1, false); // 타워 walk = 설치+대기 루프
     const hh = 58;
-    const wwt = (hh * 160) / 200;
     if (img) {
+      const wwt = (hh * img.width) / img.height;
       ctx.drawImage(img, tx - wwt / 2, groundTop - hh, wwt, hh);
     } else {
       ctx.fillStyle = TOWER_COLORS[tw.key];
@@ -314,19 +293,19 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   for (const u of b.units) {
     liveUnits.add(u.id);
     const ux = sx(u.x);
-    const dir = `units/${UNIT_SLUG[u.key]}`;
+    const rigIdx = RIG_UNIT[u.key];
     const hh = 50;
-    const wwu = (hh * 160) / 200;
     trackHit(st, `u${u.id}`, u.hp, b.t);
     const hitEl = b.t - (st.hitT.get(`u${u.id}`) ?? -9);
     const moved = Math.abs(u.x - (st.prevUnits.get(u.id)?.x ?? u.x)) > 0.01;
-    const atkEl = 0.8 - u.shotCd; // 발사 시 shotCd=0.8 리셋 → 경과로 프레임
-    let img: HTMLImageElement | null = null;
-    if (hitEl < HIT_DUR) img = shotFrame(dir, 'hit', hitEl);
-    else if (u.shotCd > 0 && atkEl < ATTACK_DUR) img = shotFrame(dir, 'attack', atkEl);
-    else if (moved) img = loopFrame(dir, 'walk', b.t, u.id);
-    else img = loopFrame(dir, 'idle', b.t, u.id);
+    const atkEl = UNIT_ATK_DUR - u.shotCd; // 발사 시 shotCd=0.8 리셋 → 경과 위상
+    let img: HTMLCanvasElement | null = null;
+    if (hitEl < HIT_DUR) img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
+    else if (u.shotCd > 0 && atkEl < UNIT_ATK_DUR) img = rigFrame(rigIdx, 'attack', atkEl / UNIT_ATK_DUR, true);
+    else if (moved) img = rigFrame(rigIdx, 'walk', (b.t + u.id * 0.37) % 1, false);
+    else img = rigFrame(rigIdx, 'walk', (b.t * 0.35 + u.id * 0.37) % 1, false); // 대기 = 저속 제자리 걸음
     if (img) {
+      const wwu = (hh * img.width) / img.height;
       ctx.drawImage(img, ux - wwu / 2, groundTop - hh, wwu, hh);
     } else {
       ctx.fillStyle = UNIT_COLORS[u.key];
@@ -352,7 +331,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     st.lastHp.delete(`u${id}`);
     st.hitT.delete(`u${id}`);
     if (b.phase !== 'done') {
-      st.corpses.push({ dir: `units/${UNIT_SLUG[info.key]}`, x: info.x, y: groundTop, w: 40, h: 50, t0: b.t });
+      st.corpses.push({ rigIdx: RIG_UNIT[info.key], x: info.x, y: groundTop, h: 50, t0: b.t });
     }
   }
 
@@ -364,20 +343,20 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const col = ENEMY_COLORS[e.type];
     const slowed = b.t < e.slowUntil;
     const stunned = b.t < e.stunUntil;
-    const dir = `enemies/${ENEMY_SLUG[e.type]}`;
+    const rigIdx = RIG_ENEMY[e.type];
     const hh = e.air ? 36 : Math.min(34 + e.size * 2.4, 72);
-    const wwe = hh * (e.type === 'boss' ? 220 / 200 : 160 / 200);
     const topY = e.air ? AIR_Y - hh / 2 : groundTop - hh;
     trackHit(st, `e${e.id}`, e.hp, b.t);
     const hitEl = b.t - (st.hitT.get(`e${e.id}`) ?? -9);
     const prevX = st.prevEnemies.get(e.id)?.x;
     const moved = prevX == null || Math.abs(e.x - prevX) > 0.01;
-    let img: HTMLImageElement | null = null;
-    if (stunned) img = vspr(`anim/${dir}/idle_0`);
-    else if (hitEl < HIT_DUR) img = shotFrame(dir, 'hit', hitEl);
-    else if (!moved) img = loopFrame(dir, 'attack', b.t, e.id); // 블로커·방벽에 막혀 교전 중
-    else img = loopFrame(dir, 'walk', b.t, e.id);
+    let img: HTMLCanvasElement | null = null;
+    if (stunned) img = rigFrame(rigIdx, 'hit', 0.55, true); // 경직 프레임 고정
+    else if (hitEl < HIT_DUR) img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
+    else if (!moved) img = rigFrame(rigIdx, 'attack', ((b.t + e.id * 0.41) % 1.25) / 1.25, false); // 교전 루프 (저작 1.25s)
+    else img = rigFrame(rigIdx, 'walk', (b.t + e.id * 0.41) % 1, false);
     if (img) {
+      const wwe = (hh * img.width) / img.height;
       if (slowed) ctx.filter = 'saturate(0.4) brightness(0.8)';
       ctx.drawImage(img, ex - wwe / 2, topY, wwe, hh);
       ctx.filter = 'none';
@@ -403,7 +382,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     }
     const bw = e.type === 'boss' ? 34 : 18;
     hpBar(ctx, ex - bw / 2, topY - 7, bw, e.hp / e.maxHp, col);
-    st.prevEnemies.set(e.id, { type: e.type, x: e.x, air: e.air, w: wwe, h: hh });
+    st.prevEnemies.set(e.id, { type: e.type, x: e.x, air: e.air, h: hh });
   }
   // 적 소멸 감지 → 사망 애니메이션 (도달 소멸 포함 — 본진 앞에서 쓰러진다)
   for (const [id, info] of st.prevEnemies) {
@@ -413,7 +392,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     st.hitT.delete(`e${id}`);
     if (b.phase !== 'done') {
       const y = info.air ? AIR_Y + info.h / 2 : groundTop;
-      st.corpses.push({ dir: `enemies/${ENEMY_SLUG[info.type]}`, x: info.x, y, w: info.w, h: info.h, t0: b.t });
+      st.corpses.push({ rigIdx: RIG_ENEMY[info.type], x: info.x, y, h: info.h, t0: b.t });
     }
   }
 
