@@ -102,7 +102,7 @@ function pushVfx(st: RenderFxState, name: string, x: number, y: number, t0: numb
 const backdropCache = new Map<string, HTMLCanvasElement>();
 
 // 지역별 픽셀아트 배경 이미지 (높이를 지면선에 맞추고 가로 타일링)
-const IMAGE_BACKDROPS: Record<string, string> = { R1: '/assets/backdrops/r1.png' };
+const IMAGE_BACKDROPS: Record<string, string> = { R1: '/assets/backdrops/r1.png', R2: '/assets/backdrops/r2.png' };
 const bdImgCache = new Map<string, HTMLImageElement>();
 
 function backdropImage(regionId: string): HTMLImageElement | null {
@@ -265,6 +265,15 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   ctx.fillRect(38, groundTop - 124, 12, 6);
   ctx.fillStyle = '#FFE9C4';
   ctx.fillRect(41, groundTop - 127, 6, 3);
+  if (b.rageStage > 0) { // FR-6.10b 위기 반격 — 적 본진 붉은 오라 펄스
+    const pulse = (0.22 + 0.14 * Math.sin(b.t * 5)) * b.rageStage;
+    const cxr = W - 64;
+    const grad = ctx.createRadialGradient(cxr, groundTop - 44, 8, cxr, groundTop - 44, 116);
+    grad.addColorStop(0, `rgba(232,101,79,${Math.min(pulse, 0.55)})`);
+    grad.addColorStop(1, 'rgba(232,101,79,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(W - 190, groundTop - 164, 190, 172);
+  }
   const foe = spr(`foe_${hpState(b.enemyBaseHP / 300)}`);
   if (foe) {
     const hh = 88;

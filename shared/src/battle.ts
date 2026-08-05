@@ -122,6 +122,7 @@ export class Battle {
   phase: BattlePhase = 'prep';
   skillReadyAt = 0;
   baseTurretCd = 0;
+  rageStage = 0; // FR-6.10b 적 본진 위기 반격 (0 → 50% 돌파 시 1 → 25% 돌파 시 2)
   victory = false;
   t = 0;
   activeEvent: MarketEvent | null = null;
@@ -293,6 +294,32 @@ export class Battle {
       for (const q of queues) if (q.n > 0) { out.push(q.type); q.n -= 1; }
     }
     return out;
+  }
+
+  /** FR-6.10b: 적 본진이 위기에 몰리면 정예 반격 분대 투입 (조기 파괴 러시 견제) */
+  private checkRage() {
+    if (this.params.regionId === 'TUT' || this.phase === 'done') return;
+    const rate = this.enemyBaseHP / BALANCE.ENEMY_BASE_HP;
+    if (this.rageStage < 1 && rate <= 0.5) { this.rageStage = 1; this.spawnRageSquad(1); }
+    if (this.rageStage < 2 && rate <= 0.25) { this.rageStage = 2; this.spawnRageSquad(2); }
+  }
+
+  private spawnRageSquad(stage: 1 | 2) {
+    const comps: EnemyTypeSpec['key'][] = stage === 1
+      ? ['tank', 'shield', 'healer', 'runner', 'runner', 'air']
+      : ['tank', 'tank', 'shield', 'shield', 'healer', 'air', 'air', 'runner', 'runner'];
+    const w = Math.min(Math.max(this.waveIdx, 1), this.params.waveTable.length);
+    const spec = this.params.waveTable[w - 1];
+    const eliteMult = (stage === 1 ? 1.2 : 1.4) * BALANCE.ENEMY_HP_MULT;
+    comps.forEach((type, i) => {
+      const et = ENEMY_TYPES[type];
+      this.pending.push({
+        at: this.t + 0.6 * i, wave: w, type,
+        hp: spec.hp * eliteMult * this.params.heat * et.hpMult,
+        speed: 15 * spec.speed * et.speedMult * 1.1,
+      });
+    });
+    this.pending.sort((a, b) => a.at - b.at);
   }
 
   private scheduleWave(w: number) {
@@ -477,6 +504,7 @@ export class Battle {
         u.x += u.spec.speed * dt;
       }
     }
+    this.checkRage(); // FR-6.10b 본진 위기 → 반격 분대
 
     // 적 행동
     for (const e of this.enemies) {

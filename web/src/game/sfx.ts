@@ -107,4 +107,13 @@ export const sfx = {
     play([{ freq: 196, to: 82, dur: 0.18, type: 'triangle', vol: 0.14 }]);
     burst(0.1, 0.05);
   },
+  /** DANGER 경보 — 2음 클락션 반복 (적 본진 위기 반격) */
+  danger() {
+    play([
+      { freq: 622, dur: 0.16, type: 'sawtooth', vol: 0.15 },
+      { freq: 466, dur: 0.16, at: 0.18, type: 'sawtooth', vol: 0.15 },
+      { freq: 622, dur: 0.16, at: 0.4, type: 'sawtooth', vol: 0.13 },
+      { freq: 466, dur: 0.22, at: 0.58, type: 'sawtooth', vol: 0.13 },
+    ]);
+  },
 };

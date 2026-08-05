@@ -55,17 +55,18 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     lastPayoutAt: number;
     lastEventKey: string;
     shakeUntil: number;
+    lastRage: number;
   }>({
     start: null, bars: null, battle: null, ws: null, t0: 0, barMs: 1000,
     seq: 0, openMarker: null, pendingOpen: false, aum: 0,
     aumReported: 0, lastAumReportAt: 0, lastGoldEarned: 0, lastUnitCount: 0, finished: false,
-    lastPayoutAt: 0, lastEventKey: '', shakeUntil: 0,
+    lastPayoutAt: 0, lastEventKey: '', shakeUntil: 0, lastRage: 0,
   });
 
   const [phase, setPhase] = useState<'loading' | 'playing' | 'settling' | 'error'>('loading');
   const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, ebhp: 300, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0, upnl: null as number | null, udelta: null as number | null });
   const [popup, setPopup] = useState<ResultPopup | null>(null);
-  const [banner, setBanner] = useState<{ text: string; kind: 'panic' | 'fomo' } | null>(null);
+  const [banner, setBanner] = useState<{ text: string; kind: 'panic' | 'fomo' | 'danger' } | null>(null);
   const [stakePct, setStakePct] = useState(0.25);
   const [leverage, setLeverage] = useState(1); // FR-5.6b 배율 (진입 시점 값이 포지션에 고정, 마진 데스크로 해금)
   const [infoKey, setInfoKey] = useState<{ kind: 'unit' | 'tower'; key: string } | null>(null); // ? 도움말 카드
@@ -190,6 +191,18 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         if (!settings.reduceShake) s.shakeUntil = Date.now() + 600;
         setTimeout(() => setBanner(null), 2000);
         setTimeout(() => setTint(''), 2500);
+      }
+
+      // FR-6.10b DANGER — 적 본진 위기 반격 경고
+      if (s.battle.rageStage > s.lastRage) {
+        s.lastRage = s.battle.rageStage;
+        setBanner({
+          text: s.lastRage === 1 ? '⚠ DANGER — 베어 요새가 정예 반격 분대를 투입합니다!' : '⚠ DANGER — 총공세! 최정예 병력 출현!',
+          kind: 'danger',
+        });
+        sfx.danger();
+        if (!settings.reduceShake) s.shakeUntil = Date.now() + 700;
+        setTimeout(() => setBanner(null), 2400);
       }
 
       if (chartRef.current) {

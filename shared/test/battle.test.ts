@@ -175,6 +175,18 @@ describe('Battle 엔진', () => {
     advanceAlive(b, 4); // 연사 2.2/s × ~4초
     expect(b.towers[0]!.rampN).toBeGreaterThanOrEqual(3);
   });
+  it('적 본진 위기 반격: HP 50%/25% 돌파 시 정예 분대 투입 (FR-6.10b)', () => {
+    const b = new Battle(params(), []);
+    b.enemyBaseHP = 140; // < 50% of 300
+    advanceAlive(b, 1);
+    expect(b.rageStage).toBe(1);
+    const anyB = b as unknown as { pending: { wave: number }[] };
+    const squad1 = b.enemies.length + anyB.pending.length;
+    expect(squad1).toBeGreaterThanOrEqual(6); // 1단계 분대 6기
+    b.enemyBaseHP = 70; // < 25%
+    advanceAlive(b, 2);
+    expect(b.rageStage).toBe(2);
+  });
   it('heat 반영: 점령 2개(1.04) → 적 수 ceil(count×1.04)', () => {
     const b = new Battle(params({ heat: 1.04 }), []);
     b.advanceTo(11); // 웨이브 1 (base 2) 스폰 직후
