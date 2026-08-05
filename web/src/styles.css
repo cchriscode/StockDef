@@ -364,6 +364,7 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .banner.panic { background: rgba(200, 60, 44, 0.94); }
 .banner.fomo { background: rgba(30, 122, 78, 0.94); }
 .banner.danger { background: rgba(160, 24, 24, 0.96); animation: danger-blink 0.4s steps(2) infinite; }
+.end-reason { font-size: 15px; letter-spacing: 1px; margin-top: -4px; }
 @keyframes danger-blink { 50% { box-shadow: 0 0 0 3px #FF9E86 inset; } }
 .popup {
   position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);

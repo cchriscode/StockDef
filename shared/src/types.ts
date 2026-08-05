@@ -103,8 +103,11 @@ export interface FinishReq {
   enemyBaseDestroyed: boolean;
 }
 
+export type EndReason = 'destroy' | 'survive' | 'hq' | 'bankrupt' | 'leave';
+
 export interface FinishRes {
   status: 'cleared' | 'failed' | 'invalid';
+  endReason?: EndReason; // 승패 사유 — 클라이언트가 전투 상태로 판정해 부가 (표시 전용)
   grade: Grade | null;
   accuracy: number;
   returnPct: number; // 트레이딩 수익률 = (총 payout − 총 투입) / 총 투입 (포지션 없으면 0)

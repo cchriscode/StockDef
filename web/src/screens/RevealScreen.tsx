@@ -158,6 +158,17 @@ export function RevealScreen({ sessionId, finish, regionId, onDone }: Props) {
       <div className="screen center reveal-final">
         <div className={`rank-badge ${failed ? 'fail' : ''}`}><i>{failed ? '✕' : finish.grade}</i></div>
         <h2>{failed ? '패배 — 다시 도전하세요' : '방어 성공'}</h2>
+        {finish.endReason && (
+          <p className={`end-reason ${failed ? 'down' : 'up'}`}>
+            {{
+              destroy: '⚔ 베어 요새 파괴 — 즉시 승리',
+              survive: '🛡 전 웨이브 방어 완수',
+              hq: '💥 사옥 파괴 — 방어선이 무너졌습니다',
+              bankrupt: '📉 파산 — 운용자금(AUM)이 바닥났습니다',
+              leave: '🚪 전선 이탈',
+            }[finish.endReason]}
+          </p>
+        )}
         <div className="card settle">
           <p>
             적중률 {(finish.accuracy * 100).toFixed(0)}% · 수익률{' '}

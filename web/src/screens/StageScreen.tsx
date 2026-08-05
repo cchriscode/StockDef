@@ -86,6 +86,13 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     setPhase('settling');
     const b = s.battle;
     track('stage_end', { region: regionId, hp: b.baseHP, gold: b.gold, positions: s.seq });
+    // 승패 사유 (표시 전용) — 파산은 이탈과 같은 giveUp 경로라 전투 상태로 직접 판정
+    const effAum = s.aum + Math.max(0, Math.floor(b.aumEarned) - s.aumReported);
+    const endReason = b.victory
+      ? (b.enemyBaseDestroyed ? 'destroy' : 'survive')
+      : b.baseHP <= 0 ? 'hq'
+        : effAum < 1 && !s.openMarker ? 'bankrupt'
+          : 'leave';
     try {
       const res = await api.stageFinish(s.start.sessionId, {
         goldLeft: Math.floor(b.gold),
@@ -93,7 +100,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         hpLeft: giveUp ? 0 : Math.max(0, Math.round(b.baseHP)),
         enemyBaseDestroyed: b.enemyBaseDestroyed,
       });
-      onFinish(s.start.sessionId, res, regionId);
+      onFinish(s.start.sessionId, { ...res, endReason }, regionId);
     } catch (e) {
       setErrMsg(`정산 실패: ${(e as Error).message}`);
       setPhase('error');
