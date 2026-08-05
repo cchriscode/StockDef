@@ -301,7 +301,9 @@ router.post('/dept/upgrade', (req, res) => {
   const acc = accountRow(accountId);
   if (acc.capital < cost) return res.status(402).json({ error: 'INSUFFICIENT_CAPITAL', shortfall: cost - acc.capital });
   db.prepare('UPDATE accounts SET capital = capital - ? WHERE id = ?').run(cost, accountId);
-  db.prepare('UPDATE departments SET level = ? WHERE account_id = ? AND dept_key = ?').run(cur + 1, accountId, deptKey);
+  // 계정 생성 후 추가된 부서(마진 데스크 등)는 행이 없을 수 있다 — upsert
+  const upd = db.prepare('UPDATE departments SET level = ? WHERE account_id = ? AND dept_key = ?').run(cur + 1, accountId, deptKey);
+  if (upd.changes === 0) db.prepare('INSERT INTO departments (account_id, dept_key, level) VALUES (?, ?, ?)').run(accountId, deptKey, cur + 1);
   res.json({ ok: true, deptKey, level: cur + 1, capital: acc.capital - cost });
 });
 

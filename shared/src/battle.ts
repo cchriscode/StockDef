@@ -60,6 +60,8 @@ export interface Tower {
   hp: number; // 손절 방벽 잔여 내구 (비방벽 0)
   maxHp: number;
   nextIncomeAt: number; // 배당 파밍 다음 지급 시각 (비파밍 Infinity)
+  lastTargetId: number | null; // 복리 화염: 직전 사격 대상 (같은 대상 연속 명중 추적)
+  rampN: number; // 복리 화염: 연속 명중 수
 }
 
 export interface Projectile {
@@ -174,7 +176,7 @@ export class Battle {
     const spec = TOWERS.find((s) => s.key === key)!;
     if (!this.spend(spec.cost)) return false;
     this.towers[slot] = {
-      slot, key, lv: 1, cooldown: 0, mode: 'first', lastTargetX: null,
+      slot, key, lv: 1, cooldown: 0, mode: 'first', lastTargetX: null, lastTargetId: null, rampN: 0,
       hp: spec.barrierHP, maxHp: spec.barrierHP,
       nextIncomeAt: spec.incomeAmount > 0 ? this.t + spec.incomePeriod : Infinity,
     };
@@ -462,9 +464,9 @@ export class Battle {
           for (const e of targets) {
             const mult = e.air ? u.spec.antiAirPct : 1;
             if (u.spec.range > 40) {
-              this.fireProjectile(u.x, e, dmg * mult, { dmgType: 'physical', projSpeed: 520, splashRadius: 0, slowPct: 0, slowDur: 0 }, false);
+              this.fireProjectile(u.x, e, dmg * mult, { dmgType: u.spec.dmgType, projSpeed: 520, splashRadius: 0, slowPct: 0, slowDur: 0 }, false);
             } else {
-              this.damage(e, dmg * mult, 'physical');
+              this.damage(e, dmg * mult, u.spec.dmgType);
             }
           }
         }
@@ -524,7 +526,12 @@ export class Battle {
       if (!target) { tw.lastTargetX = null; continue; }
       tw.cooldown = 1 / spec.rate;
       tw.lastTargetX = target.x;
-      const dmg = spec.dmg * (tw.lv === 2 ? spec.lv2Mult : 1) * this.params.towerDmgMult * atkMult;
+      if (spec.rampPct > 0) { // 복리 화염: 같은 대상 연속 명중마다 피해 복리 증가
+        tw.rampN = tw.lastTargetId === target.id ? tw.rampN + 1 : 0;
+        tw.lastTargetId = target.id;
+      }
+      const ramp = spec.rampPct > 0 ? 1 + Math.min(tw.rampN * spec.rampPct, spec.rampMax) : 1;
+      const dmg = spec.dmg * (tw.lv === 2 ? spec.lv2Mult : 1) * this.params.towerDmgMult * atkMult * ramp;
       const slowPct = tw.lv === 2 && spec.slowPct > 0 ? spec.slowPct + 0.1 : spec.slowPct;
       const dmgType = spec.lv2Pierce && tw.lv === 2 ? 'magic' as const : spec.dmgType; // Lv2 철갑탄 (armor 관통)
       this.fireProjectile(tx, target, dmg, { ...spec, dmgType, slowPct }, true);

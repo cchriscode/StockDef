@@ -166,6 +166,15 @@ describe('Battle 엔진', () => {
     expect(b.victory).toBe(true);
     expect(b.enemyBaseDestroyed).toBe(true);
   });
+  it('복리 화염: 같은 대상 연속 명중마다 램프 증가 (FR-6.4 확장)', () => {
+    const b = new Battle(params(), []);
+    b.addGold(120);
+    expect(b.buildTower(0, 'flame')).toBe(true); // slot0 x=90, 사거리 380
+    const anyB = b as unknown as { enemies: unknown[] };
+    anyB.enemies.push({ id: 600, type: 'tank', x: 200, hp: 99999, maxHp: 99999, baseSpeed: 0, dps: 0, armor: 0.6, mr: 0, air: false, size: 11, wave: 1, baseDmg: 0, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false } as never);
+    advanceAlive(b, 4); // 연사 2.2/s × ~4초
+    expect(b.towers[0]!.rampN).toBeGreaterThanOrEqual(3);
+  });
   it('heat 반영: 점령 2개(1.04) → 적 수 ceil(count×1.04)', () => {
     const b = new Battle(params({ heat: 1.04 }), []);
     b.advanceTo(11); // 웨이브 1 (base 2) 스폰 직후

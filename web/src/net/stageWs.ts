@@ -33,8 +33,8 @@ export class StageWs {
     this.send({ op: 'start' });
   }
 
-  openPosition(seq: number, direction: Direction, stake: number) {
-    this.send({ op: 'position.open', seq, direction, stake });
+  openPosition(seq: number, direction: Direction, stake: number, leverage = 1) {
+    this.send({ op: 'position.open', seq, direction, stake, leverage });
   }
 
   closePosition(seq: number) {

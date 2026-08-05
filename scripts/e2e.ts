@@ -123,7 +123,13 @@ const revealTut = await req<{ companyName: string; ticker: string }>(`/api/stage
 check('FR-9.3 공개 API (튜토리얼 = 고정 실제 차트)', revealTut.ticker !== 'TUT' && revealTut.companyName.length > 0);
 
 console.log('▶ R1 여의도 (195초 @2x, p=0.65 봇)…');
-const r1 = await playStage('R1', 0.65);
+let r1 = await playStage('R1', 0.65);
+// 봇 클리어율은 확률적 (§9.3 의도된 난이도) — 사람의 재도전처럼 최대 4회 시도
+for (let attempt = 2; attempt <= 4 && r1.finish.status !== 'cleared'; attempt++) {
+  console.log(`  미클리어 → 재도전 ${attempt}/4…`);
+  r1 = await playStage('R1', 0.65);
+}
+check('R1 클리어 (봇 p=0.65, ≤4회 시도)', r1.finish.status === 'cleared');
 const r1Reveal = await req<{ companyName: string; tradeDate: string; positions: unknown[] }>(`/api/stage/${r1.sessionId}/reveal`);
 check('FR-9 공개: 실제 종목명·날짜 노출', !!r1Reveal.companyName && /^\d{4}-\d{2}-\d{2}$/.test(r1Reveal.tradeDate), `${r1Reveal.companyName} ${r1Reveal.tradeDate}`);
 

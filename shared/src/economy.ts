@@ -26,10 +26,11 @@ export function judge(
   direction: 'long' | 'short',
   stake: number,
   lossRate: number,
+  leverage = 1, // FR-5.6b: 배율은 g에 곱해 양방향 증폭 — 손실은 여전히 MAX_LOSS_RATE에서 클램프 (강제 청산 상한)
 ): { outcome: Outcome; deltaPct: number; g: number; payout: number; pnl: number } {
   const deltaPct = ((closePrice - basePrice) / basePrice) * 100;
   const sig = Math.max(sigma, 1e-6);
-  const g = (direction === 'long' ? 1 : -1) * (deltaPct / sig);
+  const g = (direction === 'long' ? 1 : -1) * (deltaPct / sig) * leverage;
   const raw = g >= 0 ? BALANCE.PAYOUT_BASE * g : lossRate * g;
   const capped = Math.min(Math.max(raw, -BALANCE.MAX_LOSS_RATE), BALANCE.PAYOUT_BASE * BALANCE.Z_CAP);
   // 1e-6 가드: 부동소수점 오차로 정수 경계가 내려앉는 것 방지 (예: 1000×0.1 = 99.999…)

@@ -7,8 +7,8 @@ import { api, getSettings, getToken, track } from '../net/api.js';
 import { StageWs } from '../net/stageWs.js';
 import { clockLabel, drawChart, interpPct, pctOf, type OpenMarker } from '../game/chart.js';
 import { drawBattle } from '../game/battleRender.js';
-import { bakeAllRigs } from '../game/rigFrames.js';
 import { sfx } from '../game/sfx.js';
+import { TOWER_INFO, UNIT_INFO, towerStatsLine, unitStatsLine } from '../game/unitInfo.js';
 
 interface Props {
   regionId: RegionId;
@@ -41,7 +41,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     t0: number;
     barMs: number;
     seq: number;
-    openMarker: (OpenMarker & { stake: number; basePrice: number }) | null;
+    openMarker: (OpenMarker & { stake: number; basePrice: number; leverage: number }) | null;
     pendingOpen: boolean;
     aum: number;
     aumReported: number;
@@ -64,6 +64,8 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
   const [popup, setPopup] = useState<ResultPopup | null>(null);
   const [banner, setBanner] = useState<{ text: string; kind: 'panic' | 'fomo' } | null>(null);
   const [stakePct, setStakePct] = useState(0.25);
+  const [leverage, setLeverage] = useState(1); // FR-5.6b 배율 (진입 시점 값이 포지션에 고정, 마진 데스크로 해금)
+  const [infoKey, setInfoKey] = useState<{ kind: 'unit' | 'tower'; key: string } | null>(null); // ? 도움말 카드
   const [slotMenu, setSlotMenuState] = useState<number | null>(null);
   const slotMenuRef = useRef<number | null>(null); // 렌더 루프에서 사거리 원 표시용
   const setSlotMenu = (v: number | null) => { slotMenuRef.current = v; setSlotMenuState(v); };
@@ -112,7 +114,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         const ws = new StageWs(start.sessionId, getToken());
         s.ws = ws;
         ws.onMsg = handleWs;
-        await Promise.all([ws.ready(), bakeAllRigs()]); // 리그 스프라이트 베이킹 (세션 1회)
+        await ws.ready(); // 리그 베이킹은 앱 부팅 시 백그라운드로 진행 — 진입을 막지 않는다
         ws.start();
         ws.beginClockSync(() => Math.floor((Date.now() - s.t0) / s.barMs));
         track('stage_start', { region: regionId, speed: settings.speed, aum: start.params.aum, isTut });
@@ -141,6 +143,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           basePrice: m.basePrice,
           direction: s.openMarker?.direction ?? 'long',
           stake: s.openMarker?.stake ?? 0,
+          leverage: s.openMarker?.leverage ?? 1,
         };
       } else if (m.op === 'position.closed') {
         s.aum = m.aumLeft;
@@ -225,7 +228,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           const curPrice = s.bars.openPrice * (1 + interpPct(s.bars, barF) / 100);
           const dPct = ((curPrice - mk.basePrice) / mk.basePrice) * 100;
           udelta = dPct;
-          const gNorm = (mk.direction === 'long' ? 1 : -1) * (dPct / Math.max(s.bars.sigma['30'], 1e-6));
+          const gNorm = (mk.direction === 'long' ? 1 : -1) * (dPct / Math.max(s.bars.sigma['30'], 1e-6)) * mk.leverage;
           const p = s.start!.params;
           const raw = gNorm >= 0 ? p.payoutBase * gNorm : p.lossRate * gNorm;
           upnl = Math.floor(mk.stake * Math.min(Math.max(raw, -p.maxLossRate), p.payoutBase * BALANCE.Z_CAP));
@@ -279,9 +282,9 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     const stake = Math.max(1, Math.floor(s.aum * stakePct));
     s.seq += 1;
     s.pendingOpen = true;
-    s.openMarker = { openBarIdx: 0, basePricePct: 0, basePrice: 0, direction, stake };
-    s.ws.openPosition(s.seq, direction, stake);
-    track('position_open', { seq: s.seq, direction, stakePct, waveIdx: hud.wave, phase: hud.prep ? 'prep' : 'wave' });
+    s.openMarker = { openBarIdx: 0, basePricePct: 0, basePrice: 0, direction, stake, leverage };
+    s.ws.openPosition(s.seq, direction, stake, leverage);
+    track('position_open', { seq: s.seq, direction, stakePct, leverage, waveIdx: hud.wave, phase: hud.prep ? 'prep' : 'wave' });
     if (isTut && guide === 1) setGuide(2);
   };
 
@@ -414,6 +417,20 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
               </button>
             ))}
           </div>
+          <div className="stake-row">
+            <span className="lbl">배율</span>
+            {BALANCE.LEVERAGES.map((v) => (
+              <button
+                key={v}
+                className={`opt ${leverage === v ? 'on' : ''}`}
+                disabled={v > p.maxLeverage || (isTut && v !== 1)}
+                title={v > p.maxLeverage ? '회사 → 마진 데스크 업그레이드로 해금' : undefined}
+                onClick={() => setLeverage(v)}
+              >
+                {v}×{v > p.maxLeverage ? ' 🔒' : ''}
+              </button>
+            ))}
+          </div>
           <div className="pos-box">
             <div className="pr"><span>POSITION</span><span>{hud.posCount}/{p.maxPositions}</span></div>
             {hasPosition ? (
@@ -424,7 +441,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
                     {s.openMarker!.direction === 'long' ? '▲ LONG' : '▼ SHORT'}
                   </span>
                 </div>
-                <div className="pr"><span>투입</span><span>{s.openMarker!.stake.toLocaleString()} AUM</span></div>
+                <div className="pr"><span>투입</span><span>{s.openMarker!.stake.toLocaleString()} AUM × {s.openMarker!.leverage}배</span></div>
                 <div className="pr">
                   <span>진입 대비</span>
                   <span className={`upnl ${hud.udelta != null && hud.udelta < 0 ? 'neg' : 'pos'}`}>
@@ -494,10 +511,13 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
               </>
             ) : (
               TOWERS.map((t) => (
-                <button key={t.key} disabled={hud.gold < t.cost} onClick={() => buildTower(slotMenu, t.key)}>
-                  {t.name} {t.cost} G
-                  <span className="small dim"> {t.incomeAmount > 0 ? `골드 +${t.incomeAmount}/${t.incomePeriod}초` : t.barrierHP > 0 ? '경로 차단·내구' : '지상+공중 저격'}</span>
-                </button>
+                <span key={t.key} className="ub-wrap">
+                  <button disabled={hud.gold < t.cost} onClick={() => buildTower(slotMenu, t.key)}>
+                    {t.name} {t.cost} G
+                    <span className="small dim"> {TOWER_INFO[t.key].role}</span>
+                  </button>
+                  <button className="qmark" title="타워 설명" onClick={() => setInfoKey({ kind: 'tower', key: t.key })}>?</button>
+                </span>
               ))
             )}
             <button className="ghost" onClick={() => setSlotMenu(null)}>✕</button>
@@ -526,9 +546,12 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           {UNITS.map((u) => {
             const cost = battle.unitCost(u.key);
             return (
-              <button key={u.key} className={isTut && guide === 4 ? 'pulse' : ''} disabled={hud.gold < cost || phase !== 'playing'} onClick={() => spawnUnit(u.key)}>
-                {u.name}<span className="cost">{cost} G</span>
-              </button>
+              <span key={u.key} className="ub-wrap">
+                <button className={isTut && guide === 4 ? 'pulse' : ''} disabled={hud.gold < cost || phase !== 'playing'} onClick={() => spawnUnit(u.key)}>
+                  {u.name}<span className="cost">{cost} G</span>
+                </button>
+                <button className="qmark" title="유닛 설명" onClick={() => setInfoKey({ kind: 'unit', key: u.key })}>?</button>
+              </span>
             );
           })}
           <button className="skill" disabled={hud.gold < BALANCE.SKILL_COST || hud.skillCd > 0} onClick={useSkill}>
@@ -539,6 +562,29 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           <span className="small dim mono">L={p.lossRate} · heat {p.heat.toFixed(2)}</span>
         </div>
       </div>
+
+      {/* ? 도움말 카드 — 유닛/타워 역할·스킬·수치 */}
+      {infoKey && (() => {
+        const isUnit = infoKey.kind === 'unit';
+        const card = isUnit ? UNIT_INFO[infoKey.key as keyof typeof UNIT_INFO] : TOWER_INFO[infoKey.key as keyof typeof TOWER_INFO];
+        const name = isUnit
+          ? UNITS.find((u) => u.key === infoKey.key)!.name
+          : TOWERS.find((t) => t.key === infoKey.key)!.name;
+        const stats = isUnit
+          ? unitStatsLine(infoKey.key as keyof typeof UNIT_INFO)
+          : towerStatsLine(infoKey.key as keyof typeof TOWER_INFO);
+        return (
+          <div className="overlay center" onClick={() => setInfoKey(null)}>
+            <div className="card info-card" onClick={(e) => e.stopPropagation()}>
+              <h3>{name} <span className="small dim">{card.role}</span></h3>
+              <p>{card.desc}</p>
+              <p className="skill-line">✦ {card.skill}</p>
+              <p className="small mono dim">{stats}</p>
+              <button onClick={() => setInfoKey(null)}>닫기</button>
+            </div>
+          </div>
+        );
+      })()}
 
       <p className="disclaimer">본 콘텐츠는 과거 데이터를 활용한 게임이며 투자 조언이 아닙니다.</p>
 

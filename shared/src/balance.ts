@@ -14,6 +14,7 @@ export const BALANCE = {
   MAX_CONCURRENT: 1,
   OPEN_RATE_LIMIT_MS: 1000,
   STAKE_PCTS: [0.1, 0.25, 0.5, 1.0],
+  LEVERAGES: [1, 2, 3, 5] as number[], // 진입 시 선택하는 배율 — g에 곱해 손익 양방향 증폭 (손실은 MAX_LOSS_RATE 클램프 유지)
 
   // §9.2 경제 파라미터
   // 적 처치 → AUM 획득 (전투가 트레이딩 자본을 되채우는 루프). 서버는 클라 보고를
@@ -78,9 +79,9 @@ export type DmgType = 'physical' | 'magic'; // 물리는 armor에 감소, 마법
 export type TargetingMode = 'first' | 'last' | 'strong' | 'close';
 export const TARGETING_MODES: TargetingMode[] = ['first', 'last', 'strong', 'close'];
 
-// FR-6.4 타워 — Units 컨셉 시트 3종 (지정가 포탑 / 배당 파밍 / 손절 방벽). 수치는 봇 시뮬레이터로 검증
+// FR-6.4 타워 — handoff 리그 팩 6종 전체 (2026-08-05 확장). 수치는 봇 시뮬레이터로 검증
 export interface TowerSpec {
-  key: 'limit' | 'dividend' | 'barrier';
+  key: 'limit' | 'dividend' | 'barrier' | 'cannon' | 'spire' | 'flame';
   name: string;
   cost: number;
   upgradeCost: number;
@@ -98,17 +99,22 @@ export interface TowerSpec {
   incomeAmount: number; // 배당 파밍: 주기당 골드 (0 = 없음)
   incomePeriod: number; // 배당 파밍: 주기 (초)
   barrierHP: number; // 손절 방벽: 내구도 (0 = 차단 없음)
+  rampPct: number; // 복리 화염: 같은 대상 연속 명중당 피해 증가율 (0 = 없음)
+  rampMax: number; // 복리 화염: 증가 상한 (배수 가산치)
 }
 
 export const TOWERS: TowerSpec[] = [
-  { key: 'limit', name: '지정가 포탑', cost: 110, upgradeCost: 160, target: 'both', dmgType: 'physical', dmg: 20, rate: 1.4, range: 560, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0 },
-  { key: 'dividend', name: '배당 파밍', cost: 130, upgradeCost: 190, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 8, incomePeriod: 10, barrierHP: 0 },
-  { key: 'barrier', name: '손절 방벽', cost: 70, upgradeCost: 100, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 260 },
+  { key: 'limit', name: '지정가 포탑', cost: 110, upgradeCost: 160, target: 'both', dmgType: 'physical', dmg: 20, rate: 1.4, range: 560, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'cannon', name: '공매도 캐논', cost: 150, upgradeCost: 210, target: 'ground', dmgType: 'physical', dmg: 26, rate: 0.5, range: 460, splashRadius: 60, slowPct: 0, slowDur: 0, projSpeed: 420, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'spire', name: '옵션 스파이어', cost: 140, upgradeCost: 200, target: 'both', dmgType: 'magic', dmg: 14, rate: 0.9, range: 500, splashRadius: 0, slowPct: 0.3, slowDur: 1.5, projSpeed: 620, lv2Mult: 1.6, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'flame', name: '복리 화염', cost: 120, upgradeCost: 170, target: 'ground', dmgType: 'physical', dmg: 8, rate: 2.2, range: 380, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 520, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0.12, rampMax: 1.2 },
+  { key: 'dividend', name: '배당 파밍', cost: 130, upgradeCost: 190, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 8, incomePeriod: 10, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'barrier', name: '손절 방벽', cost: 70, upgradeCost: 100, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 260, rampPct: 0, rampMax: 0 },
 ];
 
-// FR-6.5 유닛 — 컨셉 시트 4직군: 블로커 / 원거리 / 근접 브루저 / 서포터
+// FR-6.5 유닛 — handoff 리그 팩 6직군: 블로커 / 원거리 / 근접 브루저 / 관통 창병 / 마법 원거리 / 서포터
 export interface UnitSpec {
-  key: 'intern' | 'analyst' | 'trader' | 'riskmgr';
+  key: 'intern' | 'analyst' | 'trader' | 'lancer' | 'mage' | 'riskmgr';
   name: string;
   cost: number;
   hp: number;
@@ -118,16 +124,19 @@ export interface UnitSpec {
   cleave: number; // 동시 타격 수
   antiAirPct: number; // 공중 공격 배율 (0 = 불가)
   block: number; // 동시에 붙잡을 수 있는 적 수 (초과분은 통과)
+  dmgType: DmgType; // 마법은 armor 관통 (Kingdom Rush 이분법)
   baseHealPerSec: number; // 리스크 매니저: 사옥 회복/초 (생존 중, BASE_HP 상한)
   guardPct: number; // 리스크 매니저: 주변 아군 피해 감소율
   guardRadius: number;
 }
 
 export const UNITS: UnitSpec[] = [
-  { key: 'intern', name: '인턴', cost: 30, hp: 60, dps: 4, speed: 46, range: 26, cleave: 1, antiAirPct: 0, block: 3, baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'analyst', name: '애널리스트', cost: 60, hp: 70, dps: 15, speed: 42, range: 110, cleave: 1, antiAirPct: 0.5, block: 1, baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'trader', name: '트레이더', cost: 90, hp: 170, dps: 22, speed: 40, range: 26, cleave: 2, antiAirPct: 0, block: 2, baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'riskmgr', name: '리스크 매니저', cost: 90, hp: 80, dps: 0, speed: 40, range: 0, cleave: 0, antiAirPct: 0, block: 1, baseHealPerSec: 0.5, guardPct: 0.2, guardRadius: 120 },
+  { key: 'intern', name: '인턴', cost: 30, hp: 60, dps: 4, speed: 23, range: 26, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'analyst', name: '애널리스트', cost: 60, hp: 70, dps: 15, speed: 21, range: 110, cleave: 1, antiAirPct: 0.5, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'lancer', name: '창병', cost: 75, hp: 120, dps: 16, speed: 20, range: 34, cleave: 3, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'trader', name: '트레이더', cost: 90, hp: 170, dps: 22, speed: 20, range: 26, cleave: 2, antiAirPct: 0, block: 2, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'mage', name: '술사', cost: 110, hp: 55, dps: 18, speed: 20, range: 130, cleave: 1, antiAirPct: 0.6, block: 1, dmgType: 'magic', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'riskmgr', name: '리스크 매니저', cost: 90, hp: 80, dps: 0, speed: 20, range: 0, cleave: 0, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0.5, guardPct: 0.2, guardRadius: 120 },
 ];
 
 // 사옥 자동 포탑 (Age of War 본진 방어) — 최후 방어선
@@ -248,6 +257,7 @@ export const DEPTS: DeptSpec[] = [
   { key: 'hr', name: '인사팀', desc: (lv) => `유닛 HP +${[0, 10, 20][lv - 1]}%`, maxLv: 3, costs: [800, 2000] },
   { key: 'legal', name: '법무팀', desc: (lv) => `손실률 −${[0, 0.05, 0.1][lv - 1].toFixed(2)}`, maxLv: 3, costs: [1500, 3500] },
   { key: 'ir', name: 'IR팀', desc: (lv) => `정산 보너스 +${[0, 5, 10][lv - 1]}%`, maxLv: 3, costs: [1000, 2500] },
+  { key: 'margin', name: '마진 데스크', desc: (lv) => `레버리지 최대 ${[1, 3, 5][lv - 1]}×`, maxLv: 3, costs: [1200, 3200] }, // FR-5.6b: Lv2 → 2·3× / Lv3 → 5× 해금
 ];
 
 export const DEPT_EFFECTS = {
@@ -255,4 +265,5 @@ export const DEPT_EFFECTS = {
   unitHpMult: (lv: number) => 1 + [0, 0.1, 0.2][lv - 1],
   legalCut: (lv: number) => [0, 0.05, 0.1][lv - 1],
   irBonus: (lv: number) => [0, 0.05, 0.1][lv - 1],
+  maxLeverage: (lv: number) => [1, 3, 5][lv - 1],
 };

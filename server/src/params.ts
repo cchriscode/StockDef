@@ -7,7 +7,7 @@ import { db, type TerritoryRow } from './db.js';
 
 export function getDeptLevels(accountId: string): Record<DeptKey, number> {
   const rows = db.prepare('SELECT dept_key, level FROM departments WHERE account_id = ?').all(accountId) as { dept_key: DeptKey; level: number }[];
-  const out = { trading_desk: 1, rnd: 1, hr: 1, legal: 1, ir: 1 } as Record<DeptKey, number>;
+  const out = { trading_desk: 1, rnd: 1, hr: 1, legal: 1, ir: 1, margin: 1 } as Record<DeptKey, number>;
   for (const r of rows) out[r.dept_key] = r.level;
   return out;
 }
@@ -43,6 +43,7 @@ export function buildStageParams(accountId: string, regionId: RegionId): StagePa
     heat: regionId === 'TUT' ? 1 : heatOf(captured),
     lossRate: Math.round(lossRate * 100) / 100,
     maxLossRate: BALANCE.MAX_LOSS_RATE,
+    maxLeverage: regionId === 'TUT' ? 1 : DEPT_EFFECTS.maxLeverage(depts.margin),
     payoutBase: BALANCE.PAYOUT_BASE,
     drawBand: BALANCE.DRAW_BAND,
     towerSlots: Math.min(BALANCE.TOWER_SLOTS_BASE + defenseRewards, BALANCE.TOWER_SLOTS_MAX),

@@ -27,7 +27,7 @@ export interface BarsFile {
 
 export type RegionId = 'R1' | 'R2' | 'R3' | 'TUT';
 export type RewardLine = 'finance' | 'info' | 'defense' | 'offense';
-export type DeptKey = 'trading_desk' | 'rnd' | 'hr' | 'legal' | 'ir';
+export type DeptKey = 'trading_desk' | 'rnd' | 'hr' | 'legal' | 'ir' | 'margin';
 export type Grade = 'S' | 'A' | 'B' | 'C';
 export type Outcome = 'win' | 'lose' | 'draw';
 export type Direction = 'long' | 'short';
@@ -42,6 +42,7 @@ export interface StageParams {
   heat: number;
   lossRate: number; // L: 하방 계수 (지역 노브)
   maxLossRate: number; // 포지션당 최대 손실률
+  maxLeverage: number; // FR-5.6b: 마진 데스크 레벨로 해금된 최대 배율 (기본 1)
   payoutBase: number;
   drawBand: number;
   towerSlots: number;
@@ -70,7 +71,7 @@ export interface StageStartRes {
 // WebSocket 메시지 (PRD §7.2) — 선물식 자유 진입·청산
 export type WsClientMsg =
   | { op: 'start' }
-  | { op: 'position.open'; seq: number; direction: Direction; stake: number }
+  | { op: 'position.open'; seq: number; direction: Direction; stake: number; leverage?: number }
   | { op: 'position.close'; seq: number }
   | { op: 'combat.aum'; earned: number } // 전투 처치 AUM 누적 보고 (서버가 상한 clamp)
   | { op: 'clock.sync'; clientBarIdx: number };

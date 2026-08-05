@@ -53,6 +53,13 @@ describe('FR-5.5 청산 손익 (선물식 연속 PnL)', () => {
     expect(r.outcome).toBe('lose');
     expect(r.payout).toBe(5);
   });
+  it('레버리지: g에 곱해 양방향 증폭, 손실은 여전히 MAX_LOSS_RATE 클램프 (FR-5.6b)', () => {
+    const lev3 = judge(10000, 10100, 1.0, 'long', 500, 0.7, 3); // g = 1×3 → payout 500×(1+0.9×3)
+    expect(lev3.payout).toBe(1850);
+    expect(lev3.payout).toBeGreaterThan(judge(10000, 10100, 1.0, 'long', 500, 0.7).payout);
+    const loss5 = judge(10000, 9900, 1.0, 'long', 500, 1.7, 5); // g = −1×5 → L×g=−8.5 → −0.95 클램프
+    expect(loss5.payout).toBe(25); // 500 × 0.05
+  });
 });
 
 describe('FR-8 정산·등급·보상 자격', () => {

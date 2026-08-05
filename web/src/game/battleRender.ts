@@ -12,8 +12,8 @@ const ENEMY_COLORS: Record<Enemy['type'], string> = {
   grunt: '#E8654F', runner: '#FF9E86', tank: '#A83A2E', shield: '#C9A84A',
   healer: '#8FD8B0', air: '#E8A0B4', boss: '#C22A2A',
 };
-const UNIT_COLORS = { intern: '#7BD8A0', analyst: '#46A574', trader: '#3E8C68', riskmgr: '#5EC0B0' };
-const TOWER_COLORS = { limit: '#4E7FB8', dividend: '#FFC53D', barrier: '#7C89A3' };
+const UNIT_COLORS: Record<string, string> = { intern: '#7BD8A0', analyst: '#46A574', trader: '#3E8C68', lancer: '#6BAF8C', mage: '#9B6BFF', riskmgr: '#5EC0B0' };
+const TOWER_COLORS: Record<string, string> = { limit: '#4E7FB8', cannon: '#B85A4E', spire: '#9B6BFF', flame: '#E8A54F', dividend: '#FFC53D', barrier: '#7C89A3' };
 const MODE_LABEL = { first: '선두', last: '후미', strong: '강적', close: '근접' };
 
 // 렌더 모션 타이밍 (리그 저작 길이와 무관하게 게임 리듬에 맞춰 위상 스케일)
@@ -86,10 +86,10 @@ function fxStateOf(b: Battle): RenderFxState {
   return st;
 }
 
-/** hp 하락 감지 → 피격 애니메이션 트리거 */
+/** hp 하락 감지 → 피격 애니메이션 트리거 (재트리거 쿨다운 — 지속 피격이 공격 모션을 영구히 덮지 않게) */
 function trackHit(st: RenderFxState, key: string, hp: number, t: number) {
   const prev = st.lastHp.get(key);
-  if (prev != null && hp < prev - 0.5) st.hitT.set(key, t);
+  if (prev != null && hp < prev - 0.5 && t - (st.hitT.get(key) ?? -9) > 1.1) st.hitT.set(key, t);
   st.lastHp.set(key, hp);
 }
 
@@ -274,9 +274,11 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const hitEl = b.t - (st.hitT.get(`t${s}`) ?? -9);
     // 모션 선택: 발리스타=발사 사이클에 attack 스케일 / 금고=지급 직후 attack / 방벽=피격 hit
     let img: HTMLCanvasElement | null = null;
+    let atkPhase: number | null = null;
     if (spec.rate > 0 && tw.cooldown > 0) {
       const cycle = 1 / spec.rate;
-      img = rigFrame(rigIdx, 'attack', (cycle - tw.cooldown) / Math.min(cycle, 1.25), true);
+      atkPhase = (cycle - tw.cooldown) / Math.min(cycle, 1.25);
+      img = rigFrame(rigIdx, 'attack', atkPhase, true);
     } else if (spec.incomeAmount > 0) {
       img = rigFrame(rigIdx, 'attack', (spec.incomePeriod - (tw.nextIncomeAt - b.t)) / 1.25, true);
     } else if (hitEl < HIT_DUR) {
@@ -291,6 +293,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.fillStyle = TOWER_COLORS[tw.key];
       ctx.fillRect(tx - 11, groundTop - 36, 22, 34);
     }
+    if (atkPhase != null && atkPhase < 1) drawRigVfx(ctx, rigIdx, 'attack', atkPhase, tx, groundTop, 0.6); // 캐논 포구 화염 (타 타워는 no-op)
     if (tw.lv === 2) {
       ctx.fillStyle = '#FFC53D';
       ctx.fillRect(tx - 12, groundTop - hh - 6, 24, 4);
@@ -320,7 +323,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     if (hitEl < HIT_DUR) img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
     else if (u.shotCd > 0 && atkEl < UNIT_ATK_DUR) img = rigFrame(rigIdx, 'attack', atkEl / UNIT_ATK_DUR, true);
     else if (castLocal < 2 && !moved) img = rigFrame(rigIdx, 'skill', castLocal / 2, true);
-    else if (moved) img = rigFrame(rigIdx, 'walk', (b.t + u.id * 0.37) % 1, false);
+    else if (moved) img = rigFrame(rigIdx, 'walk', (b.t * 0.6 + u.id * 0.37) % 1, false); // 이동속도 절반에 맞춘 보폭
     else img = rigFrame(rigIdx, 'walk', (b.t * 0.35 + u.id * 0.37) % 1, false); // 대기 = 저속 제자리 걸음
     if (img) {
       const wwu = (hh * img.width) / img.height;

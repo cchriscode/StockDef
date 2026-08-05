@@ -401,6 +401,19 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .cmd-funds .f.a i { background: var(--purple); border: 2px solid #4B2F8A; }
 .cmd-funds .f.a { color: var(--purple); }
 .cmd-units { display: flex; gap: 8px; flex-wrap: wrap; }
+.ub-wrap { position: relative; display: inline-flex; align-items: stretch; }
+.ub-wrap .qmark {
+  position: absolute; top: -6px; right: -6px; z-index: 2;
+  min-width: 20px; min-height: 20px; padding: 0; font-size: 11px; line-height: 1;
+  background: var(--head); border: 2px solid var(--line2); color: var(--mut);
+}
+.ub-wrap .qmark:hover { color: var(--cream); border-color: var(--mut); }
+.slot-menu .ub-wrap { display: flex; }
+.slot-menu .ub-wrap > button:first-child { flex: 1; text-align: left; }
+.info-card { max-width: 440px; display: flex; flex-direction: column; gap: 10px; }
+.info-card h3 { color: var(--cream); }
+.info-card p { line-height: 1.7; }
+.info-card .skill-line { color: var(--gold); }
 .cmd-units button {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   min-width: 82px; padding: 8px 6px; background: var(--panel); border-color: var(--green);

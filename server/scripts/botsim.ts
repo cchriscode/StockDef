@@ -36,7 +36,7 @@ function makeParams(region: RegionId): StageParams {
     // §9.3 전제: R1 AUM 2000 / R2 2400 / R3 2800 (데스크 업그레이드 진행 가정)
     aum: BALANCE.AUM_BY_DESK_LV[captured],
     totalBaseIncome: income.total, incomePerWave: income.perWave, incomeLastWave: income.lastWave,
-    heat: heatOf(captured), lossRate: BALANCE.LOSS_RATE[region], maxLossRate: BALANCE.MAX_LOSS_RATE, payoutBase: BALANCE.PAYOUT_BASE,
+    heat: heatOf(captured), lossRate: BALANCE.LOSS_RATE[region], maxLossRate: BALANCE.MAX_LOSS_RATE, maxLeverage: 1, payoutBase: BALANCE.PAYOUT_BASE,
     drawBand: BALANCE.DRAW_BAND, towerSlots: 6, maxPositions: BALANCE.MAX_POSITIONS, waveCount: 13,
     unitHpMult: 1, towerDmgMult: 1, unitCostMult: 1, hasInfoResearch: false,
     waveTable: WAVE_TABLES[region],

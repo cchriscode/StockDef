@@ -10,10 +10,15 @@ export const RIG_UNIT: Record<string, number> = {
   intern: 0, // 채권 수호병 (방패 블로커)
   analyst: 2, // 애널리스트 궁수
   trader: 1, // 성장주 검사 (대검 근접)
+  lancer: 3, // 분산투자 창병 (관통 찌르기)
+  mage: 5, // 레버리지 술사 (마법 원거리)
   riskmgr: 4, // 배당 사제 (서포터)
 };
 export const RIG_TOWER: Record<string, number> = {
   limit: 6, // 거래소 발리스타
+  cannon: 7, // 공매도 캐논 (광역 포격)
+  spire: 8, // 옵션 스파이어 (마법+슬로우)
+  flame: 10, // 복리 화염 (램프 지속딜)
   dividend: 11, // 중앙은행 금고
   barrier: 9, // 서킷 브레이커
 };

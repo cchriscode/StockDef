@@ -20,7 +20,7 @@ export class LiveSession {
   payoutSum = 0;
   goldSum = 0; // 골드로 환전된 순수익 누적 (payout − 반환 스테이크)
   wins = 0; loses = 0; draws = 0;
-  open: { seq: number; direction: Direction; stake: number; openBarIdx: number; basePrice: number } | null = null;
+  open: { seq: number; direction: Direction; stake: number; openBarIdx: number; basePrice: number; leverage: number } | null = null;
   positionCount = 0;
   combatCredited = 0; // 전투 처치로 크레딧된 AUM 누적 (상한 clamp)
   lastOpenAt = 0;
@@ -87,7 +87,7 @@ export class LiveSession {
     return this.params.incomePerWave * started;
   }
 
-  openPosition(seq: number, direction: Direction, stake: number) {
+  openPosition(seq: number, direction: Direction, stake: number, leverage = 1) {
     const now = Date.now();
     const err = (code: Parameters<typeof this.errMsg>[0]) => this.send(this.errMsg(code, seq));
     if (this.t0 == null) return err('SESSION_ENDED');
@@ -99,12 +99,13 @@ export class LiveSession {
     if (!Number.isInteger(stake) || stake <= 0 || stake > this.aum) return err('INSUFFICIENT_AUM');
     if (direction !== 'long' && direction !== 'short') return err('INVALID_SEQ');
     if (!Number.isInteger(seq) || seq !== this.positionCount + 1) return err('INVALID_SEQ');
+    if (!BALANCE.LEVERAGES.includes(leverage) || leverage > this.params.maxLeverage) return err('INVALID_SEQ'); // FR-5.6b 해금된 배율만
 
     // FR-5.4: 요청 순간 화면에 보이는 보간 가격으로 즉시 체결 (서버가 동일 보간식으로 재현 — 권위 유지)
     const i = this.serverBarIdx(now);
     if (i < 0 || i >= this.bars.barCount - 2) return err('SESSION_ENDED'); // 종료 직전 진입 불가
     const { price: basePrice, barIdx: openBarIdx } = this.interpPrice(now);
-    this.open = { seq, direction, stake, openBarIdx, basePrice };
+    this.open = { seq, direction, stake, openBarIdx, basePrice, leverage };
     this.positionCount += 1;
     this.aum -= stake;
 
@@ -128,8 +129,8 @@ export class LiveSession {
 
   private settleClose(exitBarIdx: number, closePrice: number, forced: boolean) {
     if (!this.open) return;
-    const { seq, direction, stake, basePrice } = this.open;
-    const r = judge(basePrice, closePrice, this.bars.sigma['30'], direction, stake, this.params.lossRate);
+    const { seq, direction, stake, basePrice, leverage } = this.open;
+    const r = judge(basePrice, closePrice, this.bars.sigma['30'], direction, stake, this.params.lossRate, leverage);
 
     if (r.outcome === 'win') this.wins += 1;
     else if (r.outcome === 'lose') this.loses += 1;
