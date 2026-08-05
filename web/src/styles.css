@@ -110,19 +110,17 @@ b.danger { color: var(--red2); }
 
 /* ── 타이틀 (목업 19번 저녁판) ── */
 .title-screen {
-  position: relative; min-height: 100vh; overflow: hidden; background: #232E4A;
+  position: relative; min-height: 100vh; overflow: hidden; background: #3E4E74;
   display: flex; flex-direction: column; align-items: center;
 }
 .title-bg {
   position: absolute; inset: 0;
   background-image: url('/assets/title-bg.png');
   background-size: cover; background-position: center; image-rendering: pixelated;
-  filter: brightness(0.64) saturate(0.78); /* 저녁 → 밤 (약 2시간 경과 톤) */
 }
 .title-shade {
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(10,14,30,.34) 0%, rgba(10,14,30,.34) 100%), /* 남색 야간 베일 */
-    linear-gradient(180deg, rgba(16,26,42,.36) 0%, rgba(16,26,42,.1) 26%, rgba(16,26,42,0) 46%, rgba(10,16,26,.28) 84%, rgba(10,16,26,.52) 100%);
+  background: linear-gradient(180deg, rgba(16,26,42,.36) 0%, rgba(16,26,42,.1) 26%, rgba(16,26,42,0) 46%, rgba(10,16,26,.28) 84%, rgba(10,16,26,.52) 100%);
 }
 .title-body { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 11vh; padding: 0 16px; }
 .title-kicker {

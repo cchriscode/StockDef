@@ -20,7 +20,7 @@ export function TitleScreen({ onStart, onCodex, onCompany }: Props) {
       <div className="title-bg" />
       <div className="title-shade" />
       <div className="title-body">
-        <div className="title-kicker">YEOUIDO · 21:40 KST · NIGHTFALL</div>
+        <div className="title-kicker">YEOUIDO · 19:40 KST · MOONRISE</div>
         <div className="title-logo l1">DEAD CAT</div>
         <div className="title-candles">
           <div className="bar-l" />
