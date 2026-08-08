@@ -55,6 +55,9 @@ export interface Unit {
   nextSkillAt: number; // FR-6.5b 자동 스킬 다음 시전 시각
   lastSkillAt: number; // 최근 시전 시각 (렌더 skill 모션·VFX 재생 기준)
   shieldUntil: number; // 인턴 원금 보장 — 받는 피해 −60% 만료 시각
+  knockUntil: number; // FR-6.10b 충격파 넉백 종료 시각 (이 동안 이동·공격 불가)
+  knockFrom: number; // 넉백 시작 x
+  knockTo: number; // 넉백 목표 x
 }
 
 export interface Tower {
@@ -129,7 +132,8 @@ export class Battle {
   phase: BattlePhase = 'prep';
   skillReadyAt = 0;
   baseTurretCd = 0;
-  rageStage = 0; // FR-6.10b 적 본진 위기 반격 (0 → 50% 돌파 시 1 → 25% 돌파 시 2)
+  rageStage = 0; // FR-6.10b 적 본진 위기 반격 (0 → 40% 돌파 시 1 → 20% 돌파 시 2)
+  rageAt = -9; // 최근 반격 발동 시각 (충격파 연출 기준)
   victory = false;
   t = 0;
   activeEvent: MarketEvent | null = null;
@@ -225,6 +229,7 @@ export class Battle {
     this.units.push({
       id: this.nextId++, key, x: UNIT_SPAWN_X, hp, maxHp: hp, spec, shotCd: 0,
       nextSkillAt: this.t + UNIT_SKILL_PERIOD[key], lastSkillAt: -9, shieldUntil: 0,
+      knockUntil: 0, knockFrom: 0, knockTo: 0,
     });
     return true;
   }
@@ -312,8 +317,19 @@ export class Battle {
     if (this.params.regionId === 'TUT' || this.phase === 'done') return;
     if (this.t >= this.stageEndT) return; // 오버타임(13웨이브 생존 확정 후) 마무리 러시엔 발동하지 않는다
     const rate = this.enemyBaseHP / BALANCE.ENEMY_BASE_HP;
-    if (this.rageStage < 1 && rate <= 0.4) { this.rageStage = 1; this.spawnRageSquad(1); }
-    if (this.rageStage < 2 && rate <= 0.2) { this.rageStage = 2; this.spawnRageSquad(2); }
+    if (this.rageStage < 1 && rate <= 0.4) { this.rageStage = 1; this.rageAt = this.t; this.spawnRageSquad(1); this.rageShockwave(); }
+    if (this.rageStage < 2 && rate <= 0.2) { this.rageStage = 2; this.rageAt = this.t; this.spawnRageSquad(2); this.rageShockwave(); }
+  }
+
+  /** FR-6.10b 충격파: 적 본진 앞까지 밀고 온 아군을 중원(RAGE_PUSH_TO_X)까지 밀어낸다 */
+  private rageShockwave() {
+    const to = BALANCE.RAGE_PUSH_TO_X;
+    for (const u of this.units) {
+      if (u.x <= to) continue;
+      u.knockFrom = u.x;
+      u.knockTo = to - (u.id % 5) * 12; // 겹침 방지 — 결정론적 분산
+      u.knockUntil = this.t + BALANCE.RAGE_PUSH_SECONDS;
+    }
   }
 
   private spawnRageSquad(stage: 1 | 2) {
@@ -584,6 +600,12 @@ export class Battle {
     // 유닛 행동 (블로커는 붙잡고, 원거리는 뒤에서, 브루저는 광역, 서포터는 후열 유지)
     for (const u of this.units) {
       u.shotCd -= dt;
+      if (t < u.knockUntil) { // FR-6.10b 충격파에 밀리는 중 — 이동·공격 불가 (easeOut 슬라이드)
+        const p = 1 - (u.knockUntil - t) / BALANCE.RAGE_PUSH_SECONDS;
+        const e3 = 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3);
+        u.x = u.knockFrom + (u.knockTo - u.knockFrom) * e3;
+        continue;
+      }
       if (u.spec.dps <= 0) { // 서포터(리스크 매니저): 비공격 — 전열 뒤에서 따라간다
         const ahead = this.units.some((o) => o !== u && o.spec.dps > 0 && o.x > u.x && o.x - u.x < 40);
         const enemyNear = this.enemies.some((e) => !e.air && e.x - u.x >= -6 && e.x - u.x <= 30);

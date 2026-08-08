@@ -187,6 +187,18 @@ describe('Battle 엔진', () => {
     advanceAlive(b, 2);
     expect(b.rageStage).toBe(2);
   });
+  it('위기 반격 충격파: 본진 앞 아군을 중원까지 밀어낸다 (FR-6.10b)', () => {
+    const b = new Battle(params(), []);
+    b.addGold(200);
+    b.spawnUnit('trader');
+    const u = b.units[0];
+    u.x = 900; // 적 본진 앞까지 전진한 상태
+    b.enemyBaseHP = 110; // 40% 돌파 → 반격 발동
+    advanceAlive(b, 0.5);
+    expect(u.knockUntil).toBeGreaterThan(0); // 넉백 시작
+    advanceAlive(b, 1.6); // 밀려나는 시간(0.9s) 경과 (이후 재전진분 포함)
+    expect(u.x).toBeLessThan(520); // 900 → 중원(500)까지 후퇴
+  });
   it('자동 스킬: 실드베어러 육각 실드 시전 → 받는 피해 감소 (FR-6.7b)', () => {
     const b = new Battle(params(), []);
     const anyB = b as unknown as { enemies: unknown[] };

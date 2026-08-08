@@ -427,6 +427,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       st.prevUnits.set(u.id, { key: u.key, x: u.x });
       continue;
     }
+    const knocked = b.t < u.knockUntil; // FR-6.10b 충격파에 밀리는 중 — 뒤로 기울고 먼지가 인다
     const skillEl = b.t - u.lastSkillAt; // FR-6.5b 자동 스킬 시전 연출
     let img: HTMLCanvasElement | null = null;
     if (hitEl < HIT_DUR) img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
@@ -436,7 +437,24 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     else img = rigFrame(rigIdx, 'walk', (b.t * 0.35 + u.id * 0.37) % 1, false); // 대기 = 저속 제자리 걸음
     if (img) {
       const wwu = (hh * img.width) / img.height;
-      ctx.drawImage(img, ux - wwu / 2, groundTop - hh, wwu, hh);
+      if (knocked) { // 밀려나는 동안 뒤로 기울이고 발밑 먼지
+        const kp = 1 - (u.knockUntil - b.t) / 0.9;
+        ctx.save();
+        ctx.translate(ux, groundTop);
+        ctx.rotate(-0.22 * Math.sin(Math.PI * Math.max(0, Math.min(1, kp))));
+        ctx.drawImage(img, -wwu / 2, -hh, wwu, hh);
+        ctx.restore();
+        ctx.fillStyle = `rgba(200,180,150,${0.4 * (1 - kp)})`;
+        for (let d = 0; d < 3; d++) {
+          const dr = 4 + kp * 16 + d * 5;
+          ctx.beginPath();
+          ctx.arc(ux + 8 + d * 7 + kp * 14, groundTop - 3 - d * 2, Math.max(1, 5 - d), 0, Math.PI * 2);
+          ctx.fill();
+          void dr;
+        }
+      } else {
+        ctx.drawImage(img, ux - wwu / 2, groundTop - hh, wwu, hh);
+      }
     } else {
       ctx.fillStyle = UNIT_COLORS[u.key];
       ctx.beginPath();
@@ -616,6 +634,38 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     }
     return true;
   });
+
+  // FR-6.10b 위기 반격 충격파 — 적 본진에서 퍼지는 돔 (아군을 중원까지 밀어내는 연출)
+  const shockEl = b.t - b.rageAt;
+  if (shockEl >= 0 && shockEl < 1.1) {
+    const p = shockEl / 1.1;
+    const originX = W - 60;
+    const r = 60 + (W * 0.8) * (1 - Math.pow(1 - p, 2)); // 빠르게 퍼졌다 감속
+    const alpha = Math.pow(1 - p, 1.6);
+    ctx.save();
+    ctx.beginPath(); // 지면 위 반구만 보이도록 클리핑
+    ctx.rect(0, 0, W, groundTop);
+    ctx.clip();
+    const g2 = ctx.createRadialGradient(originX, groundTop, Math.max(r * 0.55, 1), originX, groundTop, Math.max(r, 2));
+    g2.addColorStop(0, 'rgba(232,101,79,0)');
+    g2.addColorStop(0.82, `rgba(232,101,79,${0.16 * alpha})`);
+    g2.addColorStop(1, `rgba(255,158,134,${0.5 * alpha})`);
+    ctx.fillStyle = g2;
+    ctx.beginPath();
+    ctx.arc(originX, groundTop, r, Math.PI, 0);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255,214,196,${0.85 * alpha})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(originX, groundTop, r, Math.PI, 0);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(232,101,79,${0.45 * alpha})`; // 후행 링
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(originX, groundTop, Math.max(r - 26, 1), Math.PI, 0);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   drawPreviews(ctx, b.t, sx, groundTop, AIR_Y); // [임시] 신규 아트 프리뷰 (엔진 무관)
 
