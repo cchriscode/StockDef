@@ -4,7 +4,7 @@ import { BASE_TURRET, ENEMY_TYPES, TOWERS, type Battle, type Enemy } from '@tf/s
 import { BACKDROPS, BACKDROP_GROUND, BACKDROP_H, BACKDROP_W, type Backdrop } from './battleBackdrops.js';
 import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
-import { SHEET_UNIT, drawPreviews, drawSheetChar } from './previewSprites.js'; // [임시] 신규 아트 프리뷰
+import { SHEET_UNIT, drawPreviews, drawSheetChar, sheetCharHeight } from './previewSprites.js'; // [임시] 신규 아트 프리뷰
 
 const AIR_Y = 96;
 const GROUND_Y = 258; // 캔버스 1400×300 기준 — 스프라이트는 고정 px, 레인만 길어진다
@@ -412,7 +412,8 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
         ctx.arc(ux, groundTop - 10, 8, 0, Math.PI * 2);
         ctx.fill();
       }
-      hpBar(ctx, ux - 9, groundTop - 70, 18, u.hp / u.maxHp, '#7BD8A0');
+      // 체력바는 실제 키 위에 (저격수처럼 큰 유닛의 얼굴을 가리지 않도록)
+      hpBar(ctx, ux - 9, groundTop - sheetCharHeight(SHEET_UNIT[u.key]) - 8, 18, u.hp / u.maxHp, '#7BD8A0');
       st.prevUnits.set(u.id, { key: u.key, x: u.x });
       continue;
     }

@@ -42,6 +42,20 @@ const ATTACK = { frames: 5, fps: 10 };
 // 기준: 가위 병사(원본 344px) → 화면 64px. 시트를 1/3로 축소해 뒀으므로 ×3 보정.
 const SCALE = (64 / 344) * 3;
 
+// SPRITES.md '서 있는 키(px)' — 체력바·이름표를 머리 위에 정확히 올리기 위한 원본 키
+const STANDING_PX: Record<string, number> = {
+  'A-01_1': 308, 'A-01_2': 344, 'A-01_3': 419, 'A-01_7': 277,
+  'A-02_1': 336, 'A-02_2': 279, 'A-02_3': 434,
+  'A-03_1': 354, 'A-03_2': 334, 'A-03_3': 326,
+  enemy_a_1: 304, enemy_a_2: 283, enemy_b_1: 401, enemy_b_2: 379,
+  enemy_c_1: 257, enemy_c_2: 378, enemy_d_1: 430, enemy_d_2: 451,
+};
+
+/** 시트 캐릭터의 화면상 키(px) — 체력바 위치 계산용 */
+export function sheetCharHeight(sheetId: string): number {
+  return (STANDING_PX[sheetId] ?? 344) * (64 / 344);
+}
+
 /** [임시] 1G 프리뷰 유닛 키 → 스프라이트 시트 id */
 export const SHEET_UNIT: Record<string, string> = {
   club: 'A-01_1', scissor: 'A-01_2', foreman: 'A-01_3', apprentice: 'A-01_7',
@@ -165,10 +179,12 @@ export function drawPreviews(
     const dy = baseY - dh * anchorY;
     ctx.drawImage(img, f * cellW, 0, cellW, cellH, dx, dy, dw, dh);
 
-    // 이름표 (프리뷰 식별용)
+    // 이름표 — 셀 여백이 아니라 실제 머리 위에
+    const charH = sheetCharHeight(e.spec.id);
+    const headY = e.spec.kind === 'air' ? baseY - charH / 2 : baseY - charH;
     ctx.fillStyle = e.spec.side === 'ally' ? '#7BD8A0' : '#FF9E86';
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(e.spec.name, sx(e.x), dy - 4);
+    ctx.fillText(e.spec.name, sx(e.x), headY - 5);
   }
 }
