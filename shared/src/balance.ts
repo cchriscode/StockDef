@@ -147,7 +147,8 @@ export const UNITS: UnitSpec[] = [
   // 임시 테스트 유닛 (PNG 스프라이트 프리뷰용, handoff-walk-cane) — 확정 시 정식 스탯·비용 책정
   { key: 'cane', name: '지팡이 신사', cost: 1, hp: 100, dps: 15, speed: 20, range: 30, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   // [임시] ally-sprites 로스터 10종 — 전부 1G, 역할별 임시 스탯 (아트 확인용)
-  { key: 'club', name: '종머리 곤봉병', cost: 1, hp: 140, dps: 18, speed: 20, range: 30, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  // 종머리 곤봉은 리치가 짧다 — 적이 바짝 붙어야 때린다 (사거리 = 블로킹 간격)
+  { key: 'club', name: '종머리 곤봉병', cost: 1, hp: 140, dps: 18, speed: 20, range: 16, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'scissor', name: '가위 병사', cost: 1, hp: 120, dps: 20, speed: 20, range: 28, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'apprentice', name: '망치 견습공', cost: 1, hp: 110, dps: 16, speed: 20, range: 28, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'foreman', name: '망치 작업반장', cost: 1, hp: 240, dps: 12, speed: 20, range: 28, cleave: 2, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },

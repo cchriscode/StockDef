@@ -587,8 +587,9 @@ export class Battle {
     const engagedBy = new Map<number, Unit>(); // enemyId → 붙잡은 유닛
     for (const e of this.enemies) {
       if (e.air || this.t < e.stunUntil) continue;
+      // 붙잡는 간격은 무기 리치를 따른다 (짧은 무기일수록 적이 더 가까이 붙는다). 원거리는 28 상한.
       const candidates = this.units
-        .filter((u) => u.x <= e.x && e.x - u.x <= 28 && (blockCount.get(u.id) ?? 0) < u.spec.block)
+        .filter((u) => u.x <= e.x && e.x - u.x <= Math.min(u.spec.range, 28) && (blockCount.get(u.id) ?? 0) < u.spec.block)
         .sort((a, b) => b.x - a.x);
       const u = candidates[0];
       if (u) {
