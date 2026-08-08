@@ -116,7 +116,9 @@ export const TOWERS: TowerSpec[] = [
 
 // FR-6.5 유닛 — handoff 리그 팩 6직군: 블로커 / 원거리 / 근접 브루저 / 관통 창병 / 마법 원거리 / 서포터
 export interface UnitSpec {
-  key: 'intern' | 'analyst' | 'trader' | 'lancer' | 'mage' | 'riskmgr' | 'cane';
+  key: 'intern' | 'analyst' | 'trader' | 'lancer' | 'mage' | 'riskmgr' | 'cane'
+    // [임시] 신규 아트 프리뷰 유닛 10종 (전부 1G) — 확정 시 정식 스탯·비용 책정 또는 제거
+    | 'club' | 'scissor' | 'foreman' | 'apprentice' | 'pistol' | 'gasmask' | 'sniper' | 'roundshield' | 'shutter' | 'bricker';
   name: string;
   cost: number;
   hp: number;
@@ -141,6 +143,17 @@ export const UNITS: UnitSpec[] = [
   { key: 'riskmgr', name: '리스크 매니저', cost: 90, hp: 80, dps: 0, speed: 20, range: 0, cleave: 0, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0.5, guardPct: 0.2, guardRadius: 120 },
   // 임시 테스트 유닛 (PNG 스프라이트 프리뷰용, handoff-walk-cane) — 확정 시 정식 스탯·비용 책정
   { key: 'cane', name: '지팡이 신사', cost: 1, hp: 100, dps: 15, speed: 20, range: 30, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  // [임시] ally-sprites 로스터 10종 — 전부 1G, 역할별 임시 스탯 (아트 확인용)
+  { key: 'club', name: '종머리 곤봉병', cost: 1, hp: 140, dps: 18, speed: 20, range: 30, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'scissor', name: '가위 병사', cost: 1, hp: 120, dps: 20, speed: 20, range: 28, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'apprentice', name: '망치 견습공', cost: 1, hp: 110, dps: 16, speed: 20, range: 28, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'foreman', name: '망치 작업반장', cost: 1, hp: 240, dps: 12, speed: 20, range: 28, cleave: 2, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'roundshield', name: '원형 방패병', cost: 1, hp: 200, dps: 8, speed: 20, range: 26, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'shutter', name: '셔터 장교', cost: 1, hp: 190, dps: 9, speed: 20, range: 26, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'bricker', name: '벽돌 짐꾼', cost: 1, hp: 210, dps: 10, speed: 20, range: 26, cleave: 1, antiAirPct: 0, block: 2, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'pistol', name: '권총 장교', cost: 1, hp: 80, dps: 14, speed: 20, range: 120, cleave: 1, antiAirPct: 0.5, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'gasmask', name: '방독면 포수', cost: 1, hp: 85, dps: 16, speed: 20, range: 110, cleave: 1, antiAirPct: 0.4, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'sniper', name: '저격수', cost: 1, hp: 70, dps: 22, speed: 20, range: 160, cleave: 1, antiAirPct: 0.6, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
 ];
 
 // FR-6.5b/6.7b 자동 스킬 주기 (초) — 유닛·적이 일정 주기마다 고유 스킬을 자동 시전 (리그 skill 모션+VFX 재생)
@@ -152,6 +165,8 @@ export const UNIT_SKILL_PERIOD: Record<UnitSpec['key'], number> = {
   mage: 14, // 레버리지 오브 — 마법 광역탄 (dps×2.2, 폭발 70)
   riskmgr: 5, // 헤지 커버 — 사옥 즉시 +3 회복 (오라 패시브와 별도 버스트)
   cane: 9999, // 임시 유닛 — 스킬 없음
+  club: 9999, scissor: 9999, apprentice: 9999, foreman: 9999, roundshield: 9999, // [임시] 프리뷰 유닛 — 스킬 없음
+  shutter: 9999, bricker: 9999, pistol: 9999, gasmask: 9999, sniper: 9999,
 };
 export const ENEMY_SKILL_PERIOD: Record<EnemyTypeSpec['key'], number> = {
   grunt: 9, // 3점사 — 블로킹 중 추가 일격 (dps×1.5)

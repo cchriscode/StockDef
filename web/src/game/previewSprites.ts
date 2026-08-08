@@ -1,0 +1,174 @@
+// [임시] 신규 스프라이트 프리뷰 — 아트 확인 전용 렌더 레이어 (엔진·밸런스와 무관)
+// 아군/적군 모두 버튼 클릭으로 소환해 걷기·공격 모션을 전장 위에서 확인한다. 확정 시 이 파일과
+// web/public/assets/preview/, StageScreen의 프리뷰 바를 함께 제거하면 흔적이 남지 않는다.
+
+export type PreviewSide = 'ally' | 'enemy';
+type PreviewKind = 'ground' | 'air' | 'boss';
+
+export interface PreviewSpec {
+  id: string;
+  name: string;
+  side: PreviewSide;
+  kind: PreviewKind;
+}
+
+// SPRITES.md 로스터 (아군 10 / 적 지상 4 / 공중 2 / 보스 2)
+export const PREVIEW_ROSTER: PreviewSpec[] = [
+  { id: 'A-01_1', name: '종머리 곤봉병', side: 'ally', kind: 'ground' },
+  { id: 'A-01_2', name: '가위 병사', side: 'ally', kind: 'ground' },
+  { id: 'A-01_3', name: '망치 작업반장', side: 'ally', kind: 'ground' },
+  { id: 'A-01_7', name: '망치 견습공', side: 'ally', kind: 'ground' },
+  { id: 'A-02_1', name: '권총 장교', side: 'ally', kind: 'ground' },
+  { id: 'A-02_2', name: '방독면 포수', side: 'ally', kind: 'ground' },
+  { id: 'A-02_3', name: '저격수', side: 'ally', kind: 'ground' },
+  { id: 'A-03_1', name: '원형 방패병', side: 'ally', kind: 'ground' },
+  { id: 'A-03_2', name: '셔터 장교', side: 'ally', kind: 'ground' },
+  { id: 'A-03_3', name: '벽돌 짐꾼', side: 'ally', kind: 'ground' },
+  { id: 'enemy_a_1', name: '창 망령', side: 'enemy', kind: 'ground' },
+  { id: 'enemy_a_2', name: '방패 파쇄병', side: 'enemy', kind: 'ground' },
+  { id: 'enemy_b_1', name: '석궁 사수', side: 'enemy', kind: 'ground' },
+  { id: 'enemy_b_2', name: '다연장 포병', side: 'enemy', kind: 'ground' },
+  { id: 'enemy_c_1', name: '연 정찰기', side: 'enemy', kind: 'air' },
+  { id: 'enemy_c_2', name: '확성기 드론', side: 'enemy', kind: 'air' },
+  { id: 'enemy_d_1', name: '번개 왕', side: 'enemy', kind: 'boss' },
+  { id: 'enemy_d_2', name: '드릴 워커', side: 'enemy', kind: 'boss' },
+];
+
+// 셀 앵커 (SPRITES.md setOrigin) — 가로는 전부 중앙
+const ORIGIN_Y: Record<PreviewKind, number> = { ground: 0.9459, boss: 0.9268, air: 0.5 };
+const WALK = { frames: 4, fps: 8 };
+const ATTACK = { frames: 5, fps: 10 };
+// 시트는 공통 px 공간으로 정규화돼 있어 배율 하나로 유닛 간 상대 크기가 유지된다.
+// 기준: 가위 병사(원본 344px) → 화면 64px. 시트를 1/3로 축소해 뒀으므로 ×3 보정.
+const SCALE = (64 / 344) * 3;
+
+/** [임시] 1G 프리뷰 유닛 키 → 스프라이트 시트 id */
+export const SHEET_UNIT: Record<string, string> = {
+  club: 'A-01_1', scissor: 'A-01_2', foreman: 'A-01_3', apprentice: 'A-01_7',
+  pistol: 'A-02_1', gasmask: 'A-02_2', sniper: 'A-02_3',
+  roundshield: 'A-03_1', shutter: 'A-03_2', bricker: 'A-03_3',
+};
+
+const imgCache = new Map<string, HTMLImageElement>();
+function sheet(id: string, motion: 'walk' | 'attack'): HTMLImageElement | null {
+  const key = `${id}_${motion}`;
+  let img = imgCache.get(key);
+  if (!img) {
+    img = new Image();
+    img.src = `/assets/preview/${key}.png`;
+    imgCache.set(key, img);
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
+
+/**
+ * 시트 스프라이트 1체 드로잉 (전투에 실제 참여하는 1G 프리뷰 유닛용).
+ * @returns 시트 미로딩이면 false (호출자가 폴백 도형)
+ */
+export function drawSheetChar(
+  ctx: CanvasRenderingContext2D,
+  sheetId: string,
+  kind: PreviewKind,
+  attackPhase: number | null, // 0~1 (공격 중) / null (걷기)
+  t: number,
+  cx: number,
+  baseY: number,
+): boolean {
+  const attacking = attackPhase != null && attackPhase >= 0 && attackPhase < 1;
+  const img = sheet(sheetId, attacking ? 'attack' : 'walk');
+  if (!img) return false;
+  const cfg = attacking ? ATTACK : WALK;
+  const f = attacking
+    ? Math.min(Math.floor(attackPhase! * cfg.frames), cfg.frames - 1)
+    : Math.floor(t * cfg.fps) % cfg.frames;
+  const cellW = img.naturalWidth / cfg.frames;
+  const cellH = img.naturalHeight;
+  const dw = cellW * SCALE;
+  const dh = cellH * SCALE;
+  ctx.drawImage(img, f * cellW, 0, cellW, cellH, cx - dw / 2, baseY - dh * ORIGIN_Y[kind], dw, dh);
+  return true;
+}
+
+interface PreviewEnt {
+  spec: PreviewSpec;
+  x: number; // 필드 좌표 (0~1000, 엔진과 동일 스케일)
+  lastT: number;
+  atkUntil: number; // 공격 모션 재생 종료 시각
+  nextAtkAt: number;
+}
+
+const ents: PreviewEnt[] = [];
+const ATTACK_DUR = ATTACK.frames / ATTACK.fps;
+
+/** 프리뷰 소환 — 아군은 좌측에서 우측으로, 적군은 우측에서 좌측으로 걷는다 */
+export function spawnPreview(id: string, now: number) {
+  const spec = PREVIEW_ROSTER.find((s) => s.id === id);
+  if (!spec) return;
+  ents.push({
+    spec,
+    x: spec.side === 'ally' ? 60 : 940,
+    lastT: now,
+    atkUntil: -1,
+    nextAtkAt: now + 2.2,
+  });
+  if (ents.length > 14) ents.splice(0, ents.length - 14);
+}
+
+export function clearPreviews() {
+  ents.length = 0;
+}
+
+export function previewCount(): number {
+  return ents.length;
+}
+
+/**
+ * 프리뷰 엔티티 이동·렌더. battleRender가 유닛 레이어 뒤에 호출한다.
+ * @param sx 필드 좌표 → 캔버스 x 변환
+ */
+export function drawPreviews(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  sx: (x: number) => number,
+  groundTop: number,
+  airY: number,
+) {
+  ctx.imageSmoothingEnabled = true;
+  for (let i = ents.length - 1; i >= 0; i--) {
+    const e = ents[i];
+    const dt = Math.max(0, Math.min(t - e.lastT, 0.2));
+    e.lastT = t;
+    const attacking = t < e.atkUntil;
+    if (!attacking && t >= e.nextAtkAt) {
+      e.atkUntil = t + ATTACK_DUR;
+      e.nextAtkAt = t + ATTACK_DUR + 2.2;
+    }
+    if (!attacking) e.x += (e.spec.side === 'ally' ? 1 : -1) * 34 * dt;
+    if (e.x < -60 || e.x > 1060) { ents.splice(i, 1); continue; }
+
+    const motion = attacking ? 'attack' : 'walk';
+    const img = sheet(e.spec.id, motion);
+    if (!img) continue;
+    const cfg = attacking ? ATTACK : WALK;
+    const elapsed = attacking ? ATTACK_DUR - (e.atkUntil - t) : t;
+    const f = attacking
+      ? Math.min(Math.floor(elapsed * cfg.fps), cfg.frames - 1)
+      : Math.floor(elapsed * cfg.fps) % cfg.frames;
+
+    const cellW = img.naturalWidth / cfg.frames;
+    const cellH = img.naturalHeight;
+    const dw = cellW * SCALE;
+    const dh = cellH * SCALE;
+    const anchorY = ORIGIN_Y[e.spec.kind];
+    const baseY = e.spec.kind === 'air' ? airY : groundTop;
+    const dx = sx(e.x) - dw / 2;
+    const dy = baseY - dh * anchorY;
+    ctx.drawImage(img, f * cellW, 0, cellW, cellH, dx, dy, dw, dh);
+
+    // 이름표 (프리뷰 식별용)
+    ctx.fillStyle = e.spec.side === 'ally' ? '#7BD8A0' : '#FF9E86';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(e.spec.name, sx(e.x), dy - 4);
+  }
+}

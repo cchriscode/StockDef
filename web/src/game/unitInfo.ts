@@ -7,6 +7,13 @@ export interface InfoCard {
   skill: string; // 고유 스킬/특성 설명
 }
 
+/** [임시] 프리뷰 유닛 카드 생성기 */
+const tmpCard = (role: string, desc: string): InfoCard => ({
+  role: `${role} · 임시 프리뷰 (1G)`,
+  desc: `${desc} 신규 아트 확인용 임시 유닛이라 스탯·비용은 가안입니다.`,
+  skill: '자동 스킬 없음 — 기본 공격만 수행합니다.',
+});
+
 export const UNIT_INFO: Record<UnitSpec['key'], InfoCard> = {
   intern: {
     role: '전열 블로커',
@@ -43,6 +50,17 @@ export const UNIT_INFO: Record<UnitSpec['key'], InfoCard> = {
     desc: '신규 아트 스타일 프리뷰용 임시 캐릭터입니다 (PNG 스프라이트). 느낌 확인 후 정식 편입 여부·스탯을 결정합니다.',
     skill: '지팡이 내려침 — 근접 단일 타격. 자동 스킬 없음.',
   },
+  // [임시] ally-sprites 프리뷰 10종 — 전부 1G, 아트 확인용 (확정 시 정식 설명·스탯 작성)
+  club: tmpCard('근접', '종머리 곤봉으로 내려치는 전열 근접병.'),
+  scissor: tmpCard('근접', '거대 가위로 빠르게 베는 근접 딜러.'),
+  apprentice: tmpCard('근접', '작은 망치를 든 견습공. 가볍고 저렴한 근접병.'),
+  foreman: tmpCard('탱커', '대형 망치 작업반장. 체력이 높고 3기를 붙잡습니다.'),
+  roundshield: tmpCard('탱커', '원형 방패로 전선을 지탱하는 블로커.'),
+  shutter: tmpCard('탱커', '셔터를 방패 삼아 버티는 장교.'),
+  bricker: tmpCard('탱커', '벽돌을 짊어진 짐꾼. 맷집형 전열.'),
+  pistol: tmpCard('원거리', '권총 장교. 중거리 사격, 공중 대응 가능.'),
+  gasmask: tmpCard('원거리', '방독면 포수. 중거리 화력 지원.'),
+  sniper: tmpCard('원거리', '장거리 저격수. 사거리와 단발 화력이 가장 높습니다.'),
 };
 
 export const TOWER_INFO: Record<TowerSpec['key'], InfoCard> = {

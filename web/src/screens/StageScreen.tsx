@@ -11,6 +11,7 @@ import { sfx } from '../game/sfx.js';
 import { TOWER_INFO, UNIT_INFO, towerStatsLine, unitStatsLine } from '../game/unitInfo.js';
 import { RIG_TOWER, RIG_UNIT } from '../game/rigFrames.js';
 import { RigPreview } from '../ui/RigPreview.js';
+import { PREVIEW_ROSTER, SHEET_UNIT, clearPreviews, spawnPreview } from '../game/previewSprites.js'; // [임시] 신규 아트 프리뷰
 
 interface Props {
   regionId: RegionId;
@@ -70,6 +71,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
   const [stakePct, setStakePct] = useState(0.25);
   const [leverage, setLeverage] = useState(1); // FR-5.6b 배율 (진입 시점 값이 포지션에 고정, 마진 데스크로 해금)
   const [infoKey, setInfoKey] = useState<{ kind: 'unit' | 'tower'; key: string } | null>(null); // ? 도움말 카드
+  const [showPreviewBar, setShowPreviewBar] = useState(false); // [임시] 신규 아트 프리뷰 바
   const [slotMenu, setSlotMenuState] = useState<number | null>(null);
   const slotMenuRef = useRef<number | null>(null); // 렌더 루프에서 사거리 원 표시용
   const setSlotMenu = (v: number | null) => { slotMenuRef.current = v; setSlotMenuState(v); };
@@ -590,9 +592,30 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           </button>
         </div>
         <div className="cmd-right">
+          <button className="ghost small" onClick={() => setShowPreviewBar((v) => !v)}>🎭 아트 프리뷰</button>
           <span className="small dim mono">L={p.lossRate} · heat {p.heat.toFixed(2)}</span>
         </div>
       </div>
+
+      {/* [임시] 신규 스프라이트 프리뷰 — 아군·적군 모두 클릭 소환 (엔진 무관, 생김새 확인용) */}
+      {showPreviewBar && (
+        <div className="preview-bar">
+          <div className="pb-head">
+            <b>적군 아트 프리뷰</b>
+            <span className="small dim">클릭하면 전장에 걸어 나옵니다 (2.2초마다 공격 모션 · 전투에는 관여하지 않음). 아군은 아래 커맨드 바에 1G로 들어가 있습니다.</span>
+            <button className="ghost small" onClick={() => clearPreviews()}>전부 지우기</button>
+            <button className="ghost small" onClick={() => setShowPreviewBar(false)}>✕</button>
+          </div>
+          <div className="pb-row">
+            <span className="lbl down">적군</span>
+            {PREVIEW_ROSTER.filter((s) => s.side === 'enemy').map((s) => (
+              <button key={s.id} onClick={() => spawnPreview(s.id, battle.t)}>
+                {s.name}{s.kind === 'air' ? ' ✈' : s.kind === 'boss' ? ' ★' : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ? 도움말 카드 — 유닛/타워 역할·스킬·수치 */}
       {infoKey && (() => {
@@ -612,7 +635,11 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
               {rigIdx != null ? (
                 <RigPreview unit={rigIdx} height={150} />
               ) : (
-                <img src="/assets/units/cane/wk-strip.png" alt="" style={{ width: 100, imageRendering: 'pixelated', objectFit: 'cover', objectPosition: 'left', height: 140, margin: '0 auto' }} />
+                <img
+                  src={SHEET_UNIT[infoKey.key] ? `/assets/preview/${SHEET_UNIT[infoKey.key]}_walk.png` : '/assets/units/cane/wk-strip.png'}
+                  alt=""
+                  style={{ width: SHEET_UNIT[infoKey.key] ? 150 : 100, height: 150, objectFit: 'cover', objectPosition: 'left', imageRendering: SHEET_UNIT[infoKey.key] ? 'auto' : 'pixelated', margin: '0 auto' }}
+                />
               )}
               <p>{card.desc}</p>
               <p className="skill-line">✦ {card.skill}</p>

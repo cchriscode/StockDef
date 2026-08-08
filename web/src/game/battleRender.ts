@@ -4,6 +4,7 @@ import { BASE_TURRET, ENEMY_TYPES, TOWERS, type Battle, type Enemy } from '@tf/s
 import { BACKDROPS, BACKDROP_GROUND, BACKDROP_H, BACKDROP_W, type Backdrop } from './battleBackdrops.js';
 import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
+import { SHEET_UNIT, drawPreviews, drawSheetChar } from './previewSprites.js'; // [임시] 신규 아트 프리뷰
 
 const AIR_Y = 96;
 const GROUND_Y = 258; // 캔버스 1400×300 기준 — 스프라이트는 고정 px, 레인만 길어진다
@@ -402,6 +403,19 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const hitEl = b.t - (st.hitT.get(`u${u.id}`) ?? -9);
     const moved = Math.abs(u.x - (st.prevUnits.get(u.id)?.x ?? u.x)) > 0.01;
     const atkEl = UNIT_ATK_DUR - u.shotCd; // 발사 시 shotCd=0.8 리셋 → 경과 위상
+    if (SHEET_UNIT[u.key]) { // [임시] 신규 시트 유닛 (1G 프리뷰) — 리그 대신 PNG 시트
+      const atkEl = UNIT_ATK_DUR - u.shotCd;
+      const phase = u.shotCd > 0 && atkEl >= 0 && atkEl < 0.5 ? atkEl / 0.5 : null;
+      if (!drawSheetChar(ctx, SHEET_UNIT[u.key], 'ground', phase, b.t, ux, groundTop)) {
+        ctx.fillStyle = '#7BD8A0';
+        ctx.beginPath();
+        ctx.arc(ux, groundTop - 10, 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      hpBar(ctx, ux - 9, groundTop - 70, 18, u.hp / u.maxHp, '#7BD8A0');
+      st.prevUnits.set(u.id, { key: u.key, x: u.x });
+      continue;
+    }
     if (u.key === 'cane') { // 임시 PNG 시트 유닛 — 리그 경로 대신 전용 드로잉
       if (!drawCane(ctx, b.t, u.shotCd, ux, groundTop)) {
         ctx.fillStyle = UNIT_COLORS.cane;
@@ -439,7 +453,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     st.prevUnits.delete(id);
     st.lastHp.delete(`u${id}`);
     st.hitT.delete(`u${id}`);
-    if (b.phase !== 'done') {
+    if (b.phase !== 'done' && RIG_UNIT[info.key] != null) { // 시트 유닛(프리뷰)은 사망 연출 없음
       st.corpses.push({ rigIdx: RIG_UNIT[info.key], x: info.x, y: groundTop, h: 50, t0: b.t });
     }
   }
@@ -602,6 +616,8 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     }
     return true;
   });
+
+  drawPreviews(ctx, b.t, sx, groundTop, AIR_Y); // [임시] 신규 아트 프리뷰 (엔진 무관)
 
   // 이펙트: 데미지 숫자 · 힐 · 스킬 플래시
   ctx.textAlign = 'center';
