@@ -6,3 +6,8 @@ server/static/bars/*.json
 pipeline/out/
 __pycache__/
 .env
+
+# 원본 아트/목업 (가공본만 web/public/assets 에 커밋 — 원본은 84MB라 저장소에서 제외)
+img/
+Dead Cat Bounce - *.html
+image.png
