@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseIncome, heatOf, judge, settle } from '../src/economy.js';
+import { baseIncome, heatOf, judge, settle, splitPayout } from '../src/economy.js';
 
 describe('FR-6.8 기본 수입 — 총액 우선 분배', () => {
   it('점령 2개 → 총 275, 웨이브 1~12 각 21, 웨이브 13 = 23 (PRD 예시)', () => {
@@ -57,6 +57,15 @@ describe('FR-5.5 청산 손익 (선물식 연속 PnL)', () => {
     const r = judge(10000, 15000, 1.0, 'short', 100, 1.7);
     expect(r.outcome).toBe('lose');
     expect(r.payout).toBe(5);
+  });
+  it('청산 분해: 순수익은 500G까지만 골드, 초과분은 AUM (FR-5.5c)', () => {
+    const small = splitPayout(1300, 1000); // 수익 300 → 전액 골드
+    expect(small).toEqual({ returnToAum: 1000, goldGain: 300 });
+    const big = splitPayout(2200, 1000); // 수익 1200 → 골드 500 + AUM 700
+    expect(big).toEqual({ returnToAum: 1700, goldGain: 500 });
+    expect(big.returnToAum + big.goldGain).toBe(2200); // 총액 보존
+    const loss = splitPayout(400, 1000); // 손실 → 전액 AUM 반환, 골드 0
+    expect(loss).toEqual({ returnToAum: 400, goldGain: 0 });
   });
   it('레버리지: g에 곱해 양방향 증폭, 손실은 여전히 MAX_LOSS_RATE 클램프 (FR-5.6b)', () => {
     const lev3 = judge(10000, 10100, 1.0, 'long', 500, 0.7, 3); // g = 1×3 → payout 500×(1+0.9×3)

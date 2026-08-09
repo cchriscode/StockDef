@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  BALANCE, judge,
+  BALANCE, judge, splitPayout,
   type BarsFile, type Direction, type StageParams, type WsServerMsg,
 } from '@tf/shared';
 import type { WebSocket } from 'ws';
@@ -153,9 +153,8 @@ export class LiveSession {
     else this.draws += 1;
     this.payoutSum += r.payout;
     this.stakeSum += stake;
-    // FR-5.5b 정산 분해: 스테이크(−손실)는 AUM으로 반환, 순수익만 골드로 자동 환전 (1:1)
-    const returnToAum = Math.min(r.payout, stake);
-    const goldGain = r.payout - returnToAum;
+    // FR-5.5b/5.5c 정산 분해: 스테이크는 AUM 반환, 순수익은 상한(500G)까지 골드·초과분은 AUM
+    const { returnToAum, goldGain } = splitPayout(r.payout, stake);
     this.aum += returnToAum;
     this.goldSum += goldGain;
     this.open = null;

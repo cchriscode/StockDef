@@ -40,6 +40,16 @@ export function judge(
   return { outcome, deltaPct, g, payout, pnl };
 }
 
+/**
+ * FR-5.5b/5.5c 청산 분해 — 스테이크(−손실)는 AUM 반환, 순수익은 **GOLD_PER_TRADE_CAP까지만** 골드로
+ * 환전하고 초과분은 AUM에 쌓인다 (한 방 대박이 전투 경제를 무너뜨리지 않도록).
+ */
+export function splitPayout(payout: number, stake: number): { returnToAum: number; goldGain: number } {
+  const profit = Math.max(0, payout - stake);
+  const goldGain = Math.min(profit, BALANCE.GOLD_PER_TRADE_CAP);
+  return { returnToAum: payout - goldGain, goldGain };
+}
+
 // FR-5.12 마진콜 강제청산 — 손실률이 MAX_LOSS_RATE에 도달하는 진입 대비 Δ% (부호 = 손실 방향)
 export function liquidationDeltaPct(sigma: number, lossRate: number, leverage: number, direction: 'long' | 'short'): number {
   const mag = (BALANCE.MAX_LOSS_RATE / (lossRate * Math.max(leverage, 1))) * Math.max(sigma, 1e-6);
