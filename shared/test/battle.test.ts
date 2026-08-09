@@ -97,7 +97,7 @@ describe('Battle 엔진', () => {
     expect(b.previewWave(7).find((c) => c.type === 'boss')).toBeUndefined();
     const w13 = b.previewWave(13);
     expect(w13.find((c) => c.type === 'boss')?.count).toBe(1);
-    expect(w13.reduce((s, c) => s + c.count, 0)).toBe(18 + 1); // W13 count=18 + 보스
+    expect(w13.reduce((s, c) => s + c.count, 0)).toBe(16 + 1); // W13 count=16 + 보스 (08-10 곡선 재조정)
   });
   it('타겟팅 모드 순환: first → last → strong → close → first (Bloons)', () => {
     const b = new Battle(params(), []);
@@ -199,16 +199,36 @@ describe('Battle 엔진', () => {
     advanceAlive(b, 1.6); // 밀려나는 시간(0.9s) 경과 (이후 재전진분 포함)
     expect(u.x).toBeLessThan(520); // 900 → 중원(500)까지 후퇴
   });
-  it('자동 스킬: 실드베어러 육각 실드 시전 → 받는 피해 감소 (FR-6.7b)', () => {
+  it('자동 스킬: 방패 파쇄병 → 아군 보호막 제거 + 취약 표식 (FR-6.7c)', () => {
     const b = new Battle(params(), []);
+    b.addGold(200);
+    b.spawnUnit('shutter');
+    const u = b.units[0];
+    u.x = 480;
+    u.absorb = 50; // 셔터 보호막 보유 상태
+    u.absorbUntil = 99;
     const anyB = b as unknown as { enemies: unknown[] };
-    anyB.enemies.push({ id: 910, type: 'shield', x: 500, hp: 200, maxHp: 200, baseSpeed: 0, dps: 0, armor: 0, mr: 0, air: false, size: 9, wave: 1, baseDmg: 0, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false, nextSkillAt: 0, lastSkillAt: -9, shieldUntil: 0, hasteUntil: 0 } as never);
+    anyB.enemies.push({ id: 910, type: 'shield', x: 500, hp: 200, maxHp: 200, baseSpeed: 0, dps: 20, armor: 0, mr: 0, air: false, size: 9, wave: 1, baseDmg: 0, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false, nextSkillAt: 0, lastSkillAt: -9, shieldUntil: 0, hasteUntil: 0, armorCutUntil: 0, armorCutPct: 0, dotUntil: 0, dotDps: 0, healBlockUntil: 0, knockUntil: 0, knockFrom: 0, knockTo: 0, stunImmuneUntil: 0, dpsBuffUntil: 0, dpsBuffPct: 0, vulnUntil: 0, vulnPct: 0 } as never);
     advanceAlive(b, 1);
-    const sh = b.enemies[0] as unknown as { shieldUntil: number };
-    expect(sh.shieldUntil).toBeGreaterThan(0); // 시전됨
-    b.addGold(500);
-    b.useSkill(); // 마법 80 — 실드로 30%만 적용 (mr 0 가정)
-    expect(b.enemies[0].hp).toBeCloseTo(200 - 80 * 0.3, 3);
+    expect(u.absorb).toBe(0); // 보호막 파괴
+    expect(u.markUntil).toBeGreaterThan(0); // 취약 표식 부여
+  });
+  it('자동 스킬: 곤봉병 종울림 강타 → 광역 기절, 재기절 면역 적용 (FR-6.5c)', () => {
+    const b = new Battle(params(), []);
+    b.addGold(200);
+    b.spawnUnit('club');
+    const u = b.units[0];
+    u.x = 500;
+    u.nextSkillAt = 0.2;
+    const anyB = b as unknown as { enemies: unknown[] };
+    for (let i = 0; i < 3; i++) {
+      anyB.enemies.push({ id: 930 + i, type: 'grunt', x: 520 + i * 12, hp: 900, maxHp: 900, baseSpeed: 0, dps: 0, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 0, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false, nextSkillAt: 999, lastSkillAt: -9, shieldUntil: 0, hasteUntil: 0, armorCutUntil: 0, armorCutPct: 0, dotUntil: 0, dotDps: 0, healBlockUntil: 0, knockUntil: 0, knockFrom: 0, knockTo: 0, stunImmuneUntil: 0, dpsBuffUntil: 0, dpsBuffPct: 0, vulnUntil: 0, vulnPct: 0 } as never);
+    }
+    advanceAlive(b, 0.6);
+    const es = b.enemies as unknown as { stunUntil: number; stunImmuneUntil: number; hp: number }[];
+    expect(es.filter((e) => e.stunUntil > 0).length).toBeGreaterThanOrEqual(3); // 광역 기절
+    expect(es[0].stunImmuneUntil).toBeGreaterThan(es[0].stunUntil); // 스턴락 방지 면역창
+    expect(es[0].hp).toBeLessThan(900); // 피해 적용
   });
   it('자동 스킬: 트레이더 복리 참격 — 주기 도달 시 주변 광역 피해 (FR-6.5b)', () => {
     const b = new Battle(params(), []);

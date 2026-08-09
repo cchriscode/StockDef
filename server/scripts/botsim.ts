@@ -73,7 +73,7 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
   const buildOrder: ('limit' | 'dividend' | 'barrier' | 'cannon' | 'spire' | 'flame')[] =
     ['limit', 'cannon', 'dividend', 'spire', 'flame', 'barrier'];
   let built = 0;
-  const unitCycle: ('lancer' | 'mage' | 'trader' | 'analyst')[] = ['lancer', 'mage', 'trader', 'analyst'];
+  const unitCycle: ('club' | 'sniper' | 'foreman' | 'scissor' | 'shutter')[] = ['club', 'sniper', 'foreman', 'scissor', 'shutter'];
   let unitIdx = 0;
 
   for (let t = 0.5; t <= 390 + 95; t += 0.5) { // 오버타임 상한(+90) 너머까지 돌아야 done 판정에 도달
@@ -123,9 +123,8 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
       }
     } else {
       for (let s = 0; s < 6; s++) if (b.gold >= 400) b.upgradeTower(s);
-      if (b.gold >= 300 && !b.units.some((u) => u.key === 'riskmgr')) b.spawnUnit('riskmgr');
-      else if (b.gold >= 300) { if (b.spawnUnit(unitCycle[unitIdx % 4])) unitIdx += 1; }
-      else if (b.gold >= 200) b.spawnUnit('analyst');
+      if (b.gold >= 260) { if (b.spawnUnit(unitCycle[unitIdx % unitCycle.length])) unitIdx += 1; }
+      else if (b.gold >= 150) b.spawnUnit('apprentice');
     }
     if (b.enemies.filter((e) => !e.air).length >= 5 && b.gold >= 300) b.useSkill(); // 쿨다운 25s — 더 자주
 

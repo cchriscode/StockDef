@@ -110,10 +110,10 @@ export interface TowerSpec {
 }
 
 export const TOWERS: TowerSpec[] = [
-  { key: 'limit', name: '지정가 포탑', cost: 110, upgradeCost: 160, target: 'both', dmgType: 'physical', dmg: 16, rate: 1.4, range: 460, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
-  { key: 'cannon', name: '공매도 캐논', cost: 150, upgradeCost: 210, target: 'ground', dmgType: 'physical', dmg: 21, rate: 0.5, range: 390, splashRadius: 60, slowPct: 0, slowDur: 0, projSpeed: 420, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
-  { key: 'spire', name: '옵션 스파이어', cost: 140, upgradeCost: 200, target: 'both', dmgType: 'magic', dmg: 11, rate: 0.9, range: 430, splashRadius: 0, slowPct: 0.3, slowDur: 1.5, projSpeed: 620, lv2Mult: 1.6, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
-  { key: 'flame', name: '복리 화염', cost: 120, upgradeCost: 170, target: 'ground', dmgType: 'physical', dmg: 6.5, rate: 2.2, range: 320, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 520, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0.12, rampMax: 1.2 },
+  { key: 'limit', name: '지정가 포탑', cost: 110, upgradeCost: 160, target: 'both', dmgType: 'physical', dmg: 20, rate: 1.4, range: 460, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'cannon', name: '공매도 캐논', cost: 150, upgradeCost: 210, target: 'ground', dmgType: 'physical', dmg: 26, rate: 0.5, range: 390, splashRadius: 60, slowPct: 0, slowDur: 0, projSpeed: 420, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'spire', name: '옵션 스파이어', cost: 140, upgradeCost: 200, target: 'both', dmgType: 'magic', dmg: 14, rate: 0.9, range: 430, splashRadius: 0, slowPct: 0.3, slowDur: 1.5, projSpeed: 620, lv2Mult: 1.6, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'flame', name: '복리 화염', cost: 120, upgradeCost: 170, target: 'ground', dmgType: 'physical', dmg: 8, rate: 2.2, range: 320, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 520, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0.12, rampMax: 1.2 },
   { key: 'dividend', name: '배당 파밍', cost: 130, upgradeCost: 190, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 8, incomePeriod: 10, barrierHP: 0, rampPct: 0, rampMax: 0 },
   { key: 'barrier', name: '손절 방벽', cost: 70, upgradeCost: 100, target: 'none', dmgType: 'physical', dmg: 0, rate: 0, range: 0, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 0, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 260, rampPct: 0, rampMax: 0 },
 ];
@@ -148,18 +148,17 @@ export const UNITS: UnitSpec[] = [
   // 임시 테스트 유닛 (PNG 스프라이트 프리뷰용, handoff-walk-cane) — 확정 시 정식 스탯·비용 책정
   // 지팡이는 내려치는 무기라 리치가 짧다 — 적이 바짝 붙어야 타격 (사거리 = 블로킹 간격)
   { key: 'cane', name: '지팡이 신사', cost: 1, hp: 100, dps: 15, speed: 20, range: 16, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  // [임시] ally-sprites 로스터 10종 — 전부 1G, 역할별 임시 스탯 (아트 확인용)
-  // 종머리 곤봉은 리치가 짧다 — 적이 바짝 붙어야 때린다 (사거리 = 블로킹 간격)
-  { key: 'club', name: '종머리 곤봉병', cost: 1, hp: 140, dps: 18, speed: 20, range: 16, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'scissor', name: '가위 병사', cost: 1, hp: 120, dps: 20, speed: 20, range: 28, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'apprentice', name: '망치 견습공', cost: 1, hp: 110, dps: 16, speed: 20, range: 28, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'foreman', name: '망치 작업반장', cost: 1, hp: 240, dps: 12, speed: 20, range: 28, cleave: 2, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'roundshield', name: '원형 방패병', cost: 1, hp: 200, dps: 8, speed: 20, range: 26, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'shutter', name: '셔터 장교', cost: 1, hp: 190, dps: 9, speed: 20, range: 26, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'bricker', name: '벽돌 짐꾼', cost: 1, hp: 210, dps: 10, speed: 20, range: 26, cleave: 1, antiAirPct: 0, block: 2, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'pistol', name: '권총 장교', cost: 1, hp: 80, dps: 14, speed: 20, range: 120, cleave: 1, antiAirPct: 0.5, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'gasmask', name: '방독면 포수', cost: 1, hp: 85, dps: 16, speed: 20, range: 110, cleave: 1, antiAirPct: 0.4, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'sniper', name: '저격수', cost: 1, hp: 70, dps: 22, speed: 20, range: 160, cleave: 1, antiAirPct: 0.6, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  // FR-6.5c 신규 로스터 — 스킬 이펙트에 맞춘 효과·가격 (2026-08-10 확정)
+  { key: 'apprentice', name: '망치 견습공', cost: 35, hp: 110, dps: 16, speed: 20, range: 20, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'scissor', name: '가위 병사', cost: 60, hp: 120, dps: 20, speed: 20, range: 22, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'club', name: '종머리 곤봉병', cost: 70, hp: 140, dps: 18, speed: 20, range: 16, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'roundshield', name: '원형 방패병', cost: 80, hp: 200, dps: 8, speed: 20, range: 20, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'bricker', name: '벽돌 짐꾼', cost: 85, hp: 210, dps: 10, speed: 20, range: 22, cleave: 1, antiAirPct: 0, block: 2, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'shutter', name: '셔터 장교', cost: 90, hp: 190, dps: 9, speed: 20, range: 20, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'gasmask', name: '방독면 포수', cost: 95, hp: 85, dps: 16, speed: 20, range: 110, cleave: 1, antiAirPct: 0.4, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'foreman', name: '망치 작업반장', cost: 110, hp: 240, dps: 12, speed: 20, range: 24, cleave: 2, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'sniper', name: '저격수', cost: 120, hp: 70, dps: 22, speed: 20, range: 170, cleave: 1, antiAirPct: 0.6, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'pistol', name: '권총 장교', cost: 60, hp: 80, dps: 14, speed: 20, range: 120, cleave: 1, antiAirPct: 0.5, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
 ];
 
 // FR-6.5b/6.7b 자동 스킬 주기 (초) — 유닛·적이 일정 주기마다 고유 스킬을 자동 시전 (리그 skill 모션+VFX 재생)
@@ -185,6 +184,40 @@ export const ENEMY_SKILL_PERIOD: Record<EnemyTypeSpec['key'], number> = {
   air: 11, // 광학 볼트 — 사거리 내 아군 유닛 저격 (14)
   boss: 15, // 마진콜 충격파 — 주변 아군 유닛 전체 22 피해
 };
+
+/**
+ * FR-6.5c 스킬 수치표 — **스킬 이펙트(스프라이트 모션)와 일치하는 효과만** 정의한다.
+ * 시각과 맞지 않는 원안 항목은 시각 쪽으로 맞춰 대체했다:
+ *  - 작업반장 '공중 띄움' → 1D 전장이라 무의미 → 내리찍기에 어울리는 기절+둔화
+ *  - 벽돌 짐꾼 '장애물 설치' → 모션이 '던지기'라 광역 투척 피해+둔화 (방벽 타워와 역할 중복도 해소)
+ *  - 방독면 포수 '장판' → 착탄 광역 + 회복 차단(가스) 으로 축약 (지속 장판은 미구현 시스템)
+ *  - 견습공 '마나 회수' → 자원 개념 없음 → 다음 스킬 쿨다운 단축
+ *  - 권총 장교 '회피 무시' → 회피 스탯 없음 + 스킬 시트도 없음 → 로스터 제외
+ */
+export const UNIT_SKILL = {
+  club: { mult: 1.8, maxTargets: 4, arc: 60, stun: 0.9, knock: 50 }, // 종울림 강타
+  scissor: { mult: 1.1, hits: 2, bleedPct: 0.25, bleedDur: 4, armorCut: 0.25, cutDur: 4 }, // 십자 절단
+  foreman: { mult: 2.2, maxTargets: 5, arc: 72, stun: 0.8, slowPct: 0.45, slowDur: 2, selfGuard: 4 }, // 작업 개시
+  apprentice: { mult: 0.7, hits: 4, cdCut: 1.5 }, // 견습의 연타
+  gasmask: { mult: 1.0, splash: 55, slowPct: 0.2, slowDur: 5, healBlock: 5 }, // 독가스탄
+  sniper: { mult: 3.4, pierceArmor: 0.5, chainPct: 0.6, maxTargets: 4 }, // 조준 관통 사격
+  roundshield: { mult: 1.2, maxTargets: 3, knock: 140, selfGuard: 3 }, // 돌격 방패
+  shutter: { mult: 0.8, maxTargets: 3, shieldPct: 0.25, shieldDur: 5, allies: 3 }, // 셔터 전개
+  bricker: { mult: 1.6, maxTargets: 4, arc: 56, slowPct: 0.4, slowDur: 3 }, // 벽돌 투척
+} as const;
+
+/** FR-6.7c 적 스킬 수치표 (엔진 타입 기준 — 렌더 시트와 1:1) */
+export const ENEMY_SKILL = {
+  grunt: { mult: 1.4, pierceArmor: 0.3, targets: 2, chainPct: 0.7, selfHaste: 2 }, // 창 망령 관통 찌르기
+  shield: { mult: 1.2, breakShield: true, markPct: 0.2, markDur: 5 }, // 방패 파쇄병 방패 부수기
+  runner: { mult: 0.85, hits: 2, slowPct: 0.3, slowDur: 3 }, // 석궁 사수 삼연사
+  tank: { mult: 1.0, spots: 2 }, // 다연장 포병 융단 포격
+  air: { markPct: 0.12, markDur: 6 }, // 연 정찰기 표적 지정
+  healer: { dpsBuff: 0.12, dur: 5, radius: 340, selfVuln: 0.2 }, // 확성기 드론 선동 방송
+  boss: { mult: 1.0, targets: 2, stun: 0.5, markPct: 0.12, markDur: 3 }, // 번개 왕 낙뢰 심판
+} as const;
+
+export const STUN_IMMUNE_S = 3; // 기절 종료 후 재기절 면역 (스턴락 방지)
 
 /**
  * 총구/발사 지점 — 투사체가 캐릭터 중심이 아니라 무기 끝에서 나가도록.
@@ -260,19 +293,21 @@ export const BOSS_WAVES: Record<RegionId, number[]> = { R1: [13], R2: [7, 13], R
 // 지수형 곡선 (2026-08-05 개정): 초반은 가볍게 시작해 후반으로 갈수록 물량·HP가 가파르게 상승.
 // 앞 웨이브는 트레이딩·배치에 집중할 여유를 주고, W10+는 확실한 위협이 되도록.
 const R1_WAVES: WaveSpec[] = [
+  // 2026-08-10 후반 곡선 재조정: 지수 상승은 유지하되 상단을 아군 화력 도달권으로 낮춘다
+  // (기존 W13 총 실효 12,849 HP = 아군 20초 화력의 4.4배 → 산술적으로 클리어 불가였음)
   { count: 2, hp: 45, speed: 1.0, air: false },
   { count: 3, hp: 52, speed: 1.0, air: false },
   { count: 3, hp: 62, speed: 1.0, air: true },
   { count: 4, hp: 75, speed: 1.0, air: false },
   { count: 5, hp: 92, speed: 1.0, air: true },
-  { count: 6, hp: 115, speed: 1.0, air: false },
-  { count: 7, hp: 145, speed: 1.05, air: true },
-  { count: 8, hp: 180, speed: 1.05, air: true },
-  { count: 10, hp: 225, speed: 1.05, air: false },
-  { count: 12, hp: 280, speed: 1.1, air: true },
-  { count: 14, hp: 330, speed: 1.1, air: true },
-  { count: 16, hp: 410, speed: 1.1, air: true },
-  { count: 18, hp: 510, speed: 1.15, air: true },
+  { count: 6, hp: 112, speed: 1.0, air: false },
+  { count: 7, hp: 135, speed: 1.05, air: true },
+  { count: 8, hp: 160, speed: 1.05, air: true },
+  { count: 9, hp: 190, speed: 1.05, air: false },
+  { count: 11, hp: 215, speed: 1.1, air: true },
+  { count: 12, hp: 240, speed: 1.1, air: true },
+  { count: 14, hp: 265, speed: 1.1, air: true },
+  { count: 16, hp: 290, speed: 1.15, air: true },
 ];
 
 function scaleWaves(base: WaveSpec[], countMult: number, hpMult: number): WaveSpec[] {
@@ -287,8 +322,8 @@ function scaleWaves(base: WaveSpec[], countMult: number, hpMult: number): WaveSp
 // 스케일 근거: §9.3 목표 지출 비율 (R2 2550/2000 ≈ ×1.28, R3 3100/2000 ≈ ×1.55) — 봇 시뮬레이터로 검증
 export const WAVE_TABLES: Record<RegionId, WaveSpec[]> = {
   R1: R1_WAVES,
-  R2: scaleWaves(R1_WAVES, 1.05, 1.25),
-  R3: scaleWaves(R1_WAVES, 1.05, 1.5),
+  R2: scaleWaves(R1_WAVES, 1.05, 1.12), // 2026-08-10 재조정 (1.25→1.12)
+  R3: scaleWaves(R1_WAVES, 1.05, 1.22), // 2026-08-10 재조정 (1.5→1.18)
   TUT: [
     { count: 2, hp: 40, speed: 0.9, air: false },
     { count: 3, hp: 45, speed: 0.9, air: false },

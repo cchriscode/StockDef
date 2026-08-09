@@ -6,7 +6,7 @@
 //  - Bloons TD: 타워 타겟팅 모드 first/last/strong/close
 //  - Age of War: 블로커+원거리 역할 조합, 본진 자동 포탑, 화면 클리어 스킬
 import {
-  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, MUZZLE, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
+  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, MUZZLE, STUN_IMMUNE_S, UNIT_SKILL, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
   type DmgType, type EnemyTypeSpec, type TargetingMode, type TowerSpec, type UnitSpec,
 } from './balance.js';
 import type { MarketEvent, RegionId, StageParams } from './types.js';
@@ -42,6 +42,19 @@ export interface Enemy {
   lastSkillAt: number; // 최근 시전 시각 (렌더 재생 기준)
   shieldUntil: number; // 실드베어러 육각 실드 — 받는 피해 −70% 만료 시각
   hasteUntil: number; // 러너 질주·탱커 독려 — 이속 ×1.5 만료 시각
+  armorCutUntil: number; // 취약 — 방어 감소 만료 (가위 절단)
+  armorCutPct: number;
+  dotUntil: number; // 출혈 — 지속 피해 만료
+  dotDps: number;
+  healBlockUntil: number; // 독가스 — 회복 차단 만료
+  knockUntil: number; // 넉백 슬라이드 (곤봉·방패 돌격)
+  knockFrom: number;
+  knockTo: number;
+  stunImmuneUntil: number; // 재기절 면역 (스턴락 방지)
+  dpsBuffUntil: number; // 확성기 선동 — 공격력 버프 만료
+  dpsBuffPct: number;
+  vulnUntil: number; // 자신이 받는 피해 증가 (방송 중 드론)
+  vulnPct: number;
 }
 
 export interface Unit {
@@ -58,6 +71,14 @@ export interface Unit {
   knockUntil: number; // FR-6.10b 충격파 넉백 종료 시각 (이 동안 이동·공격 불가)
   knockFrom: number; // 넉백 시작 x
   knockTo: number; // 넉백 목표 x
+  stunUntil: number; // 적 스킬 기절 (번개 왕 등)
+  stunImmuneUntil: number;
+  slowUntil: number; // 적 스킬 둔화 (석궁 삼연사)
+  slowPct: number;
+  absorb: number; // 셔터 보호막 잔량
+  absorbUntil: number;
+  markUntil: number; // 표식 — 받는 피해 증가 만료
+  markPct: number;
 }
 
 export interface Tower {
@@ -236,6 +257,8 @@ export class Battle {
       id: this.nextId++, key, x: UNIT_SPAWN_X, hp, maxHp: hp, spec, shotCd: 0,
       nextSkillAt: this.t + UNIT_SKILL_PERIOD[key], lastSkillAt: -9, shieldUntil: 0,
       knockUntil: 0, knockFrom: 0, knockTo: 0,
+      stunUntil: 0, stunImmuneUntil: 0, slowUntil: 0, slowPct: 0,
+      absorb: 0, absorbUntil: 0, markUntil: 0, markPct: 0,
     });
     return true;
   }
@@ -278,9 +301,12 @@ export class Battle {
   }
 
   /** 피해 적용 — Kingdom Rush식: 물리는 armor, 마법은 mr에만 감소 */
-  private damage(e: Enemy, raw: number, type: DmgType) {
+  private damage(e: Enemy, raw: number, type: DmgType, pierceArmor = 0) {
     if (this.t < e.shieldUntil) raw *= 0.3; // FR-6.7b 육각 실드 — 받는 피해 −70%
-    const mult = type === 'physical' ? 1 - e.armor : 1 - e.mr;
+    if (this.t < e.vulnUntil) raw *= 1 + e.vulnPct; // 방송 중 드론 등 자기 취약
+    const cut = this.t < e.armorCutUntil ? e.armorCutPct : 0; // 취약(방어 감소) — 합산 40% 상한
+    const armor = Math.max(0, e.armor * (1 - Math.min(cut + pierceArmor, 0.9)));
+    const mult = type === 'physical' ? 1 - armor : 1 - e.mr;
     const dealt = raw * mult;
     e.hp -= dealt;
     if (dealt >= 1) this.pushFx('dmg', e.x, e.air, Math.round(dealt));
@@ -390,12 +416,47 @@ export class Battle {
     this.enemies.push({
       id: this.nextId++, type: p.type, x: ENEMY_BASE_X - 10,
       hp: p.hp, maxHp: p.hp, baseSpeed: p.speed,
-      dps: (6 + p.wave * 1.2) * et.dpsMult * (this.params.regionId === 'TUT' ? 1 : BALANCE.ENEMY_DPS_MULT),
+      // 2026-08-10: 적 공격력 성장 완화 (1.2→0.6). 아군 유닛 체력은 고정인데 적 dps만 웨이브에 비례해
+      // 커져 후반에 전열이 통째로 녹았다 — 물량·체력(웨이브 표)으로 난이도를 주고 개체 화력은 완만하게.
+      dps: (6 + p.wave * 0.6) * et.dpsMult * (this.params.regionId === 'TUT' ? 1 : BALANCE.ENEMY_DPS_MULT),
       armor: et.armor, mr: et.mr, air: et.isAir, size: et.size,
       wave: p.wave, baseDmg: et.baseDmg, healPerSec: et.healPerSec,
       slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false,
       nextSkillAt: this.t + ENEMY_SKILL_PERIOD[p.type], lastSkillAt: -9, shieldUntil: 0, hasteUntil: 0,
+      armorCutUntil: 0, armorCutPct: 0, dotUntil: 0, dotDps: 0, healBlockUntil: 0,
+      knockUntil: 0, knockFrom: 0, knockTo: 0, stunImmuneUntil: 0,
+      dpsBuffUntil: 0, dpsBuffPct: 0, vulnUntil: 0, vulnPct: 0,
     });
+  }
+
+
+  /** 기절 부여 (재기절 면역 적용 — 스턴락 방지) */
+  private applyStun(e: Enemy, dur: number) {
+    if (this.t < e.stunImmuneUntil) return;
+    e.stunUntil = this.t + dur;
+    e.stunImmuneUntil = e.stunUntil + STUN_IMMUNE_S;
+    this.pushFx('stun', e.x, e.air, 0);
+  }
+
+  /** 적 넉백 — 뒤(적 본진 쪽)로 밀어낸다 */
+  private applyKnock(e: Enemy, px: number) {
+    if (e.air) return; // 공중은 밀리지 않는다
+    e.knockFrom = e.x;
+    e.knockTo = Math.min(ENEMY_BASE_X - 4, e.x + px / 1.8); // px → 필드 좌표
+    e.knockUntil = this.t + 0.35;
+  }
+
+  /** 아군 피격 — 보호막 흡수 → 표식 증폭 → 가드 순 */
+  private damageUnit(u: Unit, raw: number) {
+    let dmg = raw;
+    if (this.t < u.markUntil) dmg *= 1 + u.markPct;
+    if (this.t < u.shieldUntil) dmg *= 0.4;
+    if (this.t < u.absorbUntil && u.absorb > 0) { // 셔터 보호막 흡수
+      const used = Math.min(u.absorb, dmg);
+      u.absorb -= used;
+      dmg -= used;
+    }
+    u.hp -= dmg;
   }
 
   /** FR-6.5b 유닛 자동 스킬 — 주기마다 조건 충족 시 시전 (대상 없으면 1.5초 후 재시도) */
@@ -442,26 +503,8 @@ export class Battle {
       } else if (u.key === 'riskmgr') { // 헤지 커버 — 사옥 즉시 회복 버스트
         this.baseHP = Math.min(BALANCE.BASE_HP, this.baseHP + 3);
         cast = true;
-      } else if (SHEET_MELEE.has(u.key)) { // 신규 근접 — 전방 광역 강타
-        const ts = this.enemies.filter((e) => !e.air && e.hp > 0 && e.x - u.x >= -8 && e.x - u.x <= 58);
-        if (ts.length) {
-          for (const e of ts) this.damage(e, u.spec.dps * 2.2 * atkMult, 'physical');
-          cast = true;
-        }
-      } else if (SHEET_TANK.has(u.key)) { // 신규 탱커 — 강타 + 자기 방어 (3초 −60%)
-        const ts = this.enemies.filter((e) => !e.air && e.hp > 0 && e.x - u.x >= -8 && e.x - u.x <= 52);
-        if (ts.length) {
-          for (const e of ts) this.damage(e, u.spec.dps * 1.8 * atkMult, 'physical');
-          u.shieldUntil = t + 3;
-          cast = true;
-        }
-      } else if (SHEET_RANGED.has(u.key)) { // 신규 원거리 — 강화탄 (관통 판정)
-        const ts = inRange(u.spec.range);
-        if (ts.length) {
-          this.fireProjectile(u.x, ts[0], u.spec.dps * 2.5 * atkMult,
-            { dmgType: 'magic', projSpeed: 620, splashRadius: 0, slowPct: 0, slowDur: 0 }, false, `${u.key}:skill`);
-          cast = true;
-        }
+      } else if (UNIT_SKILL[u.key as keyof typeof UNIT_SKILL]) {
+        cast = this.castSheetSkill(u, atkMult);
       }
       if (cast) {
         u.lastSkillAt = t;
@@ -472,36 +515,193 @@ export class Battle {
     }
   }
 
+
+  /** FR-6.5c 신규 로스터 스킬 — 각 스프라이트 모션에 대응하는 효과 */
+  private castSheetSkill(u: Unit, atkMult: number): boolean {
+    const t = this.t;
+    const S = UNIT_SKILL[u.key as keyof typeof UNIT_SKILL] as Record<string, number | boolean>;
+    const base = u.spec.dps * atkMult;
+    const ground = (reach: number, n: number) => this.enemies
+      .filter((e) => !e.air && e.hp > 0 && e.x - u.x >= -10 && e.x - u.x <= reach)
+      .sort((a, b) => a.x - b.x).slice(0, n);
+
+    switch (u.key) {
+      case 'club': { // 종울림 강타 — 전방 부채꼴 광역 + 기절 + 소폭 넉백
+        const ts = ground(S.arc as number, S.maxTargets as number);
+        if (!ts.length) return false;
+        for (const e of ts) {
+          this.damage(e, base * (S.mult as number), 'physical');
+          this.applyStun(e, S.stun as number);
+          this.applyKnock(e, S.knock as number);
+        }
+        return true;
+      }
+      case 'foreman': { // 작업 개시 — 내리찍기 광역 + 기절 + 둔화, 자신 방어
+        const ts = ground(S.arc as number, S.maxTargets as number);
+        if (!ts.length) return false;
+        for (const e of ts) {
+          this.damage(e, base * (S.mult as number), 'physical');
+          this.applyStun(e, S.stun as number);
+          e.slowUntil = t + (S.slowDur as number);
+          e.slowPct = Math.max(e.slowPct, S.slowPct as number);
+        }
+        u.shieldUntil = t + (S.selfGuard as number);
+        return true;
+      }
+      case 'bricker': { // 벽돌 투척 — 광역 피해 + 파편 둔화
+        const ts = ground(S.arc as number, S.maxTargets as number);
+        if (!ts.length) return false;
+        for (const e of ts) {
+          this.damage(e, base * (S.mult as number), 'physical');
+          e.slowUntil = t + (S.slowDur as number);
+          e.slowPct = Math.max(e.slowPct, S.slowPct as number);
+        }
+        return true;
+      }
+      case 'roundshield': { // 돌격 방패 — 밀어내기 + 자신 피해 감소
+        const ts = ground(52, S.maxTargets as number);
+        if (!ts.length) return false;
+        for (const e of ts) {
+          this.damage(e, base * (S.mult as number), 'physical');
+          this.applyKnock(e, S.knock as number);
+        }
+        u.shieldUntil = t + (S.selfGuard as number);
+        return true;
+      }
+      case 'scissor': { // 십자 절단 — 단일 2회 + 출혈 + 취약
+        const ts = ground(30, 1);
+        if (!ts.length) return false;
+        const e = ts[0];
+        for (let i = 0; i < (S.hits as number); i++) this.damage(e, base * (S.mult as number), 'physical');
+        e.dotUntil = t + (S.bleedDur as number);
+        e.dotDps = base * (S.bleedPct as number);
+        e.armorCutUntil = t + (S.cutDur as number);
+        e.armorCutPct = Math.max(e.armorCutPct, S.armorCut as number);
+        return true;
+      }
+      case 'apprentice': { // 견습의 연타 — 빠른 4연타 + 다음 쿨 단축
+        const ts = ground(30, 1);
+        if (!ts.length) return false;
+        for (let i = 0; i < (S.hits as number); i++) this.damage(ts[0], base * (S.mult as number), 'physical');
+        u.nextSkillAt = t + UNIT_SKILL_PERIOD[u.key] - (S.cdCut as number);
+        this.pushFx('skill', u.x, false, 0);
+        return true;
+      }
+      case 'gasmask': { // 독가스탄 — 착탄 광역 + 둔화 + 회복 차단
+        const inR = this.enemies.filter((e) => e.hp > 0 && e.x >= u.x - 10 && e.x - u.x <= u.spec.range);
+        if (!inR.length) return false;
+        const cx = inR.sort((a, b) => a.x - b.x)[0].x;
+        for (const e of this.enemies) {
+          if (e.hp <= 0 || Math.abs(e.x - cx) > (S.splash as number)) continue;
+          this.damage(e, base * (S.mult as number), 'physical');
+          e.slowUntil = t + (S.slowDur as number);
+          e.slowPct = Math.max(e.slowPct, S.slowPct as number);
+          e.healBlockUntil = t + (S.healBlock as number);
+        }
+        return true;
+      }
+      case 'sniper': { // 조준 관통 사격 — 경로 관통, 첫 대상 최대 피해
+        const line = this.enemies
+          .filter((e) => e.hp > 0 && e.x >= u.x - 10 && e.x - u.x <= u.spec.range && (!e.air || u.spec.antiAirPct > 0))
+          .sort((a, b) => a.x - b.x).slice(0, S.maxTargets as number);
+        if (!line.length) return false;
+        line.forEach((e, i) => {
+          const f = i === 0 ? 1 : Math.pow(S.chainPct as number, i);
+          this.damage(e, base * (S.mult as number) * f, 'physical', S.pierceArmor as number);
+        });
+        return true;
+      }
+      case 'shutter': { // 셔터 전개 — 전열 아군 보호막 + 닿은 적 타격
+        const front = [...this.units].sort((a, b) => b.x - a.x).slice(0, S.allies as number);
+        if (!front.length) return false;
+        for (const a of front) {
+          a.absorb = Math.max(a.absorb, Math.round(a.maxHp * (S.shieldPct as number)));
+          a.absorbUntil = t + (S.shieldDur as number);
+          a.stunUntil = 0; // 둔화·기절 1회 정화
+          a.slowUntil = 0;
+        }
+        for (const e of ground(46, S.maxTargets as number)) this.damage(e, base * (S.mult as number), 'physical');
+        this.pushFx('heal', u.x, false, 0);
+        return true;
+      }
+      default: return false;
+    }
+  }
+
   /** FR-6.7b 적 자동 스킬 — 유형별 주기 시전 (스턴 중 불가) */
   private castEnemySkills() {
     const t = this.t;
     for (const e of this.enemies) {
       if (e.hp <= 0 || t < e.stunUntil || t < (e.nextSkillAt ?? Infinity)) continue;
       let cast = false;
-      if (e.type === 'grunt') { // 3점사 — 블로킹 중 추가 일격
-        const u = this.units.find((u2) => e.x - u2.x >= -6 && e.x - u2.x <= 30);
-        if (u) { u.hp -= e.dps * 1.5; cast = true; }
-      } else if (e.type === 'runner') { // 질주
-        e.hasteUntil = t + 2;
-        cast = true;
-      } else if (e.type === 'tank') { // 전진 독려 — 주변 지상 적 가속
-        for (const o of this.enemies) if (o !== e && !o.air && o.hp > 0 && Math.abs(o.x - e.x) <= 90) o.hasteUntil = t + 2;
-        cast = true;
-      } else if (e.type === 'shield') { // 육각 실드
-        e.shieldUntil = t + 2.5;
-        cast = true;
-      } else if (e.type === 'healer') { // 응급 수리 — 주변 즉시 회복
-        for (const o of this.enemies) {
-          if (o !== e && !o.air && o.hp > 0 && Math.abs(o.x - e.x) <= HEAL_RADIUS) o.hp = Math.min(o.maxHp, o.hp + 30);
+      const ES = ENEMY_SKILL[e.type] as Record<string, number | boolean>;
+      const nearUnits = (reach: number) => this.units
+        .filter((u) => e.x - u.x >= -10 && e.x - u.x <= reach && u.hp > 0)
+        .sort((a, b) => b.x - a.x);
+      if (e.type === 'grunt') { // 창 망령 — 관통 찌르기 (앞의 2명, 방어 무시)
+        const ts = nearUnits(46).slice(0, ES.targets as number);
+        if (ts.length) {
+          ts.forEach((u, i) => this.damageUnit(u, e.dps * (ES.mult as number) * (i === 0 ? 1 : (ES.chainPct as number))));
+          e.hasteUntil = t + (ES.selfHaste as number);
+          cast = true;
         }
-        this.pushFx('heal', e.x, e.air, 30);
-        cast = true;
-      } else if (e.type === 'air') { // 광학 볼트 — 아군 유닛 저격
-        const u = this.units.filter((u2) => Math.abs(u2.x - e.x) <= 260).sort((a, b) => Math.abs(a.x - e.x) - Math.abs(b.x - e.x))[0];
-        if (u) { u.hp -= 14; cast = true; }
-      } else if (e.type === 'boss') { // 마진콜 충격파 — 주변 유닛 전체 타격
-        const ts = this.units.filter((u2) => Math.abs(u2.x - e.x) <= 130);
-        if (ts.length) { for (const u of ts) u.hp -= 22; cast = true; }
+      } else if (e.type === 'shield') { // 방패 파쇄병 — 보호막 파괴 + 취약
+        const ts = nearUnits(40);
+        const target = ts.find((u) => u.absorb > 0 && t < u.absorbUntil) ?? ts[0];
+        if (target) {
+          target.absorb = 0;
+          target.markUntil = t + (ES.markDur as number);
+          target.markPct = Math.max(target.markPct, ES.markPct as number);
+          this.damageUnit(target, e.dps * (ES.mult as number));
+          cast = true;
+        }
+      } else if (e.type === 'runner') { // 석궁 사수 — 삼연사 + 둔화
+        const ts = nearUnits(120);
+        if (ts.length) {
+          for (let i = 0; i < (ES.hits as number); i++) this.damageUnit(ts[0], e.dps * (ES.mult as number));
+          if (ts[1]) this.damageUnit(ts[1], e.dps * (ES.mult as number) * 0.5);
+          ts[0].slowUntil = t + (ES.slowDur as number);
+          ts[0].slowPct = Math.max(ts[0].slowPct, ES.slowPct as number);
+          cast = true;
+        }
+      } else if (e.type === 'tank') { // 다연장 포병 — 다지점 융단 포격
+        const ts = [...this.units].sort((a, b) => b.x - a.x).slice(0, ES.spots as number);
+        if (ts.length) {
+          for (const u of ts) this.damageUnit(u, e.dps * (ES.mult as number));
+          cast = true;
+        }
+      } else if (e.type === 'air') { // 연 정찰기 — 체력 최저 아군에 표식
+        const target = [...this.units].sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+        if (target) {
+          target.markUntil = t + (ES.markDur as number);
+          target.markPct = Math.max(target.markPct, ES.markPct as number);
+          cast = true;
+        }
+      } else if (e.type === 'healer') { // 확성기 드론 — 주변 적 공격력 버프 (자신은 취약)
+        const buffed = this.enemies.filter((o) => o.hp > 0 && Math.abs(o.x - e.x) <= (ES.radius as number) / 1.8);
+        for (const o of buffed) {
+          o.dpsBuffUntil = t + (ES.dur as number);
+          o.dpsBuffPct = ES.dpsBuff as number;
+          o.slowUntil = 0; // 둔화 1회 정화
+        }
+        e.vulnUntil = t + (ES.dur as number);
+        e.vulnPct = ES.selfVuln as number;
+        this.pushFx('heal', e.x, e.air, 0);
+        cast = buffed.length > 0;
+      } else if (e.type === 'boss') { // 번개 왕 — 다지점 낙뢰 (기절 + 표식)
+        const ts = [...this.units].sort((a, b) => b.x - a.x).slice(0, ES.targets as number);
+        if (ts.length) {
+          for (const u of ts) {
+            this.damageUnit(u, e.dps * (ES.mult as number));
+            if (t >= u.stunImmuneUntil) {
+              u.stunUntil = t + (ES.stun as number);
+              u.stunImmuneUntil = u.stunUntil + STUN_IMMUNE_S;
+            }
+            u.markUntil = t + (ES.markDur as number);
+            u.markPct = Math.max(u.markPct, ES.markPct as number);
+          }
+          cast = true;
+        }
       }
       if (cast) {
         e.lastSkillAt = t;
@@ -599,11 +799,17 @@ export class Battle {
     const healSum = this.units.reduce((s2, u) => s2 + u.spec.baseHealPerSec, 0);
     if (healSum > 0 && this.baseHP > 0) this.baseHP = Math.min(BALANCE.BASE_HP, this.baseHP + healSum * dt);
 
+    // 출혈 지속 피해 (가위 병사 십자 절단)
+    for (const e of this.enemies) {
+      if (e.hp > 0 && this.t < e.dotUntil && e.dotDps > 0) e.hp -= e.dotDps * dt;
+    }
+
     // 힐러 오라 (Kingdom Rush 실드 사제 — strong 타겟팅으로 저격하는 카운터 플레이)
     for (const h of this.enemies) {
       if (h.healPerSec <= 0 || h.hp <= 0) continue;
       for (const e of this.enemies) {
         if (e === h || e.air || e.hp <= 0 || e.hp >= e.maxHp) continue;
+        if (this.t < e.healBlockUntil) continue; // 독가스 — 회복 차단
         if (Math.abs(e.x - h.x) <= HEAL_RADIUS) {
           e.hp = Math.min(e.maxHp, e.hp + h.healPerSec * dt);
         }
@@ -629,6 +835,7 @@ export class Battle {
     // 유닛 행동 (블로커는 붙잡고, 원거리는 뒤에서, 브루저는 광역, 서포터는 후열 유지)
     for (const u of this.units) {
       u.shotCd -= dt;
+      if (t < u.stunUntil) continue; // 적 스킬 기절 — 이동·공격 불가
       if (t < u.knockUntil) { // FR-6.10b 충격파에 밀리는 중 — 이동·공격 불가 (easeOut 슬라이드)
         const p = 1 - (u.knockUntil - t) / BALANCE.RAGE_PUSH_SECONDS;
         const e3 = 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3);
@@ -662,7 +869,7 @@ export class Battle {
       } else if (u.x >= ENEMY_BASE_X - 60) {
         this.enemyBaseHP -= u.spec.dps * atkMult * dt; // FR-6.10 적 본진 공격
       } else {
-        u.x += u.spec.speed * dt;
+        u.x += u.spec.speed * (t < u.slowUntil ? 1 - u.slowPct : 1) * dt; // 둔화 반영
       }
     }
     this.checkRage(); // FR-6.10b 본진 위기 → 반격 분대
@@ -679,7 +886,9 @@ export class Battle {
         const guard = this.units.some((u) => u.spec.guardPct > 0 && Math.abs(u.x - blocker.x) <= u.spec.guardRadius)
           ? 1 - UNITS.find((s) => s.key === 'riskmgr')!.guardPct : 1;
         const shield = this.t < blocker.shieldUntil ? 0.4 : 1; // FR-6.5b 원금 보장 돔
-        blocker.hp -= e.dps * guard * shield * dt; // 블로킹된 적은 유닛과 교전 (공중은 배정 자체가 안 됨)
+        const eDps = e.dps * (this.t < e.dpsBuffUntil ? 1 + e.dpsBuffPct : 1); // 선동 방송 버프
+        const inc = this.t < blocker.markUntil ? 1 + blocker.markPct : 1; // 표식 — 받는 피해 증가
+        blocker.hp -= eDps * guard * shield * inc * dt; // 블로킹된 적은 유닛과 교전
       } else {
         // 손절 방벽: 지상 적의 경로를 물리적으로 막는다 — 파괴될 때까지 정지·공격
         const bar = this.towers.find((tw) => {
@@ -693,6 +902,9 @@ export class Battle {
             this.pushFx('death', this.towerSlotX(bar.slot), false, 0);
             this.towers[bar.slot] = null;
           }
+        } else if (this.t < e.knockUntil) { // 넉백 슬라이드 (곤봉·방패 돌격)
+          const p2 = 1 - (e.knockUntil - this.t) / 0.35;
+          e.x = e.knockFrom + (e.knockTo - e.knockFrom) * (1 - Math.pow(1 - Math.max(0, Math.min(1, p2)), 3));
         } else {
           e.x -= this.enemySpeed(e) * dt;
         }

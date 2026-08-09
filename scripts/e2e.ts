@@ -61,7 +61,7 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
   const buildOrder = ['limit', 'cannon', 'dividend', 'spire', 'flame', 'barrier'] as const;
   let built = 0;
   let unitIdx = 0;
-  const unitCycle = ['lancer', 'mage', 'trader', 'analyst'] as const;
+  const unitCycle = ['club', 'sniper', 'foreman', 'scissor', 'shutter'] as const;
   const totalBars = params.waveCount * 30;
 
   while (true) {
@@ -89,8 +89,8 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
     if (built < Math.min(buildOrder.length, battle.towers.length)) {
       if (battle.buildTower(built, buildOrder[built])) built += 1;
     } else {
-      if (battle.gold >= 300) { if (battle.spawnUnit(unitCycle[unitIdx % 4])) unitIdx += 1; }
-      else if (battle.gold >= 200) battle.spawnUnit('analyst');
+      if (battle.gold >= 260) { if (battle.spawnUnit(unitCycle[unitIdx % unitCycle.length])) unitIdx += 1; }
+      else if (battle.gold >= 150) battle.spawnUnit('apprentice');
     }
     if (battle.enemies.filter((e) => !e.air).length >= 5 && battle.gold >= 300) battle.useSkill();
   }
