@@ -88,11 +88,13 @@ export function bakeAllRigs(): Promise<void> {
     host.style.cssText = 'position:fixed;left:-9999px;top:0;width:220px;height:220px;overflow:hidden';
     document.body.appendChild(host);
     try {
-      const idxs = [...new Set([...Object.values(RIG_UNIT), ...Object.values(RIG_TOWER), ...Object.values(RIG_ENEMY)])];
+      // [임시] 아군·적군이 PNG 시트로 교체된 동안에는 타워 리그만 굽는다 (부팅 1054→204 프레임)
+      const idxs = [...new Set(Object.values(RIG_TOWER))];
+      const motions: RigMotion[] = ['walk', 'attack', 'hit', 'death']; // 타워는 skill 미사용 (death=방벽 파괴)
       const jobs: Promise<void>[] = [];
       for (const idx of idxs) {
         const player = new RigPlayer(host, { unit: idx, vfx: false, height: BAKE_H });
-        for (const motion of Object.keys(FRAME_COUNTS) as RigMotion[]) {
+        for (const motion of motions) {
           const { texts, w } = serializeFrames(player, idx, motion);
           jobs.push(
             Promise.all(texts.map((t) => rasterize(t, w, BAKE_H))).then((cvs) => {

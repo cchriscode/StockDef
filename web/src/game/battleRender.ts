@@ -578,10 +578,8 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     st.prevEnemies.delete(id);
     st.lastHp.delete(`e${id}`);
     st.hitT.delete(`e${id}`);
-    if (b.phase !== 'done') {
-      const y = info.air ? AIR_Y + info.h / 2 : groundTop;
-      st.corpses.push({ rigIdx: RIG_ENEMY[info.type], x: info.x, y, h: info.h, t0: b.t });
-    }
+    // [임시] 적이 PNG 시트로 교체된 동안에는 리그 사망 연출을 쓰지 않는다 (시트에 death 모션 없음)
+    void RIG_ENEMY;
   }
 
   // 투사체 — 사옥 자동 포탑=옥상 투척 골드 주머니(포물선) / 타워·유닛=팔레트 볼트, 소멸 시 충격파 vfx
