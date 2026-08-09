@@ -512,7 +512,11 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     // [임시] 신규 시트 적 — 리그 대신 PNG 시트 (스킬 → 교전 → 이동 순 우선)
     const esid = enemySheetId(e.type, b.params.regionId);
     const eskTotal = (SKILL_TOTAL_MS[esid] ?? 0) / 1000;
-    const eBaseY = e.air ? AIR_Y + hh / 2 : groundTop;
+    // 공중 띄움 — 기절 판정 동안 포물선으로 떴다가 착지 (연출 전용, 로직 영향 없음)
+    const abDur = e.airborneUntil - e.airborneFrom;
+    const abP = abDur > 0 && b.t >= e.airborneFrom && b.t < e.airborneUntil ? (b.t - e.airborneFrom) / abDur : -1;
+    const lift = abP >= 0 ? Math.sin(Math.PI * abP) * 26 : 0;
+    const eBaseY = (e.air ? AIR_Y + hh / 2 : groundTop) - lift;
     let drawn = false;
     if (!stunned && hasSkillSheet(esid) && eSkillEl >= 0 && eSkillEl < eskTotal) {
       drawn = drawSkill(ctx, esid, eSkillEl, ex, eBaseY);
@@ -528,7 +532,13 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
         ctx.fillRect(ex - 18, topY, 36, hh);
       }
       const bw2 = e.type === 'boss' ? 34 : 18;
-      hpBar(ctx, ex - bw2 / 2, (e.air ? AIR_Y + hh / 2 : groundTop) - sheetCharHeight(esid) - 8, bw2, e.hp / e.maxHp, col);
+      hpBar(ctx, ex - bw2 / 2, eBaseY - sheetCharHeight(esid) - 8, bw2, e.hp / e.maxHp, col);
+      if (lift > 2) { // 떠 있는 동안 발밑 그림자
+        ctx.fillStyle = `rgba(6,10,18,${0.3 * (1 - lift / 26)})`;
+        ctx.beginPath();
+        ctx.ellipse(ex, groundTop, 12, 3.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       if (stunned) {
         ctx.fillStyle = '#FFC53D';
         ctx.font = '10px sans-serif';

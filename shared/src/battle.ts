@@ -51,6 +51,8 @@ export interface Enemy {
   knockFrom: number;
   knockTo: number;
   stunImmuneUntil: number; // 재기절 면역 (스턴락 방지)
+  airborneUntil: number; // 공중 띄움 연출 (판정은 기절과 동일, 렌더가 포물선으로 띄운다)
+  airborneFrom: number;
   dpsBuffUntil: number; // 확성기 선동 — 공격력 버프 만료
   dpsBuffPct: number;
   vulnUntil: number; // 자신이 받는 피해 증가 (방송 중 드론)
@@ -438,7 +440,7 @@ export class Battle {
       nextSkillAt: this.t + ENEMY_SKILL_PERIOD[p.type], lastSkillAt: -9, shieldUntil: 0, hasteUntil: 0,
       armorCutUntil: 0, armorCutPct: 0, dotUntil: 0, dotDps: 0, healBlockUntil: 0,
       knockUntil: 0, knockFrom: 0, knockTo: 0, stunImmuneUntil: 0,
-      dpsBuffUntil: 0, dpsBuffPct: 0, vulnUntil: 0, vulnPct: 0,
+      dpsBuffUntil: 0, dpsBuffPct: 0, vulnUntil: 0, vulnPct: 0, airborneUntil: 0, airborneFrom: 0,
     });
   }
 
@@ -597,6 +599,7 @@ export class Battle {
         for (const e of ts) {
           this.damage(e, base * (S.mult as number), 'physical');
           this.applyStun(e, S.stun as number);
+          if (!e.air && this.t < e.stunUntil) { e.airborneFrom = t; e.airborneUntil = e.stunUntil; } // 내리찍기 = 공중 띄움
           e.slowUntil = t + (S.slowDur as number);
           e.slowPct = Math.max(e.slowPct, S.slowPct as number);
         }
@@ -879,7 +882,7 @@ export class Battle {
     const blockCount = new Map<number, number>();
     const engagedBy = new Map<number, Unit>(); // enemyId → 붙잡은 유닛
     for (const e of this.enemies) {
-      if (e.air || this.t < e.stunUntil) continue;
+      if (e.air || this.t < e.stunUntil || this.t < e.knockUntil) continue;
       // 붙잡는 간격은 무기 리치를 따른다 (짧은 무기일수록 적이 더 가까이 붙는다). 원거리는 28 상한.
       const candidates = this.units
         .filter((u) => u.x <= e.x && e.x - u.x <= Math.min(u.spec.range, 28) && (blockCount.get(u.id) ?? 0) < u.spec.block)
@@ -933,6 +936,11 @@ export class Battle {
     // 적 행동
     for (const e of this.enemies) {
       if (e.hp <= 0) continue;
+      if (this.t < e.knockUntil) { // 넉백 슬라이드 — 스턴·교전보다 우선 (밀려나는 동안은 아무것도 못 한다)
+        const kp = 1 - (e.knockUntil - this.t) / 0.35;
+        e.x = e.knockFrom + (e.knockTo - e.knockFrom) * (1 - Math.pow(1 - Math.max(0, Math.min(1, kp)), 3));
+        continue;
+      }
       if (this.t < e.stunUntil) continue; // 스턴: 이동·공격 불가
       const blocker = engagedBy.get(e.id);
       if (blocker) {
@@ -956,9 +964,6 @@ export class Battle {
             this.pushFx('death', this.towerSlotX(bar.slot), false, 0);
             this.towers[bar.slot] = null;
           }
-        } else if (this.t < e.knockUntil) { // 넉백 슬라이드 (곤봉·방패 돌격)
-          const p2 = 1 - (e.knockUntil - this.t) / 0.35;
-          e.x = e.knockFrom + (e.knockTo - e.knockFrom) * (1 - Math.pow(1 - Math.max(0, Math.min(1, p2)), 3));
         } else {
           e.x -= this.enemySpeed(e) * dt;
         }
