@@ -614,7 +614,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.fillRect(px + Math.cos(spin) * 3 - 1.5, y + Math.sin(spin) * 3 - 1.5, 3, 3);
       ctx.restore();
     } else if (!p.fromTower && drawShot(
-      ctx, SHOT_SHEET[p.srcKey ?? ''] ?? 'A-02_3', 'ally', b.t + p.id, px,
+      ctx, SHOT_SHEET[(p.srcKey ?? '').split(':')[0]] ?? 'A-02_3', 'ally', b.t + p.id, px,
       p.air ? AIR_Y : groundTop - (MUZZLE[p.srcKey ?? '']?.y ?? 34), // 총구 높이로 비행
       null,
     )) {

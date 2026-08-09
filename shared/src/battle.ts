@@ -459,7 +459,7 @@ export class Battle {
         const ts = inRange(u.spec.range);
         if (ts.length) {
           this.fireProjectile(u.x, ts[0], u.spec.dps * 2.5 * atkMult,
-            { dmgType: 'magic', projSpeed: 620, splashRadius: 0, slowPct: 0, slowDur: 0 }, false, u.key);
+            { dmgType: 'magic', projSpeed: 620, splashRadius: 0, slowPct: 0, slowDur: 0 }, false, `${u.key}:skill`);
           cast = true;
         }
       }

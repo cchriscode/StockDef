@@ -190,10 +190,14 @@ export const ENEMY_SKILL_PERIOD: Record<EnemyTypeSpec['key'], number> = {
  * 총구/발사 지점 — 투사체가 캐릭터 중심이 아니라 무기 끝에서 나가도록.
  * fx = 전방 오프셋(필드 좌표, 엔진이 시작 x에 더함) / y = 지면 기준 높이(px, 렌더 전용)
  */
+// 값은 발사 프레임(기본공격 attack[2] / 스킬 cueFrame)의 총구 화염 위치를 실측해 산출.
+// 기본공격과 스킬은 시트 셀·앵커가 달라 총구도 다르므로 `키:skill`로 분리한다.
 export const MUZZLE: Record<string, { fx: number; y: number }> = {
-  sniper: { fx: 13, y: 56 }, // 저격총 — 어깨 견착, 키가 커서 총구가 높다
-  gasmask: { fx: 11, y: 34 }, // 방독면 포수 — 허리춤 포구
-  pistol: { fx: 10, y: 40 }, // 권총 장교 — 가슴 높이
+  sniper: { fx: 17, y: 59 }, // 저격총 — 어깨 견착, 장신이라 총구가 높다
+  'sniper:skill': { fx: 16, y: 35 }, // 관통탄 — 자세를 낮춰 조준
+  gasmask: { fx: 4, y: 34 }, // 방독면 포수 — 몸에 붙여 쏜다
+  'gasmask:skill': { fx: 16, y: 22 }, // 강화탄 — 포구를 앞으로 내밀고 낮게
+  pistol: { fx: 10, y: 41 }, // 권총 장교 — 가슴 높이 (스킬 없음)
   analyst: { fx: 9, y: 30 }, // (레거시) 애널리스트 활
   mage: { fx: 9, y: 34 }, // (레거시) 술사 오브
 };

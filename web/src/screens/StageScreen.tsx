@@ -11,7 +11,7 @@ import { sfx } from '../game/sfx.js';
 import { TOWER_INFO, UNIT_INFO, towerStatsLine, unitStatsLine } from '../game/unitInfo.js';
 import { RIG_TOWER, RIG_UNIT } from '../game/rigFrames.js';
 import { RigPreview } from '../ui/RigPreview.js';
-import { PREVIEW_ROSTER, SHEET_UNIT, clearPreviews, spawnPreview } from '../game/previewSprites.js'; // [임시] 신규 아트 프리뷰
+import { PREVIEW_ROSTER, SHEET_UNIT, clearPreviews, hasSkillSheet, spawnPreview } from '../game/previewSprites.js'; // [임시] 신규 아트 프리뷰
 
 interface Props {
   regionId: RegionId;
@@ -580,8 +580,8 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           <div className="f a"><i />{hud.aum.toLocaleString()}</div>
         </div>
         <div className="cmd-units">
-          {/* [임시] 신규 아트 로스터만 노출 — 기존 벡터(리그) 유닛은 잠시 숨김 */}
-          {UNITS.filter((u) => SHEET_UNIT[u.key] || u.key === 'cane').map((u) => {
+          {/* [임시] 신규 아트 로스터 중 스킬이 있는 유닛만 노출 (권총 장교·지팡이 신사는 스킬 시트 없음) */}
+          {UNITS.filter((u) => SHEET_UNIT[u.key] && hasSkillSheet(SHEET_UNIT[u.key])).map((u) => {
             const cost = battle.unitCost(u.key);
             return (
               <span key={u.key} className="ub-wrap">
