@@ -71,7 +71,7 @@ export interface SettlementInput {
 }
 
 export interface SettlementResult {
-  goldLeftRate: number;
+  aumLeftRate: number; // 잔여 AUM ÷ 초기 AUM (운용 성과)
   accuracy: number;
   gradePoints: number;
   grade: Grade;
@@ -80,13 +80,16 @@ export interface SettlementResult {
 }
 
 export function settle(inp: SettlementInput): SettlementResult {
-  const goldLeftRate = inp.goldEarnedTotal > 0 ? inp.goldLeft / inp.goldEarnedTotal : 0;
+  // FR-8.2 개정(2026-08-10): 등급 기준을 잔여 골드 → **잔여 AUM(운용 성과)**로 전환.
+  // 골드는 방어에 쓰라고 주는 자원이라 '안 쓰고 남기면 고득점'이 소극적 플레이를 보상했다.
+  // AUM은 트레이딩 원금이므로 '원금을 지켰나 / 불렸나'가 곧 실력이 된다.
+  const aumLeftRate = inp.aumInitial > 0 ? inp.aumLeft / inp.aumInitial : 0;
   const denom = inp.wins + inp.loses; // DRAW 분모 제외
   const accuracy = denom > 0 ? inp.wins / denom : 0;
 
   // 등급 점수 (FR-8.2)
   let pts = 0;
-  pts += goldLeftRate >= 0.2 ? 2 : goldLeftRate >= 0.1 ? 1 : 0;
+  pts += aumLeftRate >= 1.15 ? 2 : aumLeftRate >= 1.0 ? 1 : 0; // 원금 대비 +15% / 원금 보전
   pts += accuracy >= 0.65 ? 2 : accuracy >= 0.55 ? 1 : 0;
   pts += inp.hpLeft >= 90 ? 2 : inp.hpLeft >= 70 ? 1 : 0;
   pts += inp.enemyBaseDestroyed ? 1 : 0;
@@ -103,10 +106,10 @@ export function settle(inp: SettlementInput): SettlementResult {
 
   // 점령 보상 자격 (FR-8.3)
   const eligibleLines: RewardLine[] = [];
-  if (goldLeftRate >= 0.2) eligibleLines.push('finance');
+  if (aumLeftRate >= 1.15) eligibleLines.push('finance'); // 재무 계열 = 운용 성과 기준
   if (accuracy >= 0.65) eligibleLines.push('info');
   if (inp.hpLeft >= 90) eligibleLines.push('defense');
   if (inp.enemyBaseDestroyed) eligibleLines.push('offense');
 
-  return { goldLeftRate, accuracy, gradePoints: pts, grade, capital: Math.floor(capital), eligibleLines };
+  return { aumLeftRate, accuracy, gradePoints: pts, grade, capital: Math.floor(capital), eligibleLines };
 }

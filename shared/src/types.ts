@@ -111,7 +111,7 @@ export interface FinishRes {
   grade: Grade | null;
   accuracy: number;
   returnPct: number; // 트레이딩 수익률 = (총 payout − 총 투입) / 총 투입 (포지션 없으면 0)
-  goldLeftRate: number;
+  aumLeftRate: number; // 잔여 AUM ÷ 초기 AUM (등급 기준)
   capitalAwarded: number;
   eligibleLines: RewardLine[];
   alreadyOwnedLines: RewardLine[];

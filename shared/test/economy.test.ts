@@ -77,9 +77,9 @@ describe('FR-5.5 청산 손익 (선물식 연속 PnL)', () => {
 });
 
 describe('FR-8 정산·등급·보상 자격', () => {
-  it('수용 기준: 잔여골드율 25% · 적중률 68% · HP 95 · 적본진 미파괴 → 6점 S, 자격 3계열', () => {
+  it('수용 기준: 운용성과 +20% · 적중률 68% · HP 95 · 적본진 미파괴 → 6점 S, 자격 3계열', () => {
     const r = settle({
-      goldLeft: 250, goldEarnedTotal: 1000, aumLeft: 0, aumInitial: 0, hpLeft: 95,
+      goldLeft: 250, goldEarnedTotal: 1000, aumLeft: 2400, aumInitial: 2000, hpLeft: 95,
       wins: 17, loses: 8, enemyBaseDestroyed: false, isRetry: false, irBonus: 0,
     });
     expect(r.gradePoints).toBe(6);
@@ -87,8 +87,8 @@ describe('FR-8 정산·등급·보상 자격', () => {
     expect(r.eligibleLines.sort()).toEqual(['defense', 'finance', 'info']);
   });
   it('적중률 보너스는 상위만 적용 (0.7 이상 → +0.30, +0.15와 중복 아님)', () => {
-    const hi = settle({ goldLeft: 100, goldEarnedTotal: 1000, aumLeft: 0, aumInitial: 0, hpLeft: 50, wins: 7, loses: 3, enemyBaseDestroyed: false, isRetry: false, irBonus: 0 });
-    // base 100 × (1+0.3) × B(1.1: 골드1점+적중2점=3점) = 143
+    const hi = settle({ goldLeft: 100, goldEarnedTotal: 1000, aumLeft: 2000, aumInitial: 2000, hpLeft: 50, wins: 7, loses: 3, enemyBaseDestroyed: false, isRetry: false, irBonus: 0 });
+    // base 100 × (1+0.3) × B(1.1: AUM 보전 1점 + 적중 2점 = 3점) = 143
     expect(hi.capital).toBe(Math.floor(100 * 1.3 * 1.1));
   });
   it('재도전 → 자본금 50% (FR-8.1)', () => {

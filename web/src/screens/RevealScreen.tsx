@@ -175,7 +175,7 @@ export function RevealScreen({ sessionId, finish, regionId, onDone }: Props) {
             <b className={finish.returnPct >= 0 ? 'up' : 'down'}>
               {finish.returnPct >= 0 ? '+' : ''}{(finish.returnPct * 100).toFixed(1)}%
             </b>{' '}
-            · 잔여골드율 {(finish.goldLeftRate * 100).toFixed(0)}%
+            · 운용 성과 <b className={finish.aumLeftRate >= 1 ? 'up' : 'down'}>{finish.aumLeftRate >= 1 ? '+' : ''}{((finish.aumLeftRate - 1) * 100).toFixed(0)}%</b>
           </p>
           <p className="big">자본금 +{finish.capitalAwarded.toLocaleString()}{finish.isRetry ? ' (재도전 50%)' : ''}</p>
           <p>보유 자본금 {finish.capitalTotal.toLocaleString()}</p>
