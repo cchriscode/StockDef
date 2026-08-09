@@ -58,7 +58,7 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
   });
   ws.send(JSON.stringify({ op: 'start' }));
 
-  const buildOrder = ['limit', 'cannon', 'barrier'] as const; // FR-6.3c 3슬롯
+  const buildOrder = ['limit', 'cannon', 'spire'] as const; // FR-6.4c 포탑 3종
   let built = 0;
   let unitIdx = 0;
   const unitCycle = ['club', 'sniper', 'foreman', 'scissor', 'shutter'] as const;

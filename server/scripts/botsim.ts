@@ -70,8 +70,7 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
   let wins = 0;
   let loses = 0;
   // 2026-08-05 확장 로스터 반영: 지정가+캐논(광역)+스파이어(마법·슬로우)+화염(램프) + 배당 + 전방 방벽
-  const buildOrder: ('limit' | 'dividend' | 'barrier' | 'cannon' | 'spire' | 'flame')[] =
-    ['limit', 'cannon', 'barrier']; // FR-6.3c 3슬롯 (사옥2 + 지면1)
+  const buildOrder: ('limit' | 'cannon' | 'spire')[] = ['limit', 'cannon', 'spire']; // FR-6.4c 포탑 3종
   let built = 0;
   const unitCycle: ('club' | 'sniper' | 'foreman' | 'scissor' | 'shutter')[] = ['club', 'sniper', 'foreman', 'scissor', 'shutter'];
   let unitIdx = 0;

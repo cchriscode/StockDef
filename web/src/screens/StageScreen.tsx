@@ -73,6 +73,9 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
   const [leverage, setLeverage] = useState(1); // FR-5.6b 배율 (진입 시점 값이 포지션에 고정, 마진 데스크로 해금)
   const [infoKey, setInfoKey] = useState<{ kind: 'unit' | 'tower'; key: string } | null>(null); // ? 도움말 카드
   const [showPreviewBar, setShowPreviewBar] = useState(false); // [임시] 신규 아트 프리뷰 바
+  const [placing, setPlacingState] = useState<(typeof TOWERS)[number]['key'] | null>(null); // 타워 배치 모드
+  const placingRef = useRef<typeof placing>(null);
+  const setPlacing = (v: typeof placing) => { placingRef.current = v; setPlacingState(v); };
   const [slotMenu, setSlotMenuState] = useState<number | null>(null);
   const slotMenuRef = useRef<number | null>(null); // 렌더 루프에서 사거리 원 표시용
   const setSlotMenu = (v: number | null) => { slotMenuRef.current = v; setSlotMenuState(v); };
@@ -385,7 +388,14 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
       const d = Math.abs(b.towerSlotX(s) - fx);
       if (d < bestD) { bestD = d; best = s; }
     }
-    setSlotMenu(best >= 0 ? best : null);
+    if (best < 0) { setSlotMenu(null); return; }
+    if (placingRef.current) { // 배치 모드 — 빈 슬롯이면 건설
+      if (!b.towers[best]) buildTower(best, placingRef.current);
+      setPlacing(null);
+      setSlotMenu(null);
+      return;
+    }
+    setSlotMenu(b.towers[best] ? best : null); // 지어진 타워만 선택 (업그레이드·타겟팅)
   };
 
   // ─── 렌더 ───
@@ -529,37 +539,6 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
                   : `DRAW ${popup.goldGain > 0 ? `+${popup.goldGain.toLocaleString()} G` : `${popup.amount.toLocaleString()} AUM`}`}
           </div>
         )}
-        {slotMenu != null && (
-          <div className="slot-menu" style={{ left: `${(battle.towerSlotX(slotMenu) / 1000) * 100}%` }}>
-            {battle.towers[slotMenu] ? (
-              <>
-                {TOWERS.find((t) => t.key === battle.towers[slotMenu]!.key)!.dmg > 0 && (
-                  <button onClick={() => { battle.cycleTargeting(slotMenu); forceUi((v) => v + 1); }}>
-                    타겟: {{ first: '선두', last: '후미', strong: '강적', close: '근접' }[battle.towers[slotMenu]!.mode]} ↻
-                  </button>
-                )}
-                {battle.towers[slotMenu]!.lv < 2 ? (
-                  <button onClick={() => upgradeTower(slotMenu)}>
-                    업그레이드 {TOWERS.find((t) => t.key === battle.towers[slotMenu]!.key)!.upgradeCost} G
-                  </button>
-                ) : (
-                  <span className="small">최대 레벨</span>
-                )}
-              </>
-            ) : (
-              TOWERS.filter((t) => !(battle.isBaseSlot(slotMenu) && t.barrierHP > 0)).map((t) => (
-                <span key={t.key} className="ub-wrap">
-                  <button disabled={hud.gold < t.cost} onClick={() => buildTower(slotMenu, t.key)}>
-                    {t.name} {t.cost} G
-                    <span className="small dim"> {TOWER_INFO[t.key].role}</span>
-                  </button>
-                  <button className="qmark" title="타워 설명" onClick={() => setInfoKey({ kind: 'tower', key: t.key })}>?</button>
-                </span>
-              ))
-            )}
-            <button className="ghost" onClick={() => setSlotMenu(null)}>✕</button>
-          </div>
-        )}
         {/* 준비 페이즈: 이번 웨이브 조합 미리보기 */}
         {hud.prep && hud.wave >= 1 && hud.wave <= hud.waveCount && (
           <div className="wave-preview">
@@ -595,6 +574,37 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           <button className="skill" disabled={hud.gold < BALANCE.SKILL_COST || hud.skillCd > 0} onClick={useSkill}>
             공시폭탄<span className="cost">{hud.skillCd > 0 ? `${hud.skillCd}s` : `${BALANCE.SKILL_COST} G`}</span>
           </button>
+        </div>
+        <div className="cmd-towers">
+          {slotMenu != null && battle.towers[slotMenu] ? (
+            <>
+              <span className="lbl">{TOWERS.find((t) => t.key === battle.towers[slotMenu]!.key)!.name}</span>
+              <button onClick={() => { battle.cycleTargeting(slotMenu); forceUi((v) => v + 1); }}>
+                타겟: {{ first: '선두', last: '후미', strong: '강적', close: '근접' }[battle.towers[slotMenu]!.mode]} ↻
+              </button>
+              {battle.towers[slotMenu]!.lv < 2 ? (
+                <button disabled={hud.gold < TOWERS.find((t) => t.key === battle.towers[slotMenu]!.key)!.upgradeCost}
+                  onClick={() => upgradeTower(slotMenu)}>
+                  업그레이드 {TOWERS.find((t) => t.key === battle.towers[slotMenu]!.key)!.upgradeCost} G
+                </button>
+              ) : <span className="small dim">최대 레벨</span>}
+              <button className="ghost small" onClick={() => setSlotMenu(null)}>해제</button>
+            </>
+          ) : (
+            <>
+              <span className="lbl">타워</span>
+              {TOWERS.map((t) => (
+                <span key={t.key} className="ub-wrap">
+                  <button className={placing === t.key ? 'on' : ''} disabled={hud.gold < t.cost}
+                    onClick={() => setPlacing(placing === t.key ? null : t.key)}>
+                    {t.name}<span className="cost">{t.cost} G</span>
+                  </button>
+                  <button className="qmark" title="타워 설명" onClick={() => setInfoKey({ kind: 'tower', key: t.key })}>?</button>
+                </span>
+              ))}
+              {placing && <span className="small up">설치할 위치를 클릭하세요 (사옥 위 2칸 · 지면 1칸)</span>}
+            </>
+          )}
         </div>
         <div className="cmd-right">
           <button className="ghost small" onClick={() => setShowPreviewBar((v) => !v)}>🎭 아트 프리뷰</button>

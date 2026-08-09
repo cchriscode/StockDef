@@ -367,6 +367,13 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .end-reason { font-size: 15px; letter-spacing: 1px; margin-top: -4px; }
 
 /* [임시] 신규 아트 프리뷰 바 — 확정 시 previewSprites.ts와 함께 제거 */
+.cmd-towers { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.cmd-towers .lbl { font-size: 12px; color: var(--mut); margin-right: 2px; }
+.cmd-towers button { min-height: 34px; padding: 5px 10px; font-size: 12px; background: var(--panel); border-color: var(--blue); display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.cmd-towers button.on { border-color: var(--gold); background: var(--sel); }
+.cmd-towers button .cost { font-family: var(--fm); font-size: 11px; color: var(--gold); }
+.cmd-towers button:disabled { border-color: var(--line2); }
+
 .preview-bar { background: var(--panel); border: 3px solid var(--line); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .preview-bar .pb-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .preview-bar .pb-head b { color: var(--cream); }
