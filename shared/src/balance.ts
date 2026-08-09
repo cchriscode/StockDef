@@ -223,6 +223,9 @@ export const UNIT_SKILL_HITS: Record<string, number> = {
   shutter: 11, // 8.8초 — 보호막이라 가장 김
 };
 
+/** 평타 발사 프레임까지의 지연(초) — 공격 시트 5프레임 중 4번째(인덱스 3)에서 총구 화염이 터진다 (실측) */
+export const ATTACK_CUE_S = 0.3;
+
 /** 스킬 큐 프레임까지의 지연(초) — 이 시점에 판정·투사체가 나가야 모션과 맞는다 */
 export const SKILL_CUE_S: Record<string, number> = {
   club: 0.27, scissor: 0.27, foreman: 0.27, apprentice: 0.09,
@@ -247,14 +250,14 @@ export const STUN_IMMUNE_S = 3; // 기절 종료 후 재기절 면역 (스턴락
  * 총구/발사 지점 — 투사체가 캐릭터 중심이 아니라 무기 끝에서 나가도록.
  * fx = 전방 오프셋(필드 좌표, 엔진이 시작 x에 더함) / y = 지면 기준 높이(px, 렌더 전용)
  */
-// 값은 발사 프레임(기본공격 attack[2] / 스킬 cueFrame)의 총구 화염 위치를 실측해 산출.
+// 값은 발사 프레임(기본공격 attack[3] / 스킬 cueFrame)의 총구 화염 위치를 실측해 산출.
 // 기본공격과 스킬은 시트 셀·앵커가 달라 총구도 다르므로 `키:skill`로 분리한다.
 export const MUZZLE: Record<string, { fx: number; y: number }> = {
-  sniper: { fx: 17, y: 59 }, // 저격총 — 어깨 견착, 장신이라 총구가 높다
+  sniper: { fx: 27, y: 56 }, // 저격총 — 어깨 견착, 장신이라 총구가 높다 (평타 발사 프레임 실측)
   'sniper:skill': { fx: 16, y: 35 }, // 관통탄 — 자세를 낮춰 조준
-  gasmask: { fx: 4, y: 34 }, // 방독면 포수 — 몸에 붙여 쏜다
+  gasmask: { fx: 16, y: 31 }, // 방독면 포수 — 포구를 앞으로 내밀고 발사 (실측)
   'gasmask:skill': { fx: 16, y: 22 }, // 강화탄 — 포구를 앞으로 내밀고 낮게
-  pistol: { fx: 10, y: 41 }, // 권총 장교 — 가슴 높이 (스킬 없음)
+  pistol: { fx: 17, y: 47 }, // 권총 장교 — 가슴 높이 (스킬 없음, 실측)
   analyst: { fx: 9, y: 30 }, // (레거시) 애널리스트 활
   mage: { fx: 9, y: 34 }, // (레거시) 술사 오브
 };

@@ -6,7 +6,7 @@
 //  - Bloons TD: 타워 타겟팅 모드 first/last/strong/close
 //  - Age of War: 블로커+원거리 역할 조합, 본진 자동 포탑, 화면 클리어 스킬
 import {
-  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, MUZZLE, SKILL_CUE_S, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
+  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, ATTACK_CUE_S, MUZZLE, SKILL_CUE_S, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
   type DmgType, type EnemyTypeSpec, type TargetingMode, type TowerSpec, type UnitSpec,
 } from './balance.js';
 import type { MarketEvent, RegionId, StageParams } from './types.js';
@@ -173,7 +173,7 @@ export class Battle {
   private nextId = 1;
   private stageEndT: number;
   /** FR-6.5d 스킬 큐 프레임 대기열 — 모션 도중이 아니라 타격 프레임에 판정이 나가도록 */
-  private pendingSkills: { kind: 'unit' | 'enemy'; id: number; at: number }[] = [];
+  private pendingSkills: { kind: 'unit' | 'enemy' | 'atk'; id: number; at: number }[] = [];
 
   constructor(params: StageParams, events: MarketEvent[]) {
     this.params = params;
@@ -463,6 +463,24 @@ export class Battle {
   }
 
 
+  /** 평타 타격 — 큐 프레임에 호출된다 (대상은 그 시점에 다시 확보) */
+  private performAttack(u: Unit, atkMult: number) {
+    const inRange = this.enemies.filter((e) =>
+      e.hp > 0 && e.x >= u.x - 6 && e.x - u.x <= u.spec.range && (!e.air || u.spec.antiAirPct > 0));
+    const ground = inRange.filter((e) => !e.air).sort((a, b) => a.x - b.x);
+    const airs = inRange.filter((e) => e.air).sort((a, b) => a.x - b.x);
+    const targets = ground.length ? ground.slice(0, u.spec.cleave) : airs.slice(0, 1);
+    const dmg = u.spec.dps * 0.8 * atkMult;
+    for (const e of targets) {
+      const mult = e.air ? u.spec.antiAirPct : 1;
+      if (u.spec.range > 40) {
+        this.fireProjectile(u.x, e, dmg * mult, { dmgType: u.spec.dmgType, projSpeed: 380, splashRadius: 0, slowPct: 0, slowDur: 0 }, false, u.key);
+      } else {
+        this.damage(e, dmg * mult, u.spec.dmgType);
+      }
+    }
+  }
+
   /** FR-6.5d 큐 프레임 도달 시 스킬 효과 실행 (모션 타격 프레임과 판정 일치) */
   private runPendingSkills(atkMult: number) {
     if (!this.pendingSkills.length) return;
@@ -470,10 +488,10 @@ export class Battle {
     if (!due.length) return;
     this.pendingSkills = this.pendingSkills.filter((q) => q.at > this.t);
     for (const q of due) {
-      if (q.kind !== 'unit') continue;
       const u = this.units.find((x) => x.id === q.id);
-      if (!u || u.hp <= 0) continue; // 시전 도중 사망하면 불발
-      this.castSheetSkill(u, atkMult);
+      if (!u || u.hp <= 0) continue; // 모션 도중 사망하면 불발
+      if (q.kind === 'atk') this.performAttack(u, atkMult);
+      else if (q.kind === 'unit') this.castSheetSkill(u, atkMult);
     }
   }
 
@@ -886,17 +904,10 @@ export class Battle {
       const targets = ground.length ? ground.slice(0, u.spec.cleave) : airs.slice(0, 1);
       if (targets.length) {
         if (u.shotCd <= 0) {
+          // FR-6.5d: 판정·발사는 모션의 타격 프레임에 (즉시 쏘면 총구 화염보다 먼저 탄이 나간다)
           u.shotCd = 0.8;
-          u.atkCount += 1; // FR-6.5d 평타 누적
-          const dmg = u.spec.dps * 0.8 * atkMult;
-          for (const e of targets) {
-            const mult = e.air ? u.spec.antiAirPct : 1;
-            if (u.spec.range > 40) {
-              this.fireProjectile(u.x, e, dmg * mult, { dmgType: u.spec.dmgType, projSpeed: 520, splashRadius: 0, slowPct: 0, slowDur: 0 }, false, u.key);
-            } else {
-              this.damage(e, dmg * mult, u.spec.dmgType);
-            }
-          }
+          u.atkCount += 1; // 평타 누적 (스킬 발동 조건)
+          this.pendingSkills.push({ kind: 'atk', id: u.id, at: t + ATTACK_CUE_S });
         }
       } else if (u.x >= ENEMY_BASE_X - 60) {
         this.enemyBaseHP -= u.spec.dps * atkMult * dt; // FR-6.10 적 본진 공격
