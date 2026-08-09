@@ -6,7 +6,7 @@ import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
 import { // [임시] 신규 아트 로스터 (아군·적군 전면 교체)
   SHEET_UNIT, SHOT_SHEET, SKILL_TOTAL_MS, drawPreviews, drawSheetChar, drawShot, drawSkill,
-  enemySheetId, hasSkillSheet, sheetCharHeight, drawTurret,
+  enemySheetId, hasSkillSheet, sheetCharHeight, drawTurret, TURRET_BY_TYPE,
 } from './previewSprites.js';
 
 const AIR_Y = 96;
@@ -363,7 +363,26 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const firedEl = spec.rate > 0 ? cycle - tw.cooldown : -1;
     const firePhase = firedEl >= 0 && firedEl < 0.38 ? firedEl / 0.38 : null;
     const aim01 = tw.lastTargetX != null ? Math.min(1, Math.abs(tw.lastTargetX - b.towerSlotX(s)) / spec.range) : 0.4;
-    if (!drawTurret(ctx, s, tx, by, firePhase, aim01, b.isBaseSlot(s))) {
+    const turretId = TURRET_BY_TYPE[tw.key]; // 타입별 스프라이트 (없으면 리그 스프라이트)
+    let towerDrawn = false;
+    if (turretId) {
+      towerDrawn = drawTurret(ctx, turretId, tx, by, firePhase, aim01, b.isBaseSlot(s));
+    } else { // 배당 파밍(금고)·손절 방벽(서킷 브레이커)·복리 화염 — 기존 리그 스프라이트
+      const rigIdx = RIG_TOWER[tw.key];
+      const hitEl = b.t - (st.hitT.get(`t${s}`) ?? -9);
+      let rimg: HTMLCanvasElement | null = null;
+      if (firePhase != null) rimg = rigFrame(rigIdx, 'attack', firePhase, true);
+      else if (spec.incomeAmount > 0) rimg = rigFrame(rigIdx, 'attack', (spec.incomePeriod - (tw.nextIncomeAt - b.t)) / 1.25, true);
+      else if (hitEl < HIT_DUR) rimg = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
+      if (!rimg) rimg = rigFrame(rigIdx, 'walk', (b.t + s * 0.29) % 1, false);
+      if (rimg) {
+        const hh2 = b.isBaseSlot(s) ? 44 : 58;
+        const ww2 = (hh2 * rimg.width) / rimg.height;
+        ctx.drawImage(rimg, tx - ww2 / 2, by - hh2, ww2, hh2);
+        towerDrawn = true;
+      }
+    }
+    if (!towerDrawn) {
       ctx.fillStyle = TOWER_COLORS[tw.key];
       ctx.fillRect(tx - 11, by - 34, 22, 32);
     }

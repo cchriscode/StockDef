@@ -317,7 +317,15 @@ const TURRET_CELL = { ox: 0.5, oy: 0.9718 };
 // 사옥 슬롯은 층 높이(58px) 안에 들어가도록 작게, 지면 슬롯은 크게
 const TURRET_SCALE_BASE = 0.22;
 const TURRET_SCALE_GROUND = 0.34;
-export const SLOT_TURRET = ['t_1', 't_2', 't_3'] as const; // 슬롯 0·1 = 사옥 / 2 = 지면
+/**
+ * 타워 타입 → 포탑 스프라이트. 성격이 맞는 것끼리 배정하고, 나머지(비공격 구조물·화염)는
+ * 기존 리그 스프라이트를 그대로 쓴다 (금고=배당 파밍, 서킷 브레이커=손절 방벽처럼 이미 잘 맞음).
+ */
+export const TURRET_BY_TYPE: Record<string, string> = {
+  cannon: 't_1', // 공매도 캐논 → 박격 포대 (광역 포격)
+  spire: 't_2', // 옵션 스파이어 → 다연장 포탑 (수직 구조)
+  limit: 't_3', // 지정가 포탑 → 대구경 곡사포 (최장 사거리 단일 저격)
+};
 const FIRE_MS = [80, 90, 90, 120]; // fire 4프레임 (f1 = 발사 섬광)
 export const TURRET_FIRE_CUE = 0.08; // f1 시작 시각(초)
 
@@ -339,11 +347,10 @@ function turretImg(id: string, motion: 'idle' | 'aim' | 'fire'): HTMLImageElemen
  * @param aim01 조준 각도 0(저각)~1(고각)
  */
 export function drawTurret(
-  ctx: CanvasRenderingContext2D, slot: number, cx: number, baseY: number,
+  ctx: CanvasRenderingContext2D, id: string, cx: number, baseY: number,
   firePhase: number | null, aim01: number, onBase = false,
 ): boolean {
   const TURRET_SCALE = onBase ? TURRET_SCALE_BASE : TURRET_SCALE_GROUND;
-  const id = SLOT_TURRET[Math.min(slot, SLOT_TURRET.length - 1)];
   const firing = firePhase != null && firePhase >= 0 && firePhase < 1;
   let img: HTMLImageElement | null = null;
   let frame = 0;
