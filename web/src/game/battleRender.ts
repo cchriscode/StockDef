@@ -252,6 +252,16 @@ function backdropFor(regionId: string, W: number, H: number, groundTop: number):
   return cv;
 }
 
+/** 슬롯의 화면 좌표 — 사옥 슬롯은 x가 같으므로 클릭 판정은 y까지 봐야 한다 */
+export function slotScreenPos(b: Battle, slot: number, W: number): { x: number; y: number } {
+  const groundTop = GROUND_Y + 16;
+  const HQ_H = 116;
+  return {
+    x: (b.towerSlotX(slot) / 1000) * W,
+    y: b.isBaseSlot(slot) ? groundTop - (slot === 0 ? HQ_H : HQ_H * 0.5) : groundTop,
+  };
+}
+
 export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, selectedSlot: number | null) {
   const ctx = canvas.getContext('2d')!;
   const W = canvas.width;
@@ -665,8 +675,8 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     if (f.t <= st.lastFxT) continue;
     if (f.kind === 'gold' && f.amount > 0) {
       st.rigVfx.push({ idx: RIG_TOWER.dividend, motion: 'skill', x: f.x, y: groundTop, scale: 0.6, t0: f.t, dur: 0.9 });
-    } else if (f.kind === 'skill') {
-      st.rigVfx.push({ idx: 5, motion: 'skill', x: f.x, y: groundTop, scale: 1.6, t0: f.t, dur: 1.1 }); // 레버리지 술사 메테오
+    } else if (f.kind === 'bomb') { // 공시폭탄 전용 — 다른 스킬이 메테오를 부르지 않도록 종류를 분리
+      st.rigVfx.push({ idx: 5, motion: 'skill', x: f.x, y: groundTop, scale: 1.6, t0: f.t, dur: 1.1 });
     }
     if (st.rigVfx.length > 40) st.rigVfx.splice(0, st.rigVfx.length - 40);
   }
@@ -750,7 +760,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.fillStyle = '#FFC53D';
       ctx.font = 'bold 11px monospace';
       ctx.fillText(`+${f.amount}G`, sx(f.x), y - 24);
-    } else if (f.kind === 'skill') {
+    } else if (f.kind === 'bomb') {
       ctx.globalAlpha = alpha * 0.5;
       ctx.fillStyle = '#9B6BFF';
       ctx.fillRect(0, GROUND_Y - 40 + age * 20, W, 44 - age * 20);

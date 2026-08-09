@@ -37,12 +37,12 @@ describe('Battle 엔진', () => {
   });
   it('타워 건설: 골드 차감·슬롯 점유, 중복 건설 불가 (포탑 3종)', () => {
     const b = new Battle(params(), []);
-    b.addGold(260); // limit 110 + spire 140 = 250
+    b.addGold(390); // limit 165 + spire 210 = 375
     expect(b.buildTower(0, 'limit')).toBe(true);
-    expect(b.gold).toBe(150);
+    expect(b.gold).toBe(225);
     expect(b.buildTower(0, 'cannon')).toBe(false); // 점유된 슬롯
     expect(b.buildTower(1, 'spire')).toBe(true);
-    expect(b.gold).toBe(10);
+    expect(b.gold).toBe(15);
     expect(b.buildTower(2, 'cannon')).toBe(false); // 골드 부족
   });
   it('리스크 매니저: 사옥 체력을 회복시킨다 (BASE_HP 상한)', () => {
@@ -82,7 +82,7 @@ describe('Battle 엔진', () => {
   });
   it('타겟팅 모드 순환: first → last → strong → close → first (Bloons)', () => {
     const b = new Battle(params(), []);
-    b.addGold(200);
+    b.addGold(300);
     b.buildTower(0, 'limit');
     expect(b.towers[0]!.mode).toBe('first');
     expect(b.cycleTargeting(0)).toBe('last');

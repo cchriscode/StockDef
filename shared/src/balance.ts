@@ -112,9 +112,9 @@ export interface TowerSpec {
 }
 
 export const TOWERS: TowerSpec[] = [
-  { key: 'limit', name: '지정가 포탑', cost: 110, upgradeCost: 160, target: 'both', dmgType: 'physical', dmg: 20, rate: 1.4, range: 460, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
-  { key: 'cannon', name: '공매도 캐논', cost: 150, upgradeCost: 210, target: 'ground', dmgType: 'physical', dmg: 26, rate: 0.5, range: 390, splashRadius: 60, slowPct: 0, slowDur: 0, projSpeed: 420, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
-  { key: 'spire', name: '옵션 스파이어', cost: 140, upgradeCost: 200, target: 'both', dmgType: 'magic', dmg: 14, rate: 0.9, range: 430, splashRadius: 0, slowPct: 0.3, slowDur: 1.5, projSpeed: 620, lv2Mult: 1.6, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'limit', name: '지정가 포탑', cost: 165, upgradeCost: 240, target: 'both', dmgType: 'physical', dmg: 14, rate: 1.4, range: 380, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'cannon', name: '공매도 캐논', cost: 225, upgradeCost: 315, target: 'ground', dmgType: 'physical', dmg: 18, rate: 0.5, range: 330, splashRadius: 60, slowPct: 0, slowDur: 0, projSpeed: 420, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'spire', name: '옵션 스파이어', cost: 210, upgradeCost: 300, target: 'both', dmgType: 'magic', dmg: 10, rate: 0.9, range: 350, splashRadius: 0, slowPct: 0.3, slowDur: 1.5, projSpeed: 620, lv2Mult: 1.6, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
 ];
 
 // FR-6.5 유닛 — handoff 리그 팩 6직군: 블로커 / 원거리 / 근접 브루저 / 관통 창병 / 마법 원거리 / 서포터

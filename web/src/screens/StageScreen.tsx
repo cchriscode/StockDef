@@ -6,7 +6,7 @@ import {
 import { api, getSettings, getToken, track } from '../net/api.js';
 import { StageWs } from '../net/stageWs.js';
 import { clockLabel, drawChart, interpPct, pctOf, type OpenMarker } from '../game/chart.js';
-import { drawBattle } from '../game/battleRender.js';
+import { drawBattle, slotScreenPos } from '../game/battleRender.js';
 import { sfx } from '../game/sfx.js';
 import { TOWER_INFO, UNIT_INFO, towerStatsLine, unitStatsLine } from '../game/unitInfo.js';
 import { RIG_TOWER, RIG_UNIT } from '../game/rigFrames.js';
@@ -381,11 +381,14 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     const canvas = battleRef.current;
     if (!b || !canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const fx = ((e.clientX - rect.left) / rect.width) * 1000;
+    // 캔버스 내부 좌표로 환산 — 사옥 슬롯은 x가 같고 높이만 다르므로 2D로 판정한다
+    const cx = ((e.clientX - rect.left) / rect.width) * canvas.width;
+    const cy = ((e.clientY - rect.top) / rect.height) * canvas.height;
     let best = -1;
-    let bestD = 40;
+    let bestD = 70;
     for (let s = 0; s < b.towers.length; s++) {
-      const d = Math.abs(b.towerSlotX(s) - fx);
+      const pos = slotScreenPos(b, s, canvas.width);
+      const d = Math.hypot(pos.x - cx, pos.y - 18 - cy); // 구조물 몸통 중심 기준
       if (d < bestD) { bestD = d; best = s; }
     }
     if (best < 0) { setSlotMenu(null); return; }

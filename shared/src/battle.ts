@@ -114,7 +114,7 @@ export interface Projectile {
 }
 
 export interface Fx {
-  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'skill' | 'aum' | 'gold';
+  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'bomb' | 'aum' | 'gold'; // bomb = 공시폭탄 전용 (메테오 낙하 연출)
   x: number;
   air: boolean;
   amount: number;
@@ -280,7 +280,7 @@ export class Battle {
       e.stunUntil = Math.max(e.stunUntil, this.t + 1.2);
       this.pushFx('stun', e.x, false, 0);
     }
-    this.pushFx('skill', 500, false, 0);
+    this.pushFx('bomb', 500, false, 0); // 공시폭탄 — 화면 전역 메테오
     this.enemies = this.enemies.filter((e) => this.aliveOrDeathFx(e));
     return true;
   }
@@ -642,7 +642,6 @@ export class Battle {
         if (!ts.length) return false;
         for (let i = 0; i < (S.hits as number); i++) this.damage(ts[0], base * (S.mult as number), 'physical');
         u.atkCount = S.hitCut as number; // 다음 시전까지 필요한 타수 감소
-        this.pushFx('skill', u.x, false, 0);
         return true;
       }
       case 'gasmask': { // 독가스탄 — 착탄 광역 + 둔화 + 회복 차단
