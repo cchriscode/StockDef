@@ -547,7 +547,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
                 )}
               </>
             ) : (
-              TOWERS.map((t) => (
+              TOWERS.filter((t) => !(battle.isBaseSlot(slotMenu) && t.barrierHP > 0)).map((t) => (
                 <span key={t.key} className="ub-wrap">
                   <button disabled={hud.gold < t.cost} onClick={() => buildTower(slotMenu, t.key)}>
                     {t.name} {t.cost} G

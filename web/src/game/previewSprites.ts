@@ -309,3 +309,62 @@ export function drawPreviews(
     ctx.fillText(e.spec.name, sx(e.x), headY - 5);
   }
 }
+
+
+// ─── 포탑 스프라이트 (turret-sprites 팩) — 슬롯별 고정 매핑 ───
+// 셀 1168×1136, 앵커(0.5, 0.9718) = 구조물 바닥. 1/5 축소본이라 배율만 맞추면 그대로 얹힌다.
+const TURRET_CELL = { ox: 0.5, oy: 0.9718 };
+// 사옥 슬롯은 층 높이(58px) 안에 들어가도록 작게, 지면 슬롯은 크게
+const TURRET_SCALE_BASE = 0.22;
+const TURRET_SCALE_GROUND = 0.34;
+export const SLOT_TURRET = ['t_1', 't_2', 't_3'] as const; // 슬롯 0·1 = 사옥 / 2 = 지면
+const FIRE_MS = [80, 90, 90, 120]; // fire 4프레임 (f1 = 발사 섬광)
+export const TURRET_FIRE_CUE = 0.08; // f1 시작 시각(초)
+
+function turretImg(id: string, motion: 'idle' | 'aim' | 'fire'): HTMLImageElement | null {
+  const key = motion === 'idle' ? id : `${id}_${motion}`;
+  let img = imgCache.get(`turret:${key}`);
+  if (!img) {
+    img = new Image();
+    img.src = `/assets/turrets/${key}.png`;
+    imgCache.set(`turret:${key}`, img);
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
+
+/**
+ * 포탑 렌더 — 발사 중이면 fire 프레임, 아니면 aim 프레임(각도 고정) 또는 idle.
+ * @param baseY 구조물이 놓일 바닥선 (사옥 탑재면 해당 층의 바닥)
+ * @param firePhase 0~1 발사 모션 진행도 (null이면 대기)
+ * @param aim01 조준 각도 0(저각)~1(고각)
+ */
+export function drawTurret(
+  ctx: CanvasRenderingContext2D, slot: number, cx: number, baseY: number,
+  firePhase: number | null, aim01: number, onBase = false,
+): boolean {
+  const TURRET_SCALE = onBase ? TURRET_SCALE_BASE : TURRET_SCALE_GROUND;
+  const id = SLOT_TURRET[Math.min(slot, SLOT_TURRET.length - 1)];
+  const firing = firePhase != null && firePhase >= 0 && firePhase < 1;
+  let img: HTMLImageElement | null = null;
+  let frame = 0;
+  let frames = 1;
+  if (firing) {
+    img = turretImg(id, 'fire');
+    frames = 4;
+    let acc = 0;
+    const el = firePhase! * FIRE_MS.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < 4; i++) { acc += FIRE_MS[i]; if (el < acc) { frame = i; break; } frame = 3; }
+  }
+  if (!img) { // t_2는 aim이 없다 (수직 고정)
+    img = turretImg(id, 'aim');
+    if (img) { frames = 4; frame = Math.max(0, Math.min(3, Math.round(aim01 * 3))); }
+  }
+  if (!img) { img = turretImg(id, 'idle'); frames = 1; frame = 0; }
+  if (!img) return false;
+  const cw = img.naturalWidth / frames;
+  const ch = img.naturalHeight;
+  const dw = cw * TURRET_SCALE;
+  const dh = ch * TURRET_SCALE;
+  ctx.drawImage(img, frame * cw, 0, cw, ch, cx - dw * TURRET_CELL.ox, baseY - dh * TURRET_CELL.oy, dw, dh);
+  return true;
+}

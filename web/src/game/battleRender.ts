@@ -6,7 +6,7 @@ import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
 import { // [임시] 신규 아트 로스터 (아군·적군 전면 교체)
   SHEET_UNIT, SHOT_SHEET, SKILL_TOTAL_MS, drawPreviews, drawSheetChar, drawShot, drawSkill,
-  enemySheetId, hasSkillSheet, sheetCharHeight,
+  enemySheetId, hasSkillSheet, sheetCharHeight, drawTurret,
 } from './previewSprites.js';
 
 const AIR_Y = 96;
@@ -332,66 +332,51 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     return true;
   });
 
-  // 타워 — idle 루프 / 발사·지급 시 attack 원샷 / 방벽 피격 hit
+  // 타워 — FR-6.3c: 슬롯 0·1은 사옥 탑재(옥상·중층), 2 이상은 지면. 신규 포탑 스프라이트 사용
+  const HQ_H = 116; // 사옥 높이 (아래 기지 렌더와 동일)
+  const slotBaseY = (s2: number) => (b.isBaseSlot(s2)
+    ? groundTop - (s2 === 0 ? HQ_H : HQ_H * 0.5) // 0 = 옥상 / 1 = 중층 (등분)
+    : groundTop);
   for (let s = 0; s < b.towers.length; s++) {
     const tx = sx(b.towerSlotX(s));
+    const by = slotBaseY(s);
     const tw = b.towers[s];
-    // 파괴 감지 (방벽 소실 → death 연출)
     const prevKey = st.prevTowers[s] ?? null;
-    if (prevKey && !tw) {
-      st.corpses.push({ rigIdx: RIG_TOWER[prevKey], x: b.towerSlotX(s), y: groundTop, h: 58, t0: b.t });
-      st.lastHp.delete(`t${s}`);
-    }
+    if (prevKey && !tw) st.lastHp.delete(`t${s}`);
     st.prevTowers[s] = tw ? tw.key : null;
-    if (!tw) {
+    if (!tw) { // 빈 슬롯 — 설치 가능 위치 표시
       ctx.fillStyle = 'rgba(110,143,181,0.14)';
-      ctx.fillRect(tx - 12, groundTop - 40, 24, 38);
+      ctx.fillRect(tx - 12, by - 34, 24, 32);
       ctx.strokeStyle = s === selectedSlot ? '#7BD8A0' : '#6E8FB5';
       ctx.setLineDash([3, 3]);
-      ctx.strokeRect(tx - 12, groundTop - 40, 24, 38);
+      ctx.strokeRect(tx - 12, by - 34, 24, 32);
       ctx.setLineDash([]);
       ctx.fillStyle = '#8FA8C7';
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${s + 1}`, tx, groundTop - 18);
+      ctx.fillText(`${s + 1}`, tx, by - 14);
       continue;
     }
     const spec = TOWERS.find((t) => t.key === tw.key)!;
-    const rigIdx = RIG_TOWER[tw.key];
     if (tw.maxHp > 0) trackHit(st, `t${s}`, tw.hp, b.t);
-    const hitEl = b.t - (st.hitT.get(`t${s}`) ?? -9);
-    // 모션 선택: 발리스타=발사 사이클에 attack 스케일 / 금고=지급 직후 attack / 방벽=피격 hit
-    let img: HTMLCanvasElement | null = null;
-    let atkPhase: number | null = null;
-    if (spec.rate > 0 && tw.cooldown > 0) {
-      const cycle = 1 / spec.rate;
-      atkPhase = (cycle - tw.cooldown) / Math.min(cycle, 1.25);
-      img = rigFrame(rigIdx, 'attack', atkPhase, true);
-    } else if (spec.incomeAmount > 0) {
-      img = rigFrame(rigIdx, 'attack', (spec.incomePeriod - (tw.nextIncomeAt - b.t)) / 1.25, true);
-    } else if (hitEl < HIT_DUR) {
-      img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
-    }
-    if (!img) img = rigFrame(rigIdx, 'walk', (b.t + s * 0.29) % 1, false); // 타워 walk = 설치+대기 루프
-    const hh = 58;
-    if (img) {
-      const wwt = (hh * img.width) / img.height;
-      ctx.drawImage(img, tx - wwt / 2, groundTop - hh, wwt, hh);
-    } else {
+    const cycle = spec.rate > 0 ? 1 / spec.rate : 0;
+    const firedEl = spec.rate > 0 ? cycle - tw.cooldown : -1;
+    const firePhase = firedEl >= 0 && firedEl < 0.38 ? firedEl / 0.38 : null;
+    const aim01 = tw.lastTargetX != null ? Math.min(1, Math.abs(tw.lastTargetX - b.towerSlotX(s)) / spec.range) : 0.4;
+    if (!drawTurret(ctx, s, tx, by, firePhase, aim01, b.isBaseSlot(s))) {
       ctx.fillStyle = TOWER_COLORS[tw.key];
-      ctx.fillRect(tx - 11, groundTop - 36, 22, 34);
+      ctx.fillRect(tx - 11, by - 34, 22, 32);
     }
-    if (atkPhase != null && atkPhase < 1) drawRigVfx(ctx, rigIdx, 'attack', atkPhase, tx, groundTop, 0.6); // 캐논 포구 화염 (타 타워는 no-op)
     if (tw.lv === 2) {
       ctx.fillStyle = '#FFC53D';
-      ctx.fillRect(tx - 12, groundTop - hh - 6, 24, 4);
+      ctx.fillRect(tx - 12, by - 76, 24, 4);
     }
-    if (tw.maxHp > 0) hpBar(ctx, tx - 12, groundTop - hh - 8, 24, tw.hp / tw.maxHp, '#7C89A3'); // 방벽 내구
-    if (spec.dmg > 0) { // 타겟팅 모드 배지 (공격 타워만)
+    if (tw.maxHp > 0) hpBar(ctx, tx - 12, by - 78, 24, tw.hp / tw.maxHp, '#7C89A3');
+    if (spec.dmg > 0) {
       ctx.fillStyle = '#7C89A3';
       ctx.font = '8px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(MODE_LABEL[tw.mode], tx, groundTop + 12);
+      ctx.fillText(MODE_LABEL[tw.mode], tx, by + 11);
     }
   }
 

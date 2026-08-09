@@ -71,7 +71,7 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
   let loses = 0;
   // 2026-08-05 확장 로스터 반영: 지정가+캐논(광역)+스파이어(마법·슬로우)+화염(램프) + 배당 + 전방 방벽
   const buildOrder: ('limit' | 'dividend' | 'barrier' | 'cannon' | 'spire' | 'flame')[] =
-    ['limit', 'cannon', 'dividend', 'spire', 'flame', 'barrier'];
+    ['limit', 'cannon', 'barrier']; // FR-6.3c 3슬롯 (사옥2 + 지면1)
   let built = 0;
   const unitCycle: ('club' | 'sniper' | 'foreman' | 'scissor' | 'shutter')[] = ['club', 'sniper', 'foreman', 'scissor', 'shutter'];
   let unitIdx = 0;
@@ -118,11 +118,11 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
     // 전투 지출 (그리디) — 3번 슬롯 기본 포탑은 강적 타겟팅(힐러·탱커 저격, 평균적 카운터 플레이 반영)
     if (built < buildOrder.length) {
       if (b.buildTower(built, buildOrder[built])) {
-        if (built === 3) { b.cycleTargeting(3); b.cycleTargeting(3); } // 스파이어: first → strong (힐러·탱커 저격)
+        if (built === 1) { b.cycleTargeting(1); b.cycleTargeting(1); } // 캐논: first → strong
         built += 1;
       }
     } else {
-      for (let s = 0; s < 6; s++) if (b.gold >= 400) b.upgradeTower(s);
+      for (let s = 0; s < 3; s++) if (b.gold >= 400) b.upgradeTower(s);
       if (b.gold >= 260) { if (b.spawnUnit(unitCycle[unitIdx % unitCycle.length])) unitIdx += 1; }
       else if (b.gold >= 150) b.spawnUnit('apprentice');
     }

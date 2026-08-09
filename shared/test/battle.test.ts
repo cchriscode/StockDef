@@ -41,9 +41,10 @@ describe('Battle 엔진', () => {
     expect(b.buildTower(0, 'limit')).toBe(true);
     expect(b.gold).toBe(90);
     expect(b.buildTower(0, 'dividend')).toBe(false); // 점유된 슬롯
-    expect(b.buildTower(1, 'barrier')).toBe(true);
+    expect(b.buildTower(1, 'barrier')).toBe(false); // 사옥 슬롯엔 경로 차단물 불가 (FR-6.3c)
+    expect(b.buildTower(2, 'barrier')).toBe(true); // 지면 슬롯
     expect(b.gold).toBe(20);
-    expect(b.buildTower(2, 'limit')).toBe(false); // 골드 부족
+    expect(b.buildTower(1, 'limit')).toBe(false); // 골드 부족
   });
   it('배당 파밍: 주기마다 골드 생산 (비공격)', () => {
     const b = new Battle(params(), []);
@@ -56,10 +57,10 @@ describe('Battle 엔진', () => {
   it('손절 방벽: 지상 적을 정지시키고 내구가 깎인다', () => {
     const b = new Battle(params(), []);
     b.addGold(70);
-    expect(b.buildTower(0, 'barrier')).toBe(true); // slot0 x=90
+    expect(b.buildTower(2, 'barrier')).toBe(true); // 지면 슬롯 x=90 (FR-6.3c)
     const anyB = b as unknown as { enemies: unknown[] };
     anyB.enemies.push({ id: 700, type: 'grunt', x: 102, hp: 500, maxHp: 500, baseSpeed: 30, dps: 10, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 10, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false } as never);
-    const tw0 = b.towers[0]!;
+    const tw0 = b.towers[2]!;
     b.advanceTo(b.t + 2);
     expect(b.enemies[0].x).toBeGreaterThan(90); // 방벽에 막혀 통과 못 함
     expect(tw0.hp).toBeLessThan(tw0.maxHp); // 내구 감소

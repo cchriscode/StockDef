@@ -31,8 +31,10 @@ export const BALANCE = {
   BASE_HP: 100,
   ENEMY_BASE_HP: 300,
   RETRY_CAPITAL_MULT: 0.5,
-  TOWER_SLOTS_BASE: 6,
-  TOWER_SLOTS_MAX: 8,
+  // FR-6.3c (2026-08-10): 슬롯 3칸 — 사옥 위 2 + 지면 1. 사옥을 등분해 옥상·중층에 포탑을 얹는다
+  TOWER_SLOTS_BASE: 3,
+  TOWER_SLOTS_MAX: 5,
+  BASE_TOWER_SLOTS: 2, // 앞 2칸은 사옥 탑재 (지면 차단물 불가)
   SKILL_COST: 200,
   SKILL_COOLDOWN_S: 25, // 2026-08-05 난이도 개편: 스킬을 더 자주 쓰는 대신 적이 강해짐
   SKILL_DAMAGE: 80,

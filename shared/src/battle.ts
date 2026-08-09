@@ -216,6 +216,7 @@ export class Battle {
   buildTower(slot: number, key: TowerSpec['key']): boolean {
     if (slot < 0 || slot >= this.towers.length || this.towers[slot]) return false;
     const spec = TOWERS.find((s) => s.key === key)!;
+    if (this.isBaseSlot(slot) && spec.barrierHP > 0) return false; // 사옥 위엔 경로 차단물을 놓을 수 없다
     if (!this.spend(spec.cost)) return false;
     this.towers[slot] = {
       slot, key, lv: 1, cooldown: 0, mode: 'first', lastTargetX: null, lastTargetId: null, rampN: 0,
@@ -282,9 +283,18 @@ export class Battle {
     return true;
   }
 
+  /**
+   * FR-6.3c 슬롯 위치 — 앞 2칸은 **사옥 탑재**(옥상·중층, 같은 x), 나머지는 지면 기존 위치.
+   * 사옥 슬롯은 건물 중심 x를 쓰므로 지면 차단(손절 방벽)은 불가하다.
+   */
   towerSlotX(slot: number): number {
-    // 일자형 TD 관례: 기지 주변(90~365)에 밀집 배치 — 사옥 앞 방어선을 이룬다
-    return 90 + slot * 55;
+    if (slot < BALANCE.BASE_TOWER_SLOTS) return 26; // 사옥 중심 (캔버스 ~47px)
+    return 90 + (slot - BALANCE.BASE_TOWER_SLOTS) * 55;
+  }
+
+  /** 해당 슬롯이 사옥 탑재인지 (렌더·건설 제한용) */
+  isBaseSlot(slot: number): boolean {
+    return slot < BALANCE.BASE_TOWER_SLOTS;
   }
 
   /** 준비 페이즈 UI용: 다음 웨이브 조합 미리보기 */
