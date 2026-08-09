@@ -6,7 +6,7 @@
 //  - Bloons TD: 타워 타겟팅 모드 first/last/strong/close
 //  - Age of War: 블로커+원거리 역할 조합, 본진 자동 포탑, 화면 클리어 스킬
 import {
-  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
+  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, MUZZLE, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
   type DmgType, type EnemyTypeSpec, type TargetingMode, type TowerSpec, type UnitSpec,
 } from './balance.js';
 import type { MarketEvent, RegionId, StageParams } from './types.js';
@@ -86,6 +86,7 @@ export interface Projectile {
   splashRadius: number;
   slowPct: number;
   slowDur: number;
+  srcKey?: string; // 발사 주체 키 (렌더가 총구 높이를 찾는 데 사용)
 }
 
 export interface Fx {
@@ -421,7 +422,7 @@ export class Battle {
         if (ts.length) {
           for (const e of ts) {
             this.fireProjectile(u.x, e, u.spec.dps * 1.2 * atkMult * (e.air ? u.spec.antiAirPct : 1),
-              { dmgType: 'physical', projSpeed: 560, splashRadius: 0, slowPct: 0, slowDur: 0 }, false);
+              { dmgType: 'physical', projSpeed: 560, splashRadius: 0, slowPct: 0, slowDur: 0 }, false, u.key);
           }
           cast = true;
         }
@@ -435,7 +436,7 @@ export class Battle {
         const ts = inRange(u.spec.range);
         if (ts.length) {
           this.fireProjectile(u.x, ts[0], u.spec.dps * 2.2 * atkMult,
-            { dmgType: 'magic', projSpeed: 480, splashRadius: 70, slowPct: 0, slowDur: 0 }, false);
+            { dmgType: 'magic', projSpeed: 480, splashRadius: 70, slowPct: 0, slowDur: 0 }, false, u.key);
           cast = true;
         }
       } else if (u.key === 'riskmgr') { // 헤지 커버 — 사옥 즉시 회복 버스트
@@ -458,7 +459,7 @@ export class Battle {
         const ts = inRange(u.spec.range);
         if (ts.length) {
           this.fireProjectile(u.x, ts[0], u.spec.dps * 2.5 * atkMult,
-            { dmgType: 'magic', projSpeed: 620, splashRadius: 0, slowPct: 0, slowDur: 0 }, false);
+            { dmgType: 'magic', projSpeed: 620, splashRadius: 0, slowPct: 0, slowDur: 0 }, false, u.key);
           cast = true;
         }
       }
@@ -515,11 +516,13 @@ export class Battle {
     return e.baseSpeed * (this.t < e.slowUntil ? 1 - e.slowPct : 1) * (this.t < e.hasteUntil ? 1.5 : 1); // 질주·독려
   }
 
-  private fireProjectile(fromX: number, target: Enemy, dmg: number, spec: { dmgType: DmgType; projSpeed: number; splashRadius: number; slowPct: number; slowDur: number }, fromTower: boolean) {
+  private fireProjectile(fromX: number, target: Enemy, dmg: number, spec: { dmgType: DmgType; projSpeed: number; splashRadius: number; slowPct: number; slowDur: number }, fromTower: boolean, srcKey?: string) {
+    // 무기 끝에서 나가도록 전방 오프셋 적용 (총구 위치 — MUZZLE)
+    const fx = srcKey ? (MUZZLE[srcKey]?.fx ?? 0) : 0;
     this.projectiles.push({
-      id: this.nextId++, x: fromX, targetId: target.id, air: target.air, fromTower,
+      id: this.nextId++, x: fromX + fx, targetId: target.id, air: target.air, fromTower,
       speed: spec.projSpeed, dmg, dmgType: spec.dmgType,
-      splashRadius: spec.splashRadius, slowPct: spec.slowPct, slowDur: spec.slowDur,
+      splashRadius: spec.splashRadius, slowPct: spec.slowPct, slowDur: spec.slowDur, srcKey,
     });
   }
 
@@ -650,7 +653,7 @@ export class Battle {
           for (const e of targets) {
             const mult = e.air ? u.spec.antiAirPct : 1;
             if (u.spec.range > 40) {
-              this.fireProjectile(u.x, e, dmg * mult, { dmgType: u.spec.dmgType, projSpeed: 520, splashRadius: 0, slowPct: 0, slowDur: 0 }, false);
+              this.fireProjectile(u.x, e, dmg * mult, { dmgType: u.spec.dmgType, projSpeed: 520, splashRadius: 0, slowPct: 0, slowDur: 0 }, false, u.key);
             } else {
               this.damage(e, dmg * mult, u.spec.dmgType);
             }

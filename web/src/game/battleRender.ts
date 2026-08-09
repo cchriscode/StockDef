@@ -1,6 +1,6 @@
 // FR-6.1 일자형 전투 렌더러 — Battle 엔진 상태를 그리기만 한다 (로직·렌더 분리, §11)
 // 스프라이트: handoff 리그 팩 — 로드 시 rigFrames가 고프레임으로 구워둔 시퀀스를 blit
-import { BASE_TURRET, ENEMY_TYPES, TOWERS, type Battle, type Enemy } from '@tf/shared';
+import { BASE_TURRET, ENEMY_TYPES, MUZZLE, TOWERS, type Battle, type Enemy } from '@tf/shared';
 import { BACKDROPS, BACKDROP_GROUND, BACKDROP_H, BACKDROP_W, type Backdrop } from './battleBackdrops.js';
 import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
@@ -613,8 +613,12 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.fillStyle = '#FFE9C4';
       ctx.fillRect(px + Math.cos(spin) * 3 - 1.5, y + Math.sin(spin) * 3 - 1.5, 3, 3);
       ctx.restore();
-    } else if (!p.fromTower && drawShot(ctx, 'A-02_3', 'ally', b.t + p.id, px, (p.air ? AIR_Y : GROUND_Y) - 6, null)) {
-      // [임시] 아군 유닛 투사체 — 신규 시트 (저격탄 공용)
+    } else if (!p.fromTower && drawShot(
+      ctx, SHOT_SHEET[p.srcKey ?? ''] ?? 'A-02_3', 'ally', b.t + p.id, px,
+      p.air ? AIR_Y : groundTop - (MUZZLE[p.srcKey ?? '']?.y ?? 34), // 총구 높이로 비행
+      null,
+    )) {
+      // [임시] 아군 유닛 투사체 — 발사 주체별 시트, 무기 끝에서 출발
     } else {
       const y = (p.air ? AIR_Y : GROUND_Y) - (p.fromTower ? 14 : 4) + Math.sin(p.x * 0.15) * 2;
       const len = p.fromTower ? 16 : 11;

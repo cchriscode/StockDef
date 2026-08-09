@@ -186,6 +186,18 @@ export const ENEMY_SKILL_PERIOD: Record<EnemyTypeSpec['key'], number> = {
   boss: 15, // 마진콜 충격파 — 주변 아군 유닛 전체 22 피해
 };
 
+/**
+ * 총구/발사 지점 — 투사체가 캐릭터 중심이 아니라 무기 끝에서 나가도록.
+ * fx = 전방 오프셋(필드 좌표, 엔진이 시작 x에 더함) / y = 지면 기준 높이(px, 렌더 전용)
+ */
+export const MUZZLE: Record<string, { fx: number; y: number }> = {
+  sniper: { fx: 13, y: 56 }, // 저격총 — 어깨 견착, 키가 커서 총구가 높다
+  gasmask: { fx: 11, y: 34 }, // 방독면 포수 — 허리춤 포구
+  pistol: { fx: 10, y: 40 }, // 권총 장교 — 가슴 높이
+  analyst: { fx: 9, y: 30 }, // (레거시) 애널리스트 활
+  mage: { fx: 9, y: 34 }, // (레거시) 술사 오브
+};
+
 // 사옥 자동 포탑 (Age of War 본진 방어) — 최후 방어선
 export const BASE_TURRET = { dmg: 4.5, rate: 1.0, range: 260, dmgType: 'physical' as DmgType }; // 2026-08-05 난이도 개편: 아군 공격력 −20%
 
