@@ -6,7 +6,7 @@
 //  - Bloons TD: 타워 타겟팅 모드 first/last/strong/close
 //  - Age of War: 블로커+원거리 역할 조합, 본진 자동 포탑, 화면 클리어 스킬
 import {
-  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, MUZZLE, STUN_IMMUNE_S, UNIT_SKILL, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
+  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, MUZZLE, SKILL_CUE_S, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
   type DmgType, type EnemyTypeSpec, type TargetingMode, type TowerSpec, type UnitSpec,
 } from './balance.js';
 import type { MarketEvent, RegionId, StageParams } from './types.js';
@@ -79,6 +79,7 @@ export interface Unit {
   absorbUntil: number;
   markUntil: number; // 표식 — 받는 피해 증가 만료
   markPct: number;
+  atkCount: number; // FR-6.5d 평타 누적 (N회마다 스킬 시전)
 }
 
 export interface Tower {
@@ -171,6 +172,8 @@ export class Battle {
   private spawnedWaves = new Set<number>();
   private nextId = 1;
   private stageEndT: number;
+  /** FR-6.5d 스킬 큐 프레임 대기열 — 모션 도중이 아니라 타격 프레임에 판정이 나가도록 */
+  private pendingSkills: { kind: 'unit' | 'enemy'; id: number; at: number }[] = [];
 
   constructor(params: StageParams, events: MarketEvent[]) {
     this.params = params;
@@ -258,7 +261,7 @@ export class Battle {
       nextSkillAt: this.t + UNIT_SKILL_PERIOD[key], lastSkillAt: -9, shieldUntil: 0,
       knockUntil: 0, knockFrom: 0, knockTo: 0,
       stunUntil: 0, stunImmuneUntil: 0, slowUntil: 0, slowPct: 0,
-      absorb: 0, absorbUntil: 0, markUntil: 0, markPct: 0,
+      absorb: 0, absorbUntil: 0, markUntil: 0, markPct: 0, atkCount: 0,
     });
     return true;
   }
@@ -459,10 +462,34 @@ export class Battle {
     u.hp -= dmg;
   }
 
+
+  /** FR-6.5d 큐 프레임 도달 시 스킬 효과 실행 (모션 타격 프레임과 판정 일치) */
+  private runPendingSkills(atkMult: number) {
+    if (!this.pendingSkills.length) return;
+    const due = this.pendingSkills.filter((q) => q.at <= this.t);
+    if (!due.length) return;
+    this.pendingSkills = this.pendingSkills.filter((q) => q.at > this.t);
+    for (const q of due) {
+      if (q.kind !== 'unit') continue;
+      const u = this.units.find((x) => x.id === q.id);
+      if (!u || u.hp <= 0) continue; // 시전 도중 사망하면 불발
+      this.castSheetSkill(u, atkMult);
+    }
+  }
+
   /** FR-6.5b 유닛 자동 스킬 — 주기마다 조건 충족 시 시전 (대상 없으면 1.5초 후 재시도) */
   private castUnitSkills(atkMult: number) {
     const t = this.t;
     for (const u of this.units) {
+      // FR-6.5d 신규 로스터: 평타 N회를 채우면 시전 (모션 시작 → 큐 프레임에 판정)
+      const need = UNIT_SKILL_HITS[u.key];
+      if (need != null) {
+        if (u.atkCount < need) continue;
+        u.atkCount = 0;
+        u.lastSkillAt = t;
+        this.pendingSkills.push({ kind: 'unit', id: u.id, at: t + (SKILL_CUE_S[u.key] ?? 0.27) });
+        continue;
+      }
       if (t < u.nextSkillAt) continue;
       const inRange = (r: number) =>
         this.enemies.filter((e) => e.hp > 0 && e.x >= u.x - 6 && e.x - u.x <= r && (!e.air || u.spec.antiAirPct > 0));
@@ -583,20 +610,21 @@ export class Battle {
         const ts = ground(30, 1);
         if (!ts.length) return false;
         for (let i = 0; i < (S.hits as number); i++) this.damage(ts[0], base * (S.mult as number), 'physical');
-        u.nextSkillAt = t + UNIT_SKILL_PERIOD[u.key] - (S.cdCut as number);
+        u.atkCount = S.hitCut as number; // 다음 시전까지 필요한 타수 감소
         this.pushFx('skill', u.x, false, 0);
         return true;
       }
       case 'gasmask': { // 독가스탄 — 착탄 광역 + 둔화 + 회복 차단
         const inR = this.enemies.filter((e) => e.hp > 0 && e.x >= u.x - 10 && e.x - u.x <= u.spec.range);
         if (!inR.length) return false;
-        const cx = inR.sort((a, b) => a.x - b.x)[0].x;
-        for (const e of this.enemies) {
-          if (e.hp <= 0 || Math.abs(e.x - cx) > (S.splash as number)) continue;
-          this.damage(e, base * (S.mult as number), 'physical');
-          e.slowUntil = t + (S.slowDur as number);
-          e.slowPct = Math.max(e.slowPct, S.slowPct as number);
-          e.healBlockUntil = t + (S.healBlock as number);
+        const target = inR.sort((a, b) => a.x - b.x)[0];
+        // 가스탄은 투사체로 날아가 착탄 시 광역·둔화 (SKILLS.md 스펙)
+        this.fireProjectile(u.x, target, base * (S.mult as number), {
+          dmgType: 'physical', projSpeed: 460,
+          splashRadius: S.splash as number, slowPct: S.slowPct as number, slowDur: S.slowDur as number,
+        }, false, 'gasmask:skill');
+        for (const e of this.enemies) { // 가스 확산 — 회복 차단
+          if (e.hp > 0 && Math.abs(e.x - target.x) <= (S.splash as number)) e.healBlockUntil = t + (S.healBlock as number);
         }
         return true;
       }
@@ -605,9 +633,12 @@ export class Battle {
           .filter((e) => e.hp > 0 && e.x >= u.x - 10 && e.x - u.x <= u.spec.range && (!e.air || u.spec.antiAirPct > 0))
           .sort((a, b) => a.x - b.x).slice(0, S.maxTargets as number);
         if (!line.length) return false;
-        line.forEach((e, i) => {
-          const f = i === 0 ? 1 : Math.pow(S.chainPct as number, i);
-          this.damage(e, base * (S.mult as number) * f, 'physical', S.pierceArmor as number);
+        // 첫 대상은 관통탄(투사체)으로, 뒤쪽은 관통 피해로 즉시 적용
+        this.fireProjectile(u.x, line[0], base * (S.mult as number), {
+          dmgType: 'magic', projSpeed: 720, splashRadius: 0, slowPct: 0, slowDur: 0,
+        }, false, 'sniper:skill');
+        line.slice(1).forEach((e, i) => {
+          this.damage(e, base * (S.mult as number) * Math.pow(S.chainPct as number, i + 1), 'physical', S.pierceArmor as number);
         });
         return true;
       }
@@ -856,6 +887,7 @@ export class Battle {
       if (targets.length) {
         if (u.shotCd <= 0) {
           u.shotCd = 0.8;
+          u.atkCount += 1; // FR-6.5d 평타 누적
           const dmg = u.spec.dps * 0.8 * atkMult;
           for (const e of targets) {
             const mult = e.air ? u.spec.antiAirPct : 1;
@@ -873,7 +905,8 @@ export class Battle {
       }
     }
     this.checkRage(); // FR-6.10b 본진 위기 → 반격 분대
-    this.castUnitSkills(atkMult); // FR-6.5b 유닛 자동 스킬
+    this.castUnitSkills(atkMult); // FR-6.5b 유닛 자동 스킬 (타수 충족 시 예약)
+    this.runPendingSkills(atkMult); // FR-6.5d 큐 프레임 판정
     this.castEnemySkills(); // FR-6.7b 적 자동 스킬
 
     // 적 행동

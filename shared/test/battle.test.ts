@@ -219,12 +219,12 @@ describe('Battle 엔진', () => {
     b.spawnUnit('club');
     const u = b.units[0];
     u.x = 500;
-    u.nextSkillAt = 0.2;
+    u.atkCount = 99; // 평타 조건 충족 상태로 세팅 (FR-6.5d)
     const anyB = b as unknown as { enemies: unknown[] };
     for (let i = 0; i < 3; i++) {
       anyB.enemies.push({ id: 930 + i, type: 'grunt', x: 520 + i * 12, hp: 900, maxHp: 900, baseSpeed: 0, dps: 0, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 0, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false, nextSkillAt: 999, lastSkillAt: -9, shieldUntil: 0, hasteUntil: 0, armorCutUntil: 0, armorCutPct: 0, dotUntil: 0, dotDps: 0, healBlockUntil: 0, knockUntil: 0, knockFrom: 0, knockTo: 0, stunImmuneUntil: 0, dpsBuffUntil: 0, dpsBuffPct: 0, vulnUntil: 0, vulnPct: 0 } as never);
     }
-    advanceAlive(b, 0.6);
+    advanceAlive(b, 1.2); // 큐 프레임 지연(0.27초) 이후 판정
     const es = b.enemies as unknown as { stunUntil: number; stunImmuneUntil: number; hp: number }[];
     expect(es.filter((e) => e.stunUntil > 0).length).toBeGreaterThanOrEqual(3); // 광역 기절
     expect(es[0].stunImmuneUntil).toBeGreaterThan(es[0].stunUntil); // 스턴락 방지 면역창

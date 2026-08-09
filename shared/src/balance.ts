@@ -195,26 +195,50 @@ export const ENEMY_SKILL_PERIOD: Record<EnemyTypeSpec['key'], number> = {
  *  - 권총 장교 '회피 무시' → 회피 스탯 없음 + 스킬 시트도 없음 → 로스터 제외
  */
 export const UNIT_SKILL = {
-  club: { mult: 1.8, maxTargets: 4, arc: 60, stun: 0.9, knock: 50 }, // 종울림 강타
-  scissor: { mult: 1.1, hits: 2, bleedPct: 0.25, bleedDur: 4, armorCut: 0.25, cutDur: 4 }, // 십자 절단
-  foreman: { mult: 2.2, maxTargets: 5, arc: 72, stun: 0.8, slowPct: 0.45, slowDur: 2, selfGuard: 4 }, // 작업 개시
-  apprentice: { mult: 0.7, hits: 4, cdCut: 1.5 }, // 견습의 연타
-  gasmask: { mult: 1.0, splash: 55, slowPct: 0.2, slowDur: 5, healBlock: 5 }, // 독가스탄
-  sniper: { mult: 3.4, pierceArmor: 0.5, chainPct: 0.6, maxTargets: 4 }, // 조준 관통 사격
-  roundshield: { mult: 1.2, maxTargets: 3, knock: 140, selfGuard: 3 }, // 돌격 방패
-  shutter: { mult: 0.8, maxTargets: 3, shieldPct: 0.25, shieldDur: 5, allies: 3 }, // 셔터 전개
-  bricker: { mult: 1.6, maxTargets: 4, arc: 56, slowPct: 0.4, slowDur: 3 }, // 벽돌 투척
+  club: { mult: 1.2, maxTargets: 4, arc: 60, stun: 0.9, knock: 50 }, // 종울림 강타
+  scissor: { mult: 0.8, hits: 2, bleedPct: 0.2, bleedDur: 4, armorCut: 0.25, cutDur: 4 }, // 십자 절단
+  foreman: { mult: 1.5, maxTargets: 5, arc: 72, stun: 0.8, slowPct: 0.45, slowDur: 2, selfGuard: 4 }, // 작업 개시
+  apprentice: { mult: 0.5, hits: 4, hitCut: 2 }, // 견습의 연타 (다음 시전 필요 타수 −2)
+  gasmask: { mult: 0.8, splash: 55, slowPct: 0.2, slowDur: 5, healBlock: 5 }, // 독가스탄 (투사체)
+  sniper: { mult: 2.2, pierceArmor: 0.5, chainPct: 0.6, maxTargets: 4 }, // 조준 관통 사격 (투사체)
+  roundshield: { mult: 0.9, maxTargets: 3, knock: 140, selfGuard: 3 }, // 돌격 방패
+  shutter: { mult: 0.6, maxTargets: 3, shieldPct: 0.25, shieldDur: 5, allies: 3 }, // 셔터 전개
+  bricker: { mult: 1.1, maxTargets: 4, arc: 56, slowPct: 0.4, slowDur: 3 }, // 벽돌 투척
 } as const;
+
+/**
+ * FR-6.5d 스킬 발동 조건 — **평타 N회 후 시전** (타이머 아님).
+ * 유닛은 교전 중에만 평타를 치므로, 실제로 싸운 만큼만 스킬이 나간다.
+ * 평타 주기는 0.8초이므로 N×0.8초가 최소 간격이 된다.
+ */
+export const UNIT_SKILL_HITS: Record<string, number> = {
+  apprentice: 5, // 4.0초 — 가장 빠른 회전
+  scissor: 7, // 5.6초
+  club: 8, // 6.4초
+  sniper: 8, // 6.4초
+  gasmask: 8, // 6.4초
+  foreman: 10, // 8.0초
+  roundshield: 10,
+  bricker: 10,
+  shutter: 11, // 8.8초 — 보호막이라 가장 김
+};
+
+/** 스킬 큐 프레임까지의 지연(초) — 이 시점에 판정·투사체가 나가야 모션과 맞는다 */
+export const SKILL_CUE_S: Record<string, number> = {
+  club: 0.27, scissor: 0.27, foreman: 0.27, apprentice: 0.09,
+  gasmask: 0.27, sniper: 0.27, roundshield: 0.27, shutter: 0.27, bricker: 0.27,
+  grunt: 0.27, shield: 0.27, runner: 0.27, tank: 0.27, air: 0.20, healer: 0.27, boss: 0.45,
+};
 
 /** FR-6.7c 적 스킬 수치표 (엔진 타입 기준 — 렌더 시트와 1:1) */
 export const ENEMY_SKILL = {
-  grunt: { mult: 1.4, pierceArmor: 0.3, targets: 2, chainPct: 0.7, selfHaste: 2 }, // 창 망령 관통 찌르기
-  shield: { mult: 1.2, breakShield: true, markPct: 0.2, markDur: 5 }, // 방패 파쇄병 방패 부수기
+  grunt: { mult: 1.1, pierceArmor: 0.3, targets: 2, chainPct: 0.7, selfHaste: 2 }, // 창 망령 관통 찌르기
+  shield: { mult: 0.9, breakShield: true, markPct: 0.2, markDur: 5 }, // 방패 파쇄병 방패 부수기
   runner: { mult: 0.85, hits: 2, slowPct: 0.3, slowDur: 3 }, // 석궁 사수 삼연사
-  tank: { mult: 1.0, spots: 2 }, // 다연장 포병 융단 포격
+  tank: { mult: 0.8, spots: 2 }, // 다연장 포병 융단 포격
   air: { markPct: 0.12, markDur: 6 }, // 연 정찰기 표적 지정
   healer: { dpsBuff: 0.12, dur: 5, radius: 340, selfVuln: 0.2 }, // 확성기 드론 선동 방송
-  boss: { mult: 1.0, targets: 2, stun: 0.5, markPct: 0.12, markDur: 3 }, // 번개 왕 낙뢰 심판
+  boss: { mult: 0.8, targets: 2, stun: 0.5, markPct: 0.12, markDur: 3 }, // 번개 왕 낙뢰 심판
 } as const;
 
 export const STUN_IMMUNE_S = 3; // 기절 종료 후 재기절 면역 (스턴락 방지)
