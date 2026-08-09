@@ -5,12 +5,13 @@
 ## 요구 사항
 
 - Node.js 20+
-- Python 3.11+ (`pip install yfinance` — 데이터 수집용)
+- Python 3.11+ (`pip install -r pipeline/requirements.txt` — 데이터 수집용)
 
 ## 실행
 
 ```bash
 npm install
+pip install -r pipeline/requirements.txt
 
 # 1) 데이터 수집 (최초 1회, ~1분) — yfinance로 국내 주식 30종목 × 일봉 10년치
 npm run fetch

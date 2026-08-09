@@ -177,7 +177,7 @@ TICKER FRONT — 게임 소개 및 설명 문서
     npm install
     pip install -r pipeline/requirements.txt
 
-    npm run fetch        # 한국 증시 일봉 10년치 수집 (30종목)
+    npm run fetch        # 한국 증시 일봉 10년치 수집 (30종목, 약 2분)
     npm run build:data   # 스테이지 윈도우 슬라이싱 + 아키타입 분류
     npm run seed         # DB 시드
     npm run dev          # 서버 :3000 + 웹 :5173 동시 기동
@@ -186,6 +186,8 @@ TICKER FRONT — 게임 소개 및 설명 문서
 
     ※ 차트 데이터(server/static/bars/)와 DB는 용량 문제로 저장소에
       포함하지 않았다. 위 3개 명령으로 로컬에서 생성된다.
+      빈 저장소에서 클론 → 위 절차 → 게임 구동까지 실제로 검증했다
+      (30종목 2,447일 수집 → 892조합 생성 → 서버·웹 기동 → 스테이지 시작 확인).
 
 ■ 검증 명령
 

@@ -1,0 +1,2 @@
+# 차트 데이터 수집 (pipeline/fetch_krx.py) — 나머지는 표준 라이브러리만 사용
+yfinance>=0.2.40
