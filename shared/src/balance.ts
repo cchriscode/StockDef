@@ -171,8 +171,10 @@ export const UNIT_SKILL_PERIOD: Record<UnitSpec['key'], number> = {
   mage: 14, // 레버리지 오브 — 마법 광역탄 (dps×2.2, 폭발 70)
   riskmgr: 5, // 헤지 커버 — 사옥 즉시 +3 회복 (오라 패시브와 별도 버스트)
   cane: 9999, // 임시 유닛 — 스킬 없음
-  club: 9999, scissor: 9999, apprentice: 9999, foreman: 9999, roundshield: 9999, // [임시] 프리뷰 유닛 — 스킬 없음
-  shutter: 9999, bricker: 9999, pistol: 9999, gasmask: 9999, sniper: 9999,
+  // 신규 로스터 자동 스킬 (skill-sprites 시트 연동): 근접 강타 / 탱커 방벽 강타 / 원거리 강화탄
+  club: 9, scissor: 9, apprentice: 8, // 근접 — 전방 광역 강타
+  foreman: 11, roundshield: 12, shutter: 12, bricker: 11, // 탱커 — 강타 + 자기 방어
+  pistol: 9999, gasmask: 12, sniper: 12, // 원거리 — 강화탄 (권총 장교는 스킬 시트 없음)
 };
 export const ENEMY_SKILL_PERIOD: Record<EnemyTypeSpec['key'], number> = {
   grunt: 9, // 3점사 — 블로킹 중 추가 일격 (dps×1.5)

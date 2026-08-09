@@ -63,8 +63,129 @@ export const SHEET_UNIT: Record<string, string> = {
   roundshield: 'A-03_1', shutter: 'A-03_2', bricker: 'A-03_3',
 };
 
+/** 엔진 적 타입 → 신규 시트 id (보스는 지역별 변주) */
+export const SHEET_ENEMY: Record<string, string> = {
+  grunt: 'enemy_a_1', // 창 망령
+  runner: 'enemy_b_1', // 석궁 사수
+  tank: 'enemy_b_2', // 다연장 포병
+  shield: 'enemy_a_2', // 방패 파쇄병
+  healer: 'enemy_c_2', // 확성기 드론
+  air: 'enemy_c_1', // 연 정찰기
+  boss: 'enemy_d_1', // 번개 왕 (R3는 드릴 워커)
+};
+export function enemySheetId(type: string, regionId: string): string {
+  if (type === 'boss' && regionId === 'R3') return 'enemy_d_2'; // 드릴 워커
+  return SHEET_ENEMY[type] ?? 'enemy_a_1';
+}
+
+// ─── 스킬 시트 (skills.json 요약) — cueFrame에 판정·투사체 생성 ───
+interface SkillSpec { frames: number; durationsMs: number[]; cueFrame: number; cell: 'skill' | 'skillEffect' }
+const SK = (d: number[], cue: number, cell: 'skill' | 'skillEffect' = 'skill'): SkillSpec =>
+  ({ frames: d.length, durationsMs: d, cueFrame: cue, cell });
+const D8 = [90, 90, 90, 140, 90, 90, 90, 180];
+export const SKILL_SPEC: Record<string, SkillSpec> = {
+  'A-01_1': SK(D8, 3), 'A-01_2': SK([...D8.slice(0, 7), 90, 180], 3), 'A-01_3': SK(D8, 3),
+  'A-01_7': SK([90, 140, 90, 180], 1),
+  'A-02_2': SK(D8, 3), 'A-02_3': SK(D8, 3),
+  'A-03_1': SK(D8, 3), 'A-03_2': SK(D8, 3), 'A-03_3': SK(D8, 3),
+  enemy_a_1: SK(D8, 3), enemy_a_2: SK(D8, 3),
+  enemy_b_1: SK(D8, 3), enemy_b_2: SK([90, 90, 90, 140, 140, 190], 3),
+  enemy_c_1: SK([100, 100, 120, 180], 2, 'skillEffect'),
+  enemy_d_1: SK([130, 150, 170, 200, 150, 140, 140, 220], 3),
+  enemy_d_2: SK([120, 140, 150, 180, 140, 140, 140, 220], 3),
+};
+export const SKILL_TOTAL_MS: Record<string, number> = Object.fromEntries(
+  Object.entries(SKILL_SPEC).map(([k, s]) => [k, s.durationsMs.reduce((a, b) => a + b, 0)]),
+);
+/** 스킬이 정의된 시트인지 (A-02_1 권총 장교는 스킬 시트 없음) */
+export function hasSkillSheet(sheetId: string): boolean {
+  return !!SKILL_SPEC[sheetId];
+}
+
+/** 경과(ms) → 프레임 인덱스, 끝나면 null */
+function skillFrameAt(spec: SkillSpec, elapsedMs: number): number | null {
+  let acc = 0;
+  for (let i = 0; i < spec.frames; i++) {
+    acc += spec.durationsMs[i];
+    if (elapsedMs < acc) return i;
+  }
+  return null;
+}
+
+/** 스킬 모션 렌더 — 그려졌으면 true (셀이 일반 모션보다 커서 전용 앵커 사용) */
+export function drawSkill(
+  ctx: CanvasRenderingContext2D,
+  sheetId: string,
+  elapsedSec: number,
+  cx: number,
+  baseY: number,
+): boolean {
+  const spec = SKILL_SPEC[sheetId];
+  if (!spec) return false;
+  const f = skillFrameAt(spec, elapsedSec * 1000);
+  if (f == null) return false;
+  const img = sheet(sheetId, 'skill');
+  if (!img) return false;
+  const cellW = img.naturalWidth / spec.frames;
+  const cellH = img.naturalHeight;
+  const dw = cellW * SCALE;
+  const dh = cellH * SCALE;
+  const oy = spec.cell === 'skillEffect' ? 0.5 : 0.9318;
+  ctx.drawImage(img, f * cellW, 0, cellW, cellH, cx - dw / 2, baseY - dh * oy, dw, dh);
+  return true;
+}
+
+// ─── 투사체 (ally-sprites *_shot.png) — travel 0~1 루프 / impact 2~3 원샷 ───
+const SHOT_ORIGIN: Record<string, [number, number]> = {
+  ally: [313 / 416, 112 / 224],
+  enemy: [182 / 560, 115 / 240],
+  air: [182 / 512, 335 / 464],
+};
+export const SHOT_SHEET: Record<string, string> = { // 유닛/적 키 → 투사체 시트 id
+  pistol: 'A-02_1', gasmask: 'A-02_2', sniper: 'A-02_3',
+  runner: 'enemy_b_1', tank: 'enemy_b_2', air: 'enemy_c_1', healer: 'enemy_c_2',
+};
+
+/** 비행 중 투사체 / 착탄 이펙트 렌더 */
+export function drawShot(
+  ctx: CanvasRenderingContext2D,
+  shotId: string,
+  side: 'ally' | 'enemy' | 'air',
+  t: number,
+  cx: number,
+  cy: number,
+  impactPhase: number | null, // null = 비행 중, 0~1 = 착탄 재생
+): boolean {
+  const img = sheet(shotId, 'shot');
+  if (!img) return false;
+  const cellW = img.naturalWidth / 4;
+  const cellH = img.naturalHeight;
+  const f = impactPhase == null ? Math.floor(t * 16) % 2 : (impactPhase < 0.42 ? 2 : 3);
+  const s = SCALE * 0.62; // 투사체는 캐릭터보다 작게
+  const dw = cellW * s;
+  const dh = cellH * s;
+  const [ox, oy] = SHOT_ORIGIN[side];
+  ctx.drawImage(img, f * cellW, 0, cellW, cellH, cx - dw * ox, cy - dh * oy, dw, dh);
+  return true;
+}
+
+/** 번개 왕 낙뢰 FX — 대상 발밑에 세로 기둥 */
+export function drawStrikeFx(ctx: CanvasRenderingContext2D, elapsedSec: number, cx: number, groundY: number): boolean {
+  const durs = [60, 70, 140];
+  const f = skillFrameAt({ frames: 3, durationsMs: durs, cueFrame: 0, cell: 'skill' }, elapsedSec * 1000);
+  if (f == null) return false;
+  const img = sheet('enemy_d_1', 'fx');
+  if (!img) return false;
+  const cellW = img.naturalWidth / 3;
+  const cellH = img.naturalHeight;
+  const dw = cellW * SCALE;
+  const dh = cellH * SCALE;
+  ctx.drawImage(img, f * cellW, 0, cellW, cellH, cx - dw * 0.5, groundY - dh * 0.9712, dw, dh);
+  return true;
+}
+
 const imgCache = new Map<string, HTMLImageElement>();
-function sheet(id: string, motion: 'walk' | 'attack'): HTMLImageElement | null {
+function sheet(id: string, motion: 'walk' | 'attack' | 'skill' | 'shot' | 'fx'): HTMLImageElement | null {
   const key = `${id}_${motion}`;
   let img = imgCache.get(key);
   if (!img) {
@@ -82,7 +203,7 @@ function sheet(id: string, motion: 'walk' | 'attack'): HTMLImageElement | null {
 export function drawSheetChar(
   ctx: CanvasRenderingContext2D,
   sheetId: string,
-  kind: PreviewKind,
+  kind: 'ground' | 'air' | 'boss',
   attackPhase: number | null, // 0~1 (공격 중) / null (걷기)
   t: number,
   cx: number,

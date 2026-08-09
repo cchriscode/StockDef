@@ -580,7 +580,8 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           <div className="f a"><i />{hud.aum.toLocaleString()}</div>
         </div>
         <div className="cmd-units">
-          {UNITS.map((u) => {
+          {/* [임시] 신규 아트 로스터만 노출 — 기존 벡터(리그) 유닛은 잠시 숨김 */}
+          {UNITS.filter((u) => SHEET_UNIT[u.key] || u.key === 'cane').map((u) => {
             const cost = battle.unitCost(u.key);
             return (
               <span key={u.key} className="ub-wrap">

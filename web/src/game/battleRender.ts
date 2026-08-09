@@ -4,7 +4,10 @@ import { BASE_TURRET, ENEMY_TYPES, TOWERS, type Battle, type Enemy } from '@tf/s
 import { BACKDROPS, BACKDROP_GROUND, BACKDROP_H, BACKDROP_W, type Backdrop } from './battleBackdrops.js';
 import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
-import { SHEET_UNIT, drawPreviews, drawSheetChar, sheetCharHeight } from './previewSprites.js'; // [임시] 신규 아트 프리뷰
+import { // [임시] 신규 아트 로스터 (아군·적군 전면 교체)
+  SHEET_UNIT, SHOT_SHEET, SKILL_TOTAL_MS, drawPreviews, drawSheetChar, drawShot, drawSkill,
+  enemySheetId, hasSkillSheet, sheetCharHeight,
+} from './previewSprites.js';
 
 const AIR_Y = 96;
 const GROUND_Y = 258; // 캔버스 1400×300 기준 — 스프라이트는 고정 px, 레인만 길어진다
@@ -403,10 +406,19 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const hitEl = b.t - (st.hitT.get(`u${u.id}`) ?? -9);
     const moved = Math.abs(u.x - (st.prevUnits.get(u.id)?.x ?? u.x)) > 0.01;
     const atkEl = UNIT_ATK_DUR - u.shotCd; // 발사 시 shotCd=0.8 리셋 → 경과 위상
-    if (SHEET_UNIT[u.key]) { // [임시] 신규 시트 유닛 (1G 프리뷰) — 리그 대신 PNG 시트
+    if (SHEET_UNIT[u.key]) { // [임시] 신규 시트 유닛 — 리그 대신 PNG 시트 (스킬 모션 우선)
+      const sid = SHEET_UNIT[u.key];
+      const skEl = b.t - u.lastSkillAt;
+      const skTotal = (SKILL_TOTAL_MS[sid] ?? 0) / 1000;
+      if (hasSkillSheet(sid) && skEl >= 0 && skEl < skTotal) {
+        drawSkill(ctx, sid, skEl, ux, groundTop);
+        hpBar(ctx, ux - 9, groundTop - sheetCharHeight(sid) - 8, 18, u.hp / u.maxHp, '#7BD8A0');
+        st.prevUnits.set(u.id, { key: u.key, x: u.x });
+        continue;
+      }
       const atkEl = UNIT_ATK_DUR - u.shotCd;
       const phase = u.shotCd > 0 && atkEl >= 0 && atkEl < 0.5 ? atkEl / 0.5 : null;
-      if (!drawSheetChar(ctx, SHEET_UNIT[u.key], 'ground', phase, b.t, ux, groundTop)) {
+      if (!drawSheetChar(ctx, sid, 'ground', phase, b.t, ux, groundTop)) {
         ctx.fillStyle = '#7BD8A0';
         ctx.beginPath();
         ctx.arc(ux, groundTop - 10, 8, 0, Math.PI * 2);
@@ -493,6 +505,35 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const prevX = st.prevEnemies.get(e.id)?.x;
     const moved = prevX == null || Math.abs(e.x - prevX) > 0.01;
     const eSkillEl = b.t - (e.lastSkillAt ?? -9); // FR-6.7b 적 자동 스킬 연출
+    // [임시] 신규 시트 적 — 리그 대신 PNG 시트 (스킬 → 교전 → 이동 순 우선)
+    const esid = enemySheetId(e.type, b.params.regionId);
+    const eskTotal = (SKILL_TOTAL_MS[esid] ?? 0) / 1000;
+    const eBaseY = e.air ? AIR_Y + hh / 2 : groundTop;
+    let drawn = false;
+    if (!stunned && hasSkillSheet(esid) && eSkillEl >= 0 && eSkillEl < eskTotal) {
+      drawn = drawSkill(ctx, esid, eSkillEl, ex, eBaseY);
+    }
+    if (!drawn) {
+      const engagedNow = !moved && !stunned;
+      const aPhase = engagedNow ? ((b.t + e.id * 0.41) % 0.6) / 0.6 : null;
+      drawn = drawSheetChar(ctx, esid, e.type === 'boss' ? 'boss' : e.air ? 'air' : 'ground', aPhase, b.t + e.id * 0.41, ex, eBaseY);
+    }
+    if (drawn) {
+      if (slowed) { // 슬로우 표시는 오버레이로 (시트에 필터를 걸면 매 프레임 비용이 큼)
+        ctx.fillStyle = 'rgba(94,154,160,0.22)';
+        ctx.fillRect(ex - 18, topY, 36, hh);
+      }
+      const bw2 = e.type === 'boss' ? 34 : 18;
+      hpBar(ctx, ex - bw2 / 2, (e.air ? AIR_Y + hh / 2 : groundTop) - sheetCharHeight(esid) - 8, bw2, e.hp / e.maxHp, col);
+      if (stunned) {
+        ctx.fillStyle = '#FFC53D';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('✶', ex, topY - 10);
+      }
+      st.prevEnemies.set(e.id, { type: e.type, x: e.x, air: e.air, h: hh });
+      continue;
+    }
     let img: HTMLCanvasElement | null = null;
     if (stunned) img = rigFrame(rigIdx, 'hit', 0.55, true); // 경직 프레임 고정
     else if (hitEl < HIT_DUR) img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
@@ -574,6 +615,8 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.fillStyle = '#FFE9C4';
       ctx.fillRect(px + Math.cos(spin) * 3 - 1.5, y + Math.sin(spin) * 3 - 1.5, 3, 3);
       ctx.restore();
+    } else if (!p.fromTower && drawShot(ctx, 'A-02_3', 'ally', b.t + p.id, px, (p.air ? AIR_Y : GROUND_Y) - 6, null)) {
+      // [임시] 아군 유닛 투사체 — 신규 시트 (저격탄 공용)
     } else {
       const y = (p.air ? AIR_Y : GROUND_Y) - (p.fromTower ? 14 : 4) + Math.sin(p.x * 0.15) * 2;
       const len = p.fromTower ? 16 : 11;

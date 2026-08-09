@@ -112,6 +112,11 @@ interface PendingSpawn {
   speed: number;
 }
 
+// [임시] 신규 시트 로스터 역할군 — 자동 스킬 분기용
+const SHEET_MELEE = new Set(['club', 'scissor', 'apprentice']);
+const SHEET_TANK = new Set(['foreman', 'roundshield', 'shutter', 'bricker']);
+const SHEET_RANGED = new Set(['gasmask', 'sniper']);
+
 export type BattlePhase = 'prep' | 'wave' | 'overtime' | 'done';
 
 export class Battle {
@@ -436,6 +441,26 @@ export class Battle {
       } else if (u.key === 'riskmgr') { // 헤지 커버 — 사옥 즉시 회복 버스트
         this.baseHP = Math.min(BALANCE.BASE_HP, this.baseHP + 3);
         cast = true;
+      } else if (SHEET_MELEE.has(u.key)) { // 신규 근접 — 전방 광역 강타
+        const ts = this.enemies.filter((e) => !e.air && e.hp > 0 && e.x - u.x >= -8 && e.x - u.x <= 58);
+        if (ts.length) {
+          for (const e of ts) this.damage(e, u.spec.dps * 2.2 * atkMult, 'physical');
+          cast = true;
+        }
+      } else if (SHEET_TANK.has(u.key)) { // 신규 탱커 — 강타 + 자기 방어 (3초 −60%)
+        const ts = this.enemies.filter((e) => !e.air && e.hp > 0 && e.x - u.x >= -8 && e.x - u.x <= 52);
+        if (ts.length) {
+          for (const e of ts) this.damage(e, u.spec.dps * 1.8 * atkMult, 'physical');
+          u.shieldUntil = t + 3;
+          cast = true;
+        }
+      } else if (SHEET_RANGED.has(u.key)) { // 신규 원거리 — 강화탄 (관통 판정)
+        const ts = inRange(u.spec.range);
+        if (ts.length) {
+          this.fireProjectile(u.x, ts[0], u.spec.dps * 2.5 * atkMult,
+            { dmgType: 'magic', projSpeed: 620, splashRadius: 0, slowPct: 0, slowDur: 0 }, false);
+          cast = true;
+        }
       }
       if (cast) {
         u.lastSkillAt = t;
