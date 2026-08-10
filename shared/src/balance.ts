@@ -30,6 +30,9 @@ export const BALANCE = {
   HEAT_PER_TERRITORY: 0.02,
   AUM_BY_DESK_LV: [2000, 2400, 2800],
   BASE_HP: 100,
+  // FR-6.11 (2026-08-10): 적은 사옥을 통과해 소멸하지 않고 그 자리에서 사옥을 친다.
+  // 초당 피해 = 적 baseDmg × 이 계수 (봇 시뮬로 결정)
+  BASE_ATTACK_DPS_MULT: 0.35,
   ENEMY_BASE_HP: 300,
   RETRY_CAPITAL_MULT: 0.5,
   // FR-6.3c (2026-08-10): 슬롯 3칸 — 사옥 위 2 + 지면 1. 사옥을 등분해 옥상·중층에 포탑을 얹는다
@@ -40,11 +43,12 @@ export const BALANCE = {
   SKILL_COOLDOWN_S: 25, // 2026-08-05 난이도 개편: 스킬을 더 자주 쓰는 대신 적이 강해짐
   SKILL_DAMAGE: 80,
   // FR-2.6 난이도 모드 — 스테이지 진입 전 선택. 하드가 기본 밸런스이고 이지는 완화 계수를 곱한다.
-  // 계수는 봇 시뮬 실측으로 정했다 (R1 p=55%: 하드 5~10% → 이지 50~57% 클리어).
+  // 계수는 봇 시뮬 실측으로 정한다 (R1 p=55% 기준 이지 50~60%가 목표).
   // 골드를 늘리는 방식은 +100%를 줘도 10→13%에 그쳐(전열이 먼저 무너짐) 스탯 완화로 간다.
-  EASY_HP_MULT: 0.55, // 이지: 적 체력 −45%
-  EASY_DPS_MULT: 0.6, // 이지: 적 공격력 −40%
-  EASY_COUNT_MULT: 0.7, // 이지: 적 수 −30%
+  // 2026-08-10 재조정: 적이 사옥 앞에 쌓여 계속 싸우게 되면서(FR-6.11) 압력이 올라 한 단계 더 완화.
+  EASY_HP_MULT: 0.4, // 이지: 적 체력 −60%
+  EASY_DPS_MULT: 0.45, // 이지: 적 공격력 −55%
+  EASY_COUNT_MULT: 0.6, // 이지: 적 수 −40%
   EASY_CAPITAL_MULT: 0.7, // 이지: 자본금 보상 70% (쉬운 만큼 성장은 느리게)
   ENEMY_HP_MULT: 1.3, // 2026-08-05 전 지역 적 체력 +30% (플레이테스트 "너무 쉽다" 반영)
   ENEMY_DPS_MULT: 1.3, // 적 공격력 +30%
@@ -327,7 +331,8 @@ export const ENEMY_TYPES: Record<EnemyTypeSpec['key'], EnemyTypeSpec> = {
   runner: { key: 'runner', name: '스캘퍼', icon: '💨', hpMult: 0.55, speedMult: 1.8, armor: 0, mr: 0, dpsMult: 0.7, healPerSec: 0, baseDmg: 8, isAir: false, size: 6, aumBounty: 1 },
   tank: { key: 'tank', name: '기관 물량', icon: '🛡', hpMult: 2.2, speedMult: 0.6, armor: 0.4, mr: 0, dpsMult: 1.4, healPerSec: 0, baseDmg: 18, isAir: false, size: 11, aumBounty: 5 },
   shield: { key: 'shield', name: '로펌 실드', icon: '⚖', hpMult: 1.3, speedMult: 0.8, armor: 0.55, mr: 0, dpsMult: 1, healPerSec: 0, baseDmg: 12, isAir: false, size: 9, aumBounty: 3 },
-  healer: { key: 'healer', name: '리스크 헤지', icon: '➕', hpMult: 0.9, speedMult: 0.9, armor: 0, mr: 0.3, dpsMult: 0.5, healPerSec: 6, baseDmg: 8, isAir: false, size: 8, aumBounty: 3 },
+  // 확성기 드론 스프라이트를 쓰므로 실제로도 공중 유닛 (지상 판정이면 드론이 걸어 다닌다)
+  healer: { key: 'healer', name: '리스크 헤지', icon: '➕', hpMult: 0.9, speedMult: 0.9, armor: 0, mr: 0.3, dpsMult: 0.5, healPerSec: 6, baseDmg: 8, isAir: true, size: 8, aumBounty: 3 },
   air: { key: 'air', name: '드론', icon: '✈', hpMult: 0.8, speedMult: 1.15, armor: 0, mr: 0.3, dpsMult: 0.8, healPerSec: 0, baseDmg: 10, isAir: true, size: 8, aumBounty: 2 },
   boss: { key: 'boss', name: '베어 간부', icon: '👹', hpMult: 5.5, speedMult: 0.45, armor: 0.25, mr: 0.2, dpsMult: 3, healPerSec: 0, baseDmg: 30, isAir: false, size: 15, aumBounty: 12 },
 };

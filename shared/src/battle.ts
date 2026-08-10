@@ -14,7 +14,11 @@ import type { MarketEvent, RegionId, StageParams } from './types.js';
 export const FIELD_W = 1000;
 const PLAYER_BASE_X = 0;
 const ENEMY_BASE_X = FIELD_W;
-const UNIT_SPAWN_X = 70;
+// 2026-08-10 사옥·적 본진을 2배로 키우면서 전장 앵커도 함께 밀었다 (건물 안에서 소환·공격하지 않도록).
+// 필드 1000단위 = 캔버스 1800px 기준: 사옥은 world 2~92, 적 본진은 863~999를 차지한다.
+const UNIT_SPAWN_X = 100;
+const BASE_ATTACK_X = 100; // 적이 사옥을 때리는 위치 (건물 오른쪽 끝 바로 밖)
+const ENEMY_BASE_ATTACK_X = 150; // 아군이 적 본진을 때리는 거리
 const SIM_DT = 0.05;
 const HEAL_RADIUS = 120;
 const PROJ_HIT_DIST = 12;
@@ -37,7 +41,6 @@ export interface Enemy {
   slowUntil: number;
   slowPct: number;
   stunUntil: number;
-  leaked: boolean; // 본진 도달로 소멸 (처치 아님 → AUM 보상 없음)
   nextSkillAt: number; // FR-6.7b 자동 스킬 다음 시전 시각
   lastSkillAt: number; // 최근 시전 시각 (렌더 재생 기준)
   shieldUntil: number; // 실드베어러 육각 실드 — 받는 피해 −70% 만료 시각
@@ -305,7 +308,7 @@ export class Battle {
    */
   towerSlotX(slot: number): number {
     if (slot < BALANCE.BASE_TOWER_SLOTS) return 26; // 사옥 중심 (캔버스 ~47px)
-    return 90 + (slot - BALANCE.BASE_TOWER_SLOTS) * 55;
+    return 115 + (slot - BALANCE.BASE_TOWER_SLOTS) * 55; // 지면 슬롯 — 커진 사옥 바깥
   }
 
   /** 해당 슬롯이 사옥 탑재인지 (렌더·건설 제한용) */
@@ -344,7 +347,7 @@ export class Battle {
   private aliveOrDeathFx(e: Enemy): boolean {
     if (e.hp > 0) return true;
     this.pushFx('death', e.x, e.air, 0);
-    if (!e.leaked) { // 처치 보상: 트레이딩 자본(AUM) 회복
+    { // 처치 보상: 트레이딩 자본(AUM) 회복
       const bounty = ENEMY_TYPES[e.type].aumBounty;
       this.aumEarned += bounty;
       this.pushFx('aum', e.x, e.air, bounty);
@@ -450,7 +453,7 @@ export class Battle {
       dps: (6 + p.wave * 0.6) * et.dpsMult * (this.params.regionId === 'TUT' ? 1 : this.params.enemyDpsMult),
       armor: et.armor, mr: et.mr, air: et.isAir, size: et.size,
       wave: p.wave, baseDmg: et.baseDmg, healPerSec: et.healPerSec,
-      slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false,
+      slowUntil: 0, slowPct: 0, stunUntil: 0,
       nextSkillAt: this.t + ENEMY_SKILL_PERIOD[p.type], lastSkillAt: -9, shieldUntil: 0, hasteUntil: 0,
       armorCutUntil: 0, armorCutPct: 0, dotUntil: 0, dotDps: 0, healBlockUntil: 0,
       knockUntil: 0, knockFrom: 0, knockTo: 0, stunImmuneUntil: 0,
@@ -956,7 +959,7 @@ export class Battle {
       if (u.spec.dps <= 0) { // 서포터(리스크 매니저): 비공격 — 전열 뒤에서 따라간다
         const ahead = this.units.some((o) => o !== u && o.spec.dps > 0 && o.x > u.x && o.x - u.x < 40);
         const enemyNear = this.enemies.some((e) => !e.air && e.x - u.x >= -6 && e.x - u.x <= 30);
-        if (!ahead && !enemyNear && u.x < ENEMY_BASE_X - 80) u.x += u.spec.speed * dt;
+        if (!ahead && !enemyNear && u.x < ENEMY_BASE_X - ENEMY_BASE_ATTACK_X - 20) u.x += u.spec.speed * dt;
         continue;
       }
       const inRange = this.enemies.filter((e) =>
@@ -971,7 +974,7 @@ export class Battle {
           u.atkCount += 1; // 평타 누적 (스킬 발동 조건)
           this.pendingSkills.push({ kind: 'atk', id: u.id, at: t + ATTACK_CUE_S });
         }
-      } else if (u.x >= ENEMY_BASE_X - 60) {
+      } else if (u.x >= ENEMY_BASE_X - ENEMY_BASE_ATTACK_X) {
         this.enemyBaseHP -= u.spec.dps * atkMult * dt; // FR-6.10 적 본진 공격
       } else {
         u.x += u.spec.speed * (t < u.slowUntil ? 1 - u.slowPct : 1) * dt; // 둔화 반영
@@ -1018,11 +1021,11 @@ export class Battle {
           e.x -= this.enemySpeed(e) * dt;
         }
       }
-      if (e.x <= PLAYER_BASE_X + 12) {
-        this.baseHP -= e.baseDmg;
-        this.pushFx('death', e.x, e.air, 0);
-        e.leaked = true; // 도달 소멸 — 처치 아님
-        e.hp = 0;
+      // 사옥에 닿은 적은 통과해 소멸하지 않고, 아군이 적 본진을 때리듯 그 자리에서 사옥을 친다.
+      if (e.x <= PLAYER_BASE_X + BASE_ATTACK_X) {
+        e.x = PLAYER_BASE_X + BASE_ATTACK_X;
+        this.baseHP -= e.baseDmg * BALANCE.BASE_ATTACK_DPS_MULT * dt;
+        if (this.baseHP < 0) this.baseHP = 0;
       }
     }
 

@@ -10,6 +10,9 @@ import { // [임시] 신규 아트 로스터 (아군·적군 전면 교체)
 } from './previewSprites.js';
 
 const AIR_Y = 96;
+// 2026-08-10: 사옥·적 본진을 2배로. 사옥 슬롯 높이·클릭 판정이 전부 이 값에서 파생된다
+const HQ_H = 232;
+const FOE_H = 176;
 const GROUND_Y = 258; // 캔버스 1400×300 기준 — 스프라이트는 고정 px, 레인만 길어진다
 
 const ENEMY_COLORS: Record<Enemy['type'], string> = {
@@ -256,7 +259,6 @@ function backdropFor(regionId: string, W: number, H: number, groundTop: number):
 /** 슬롯의 화면 좌표 — 사옥 슬롯은 x가 같으므로 클릭 판정은 y까지 봐야 한다 */
 export function slotScreenPos(b: Battle, slot: number, W: number): { x: number; y: number } {
   const groundTop = GROUND_Y + 16;
-  const HQ_H = 116;
   return {
     x: (b.towerSlotX(slot) / 1000) * W,
     y: b.isBaseSlot(slot) ? groundTop - (slot === 0 ? HQ_H : HQ_H * 0.5) : groundTop,
@@ -301,30 +303,28 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   const hpState = (rate: number) => (rate >= 0.6 ? '100' : rate >= 0.25 ? '59' : '24');
   const hq = spr(`hq_${hpState(b.baseHP / 100)}`);
   if (hq) {
-    const hh = 116;
-    const wwq = (hh * 112) / 160;
-    ctx.drawImage(hq, 4, groundTop - hh, wwq, hh);
-    hpBar(ctx, 8, groundTop - hh - 8, wwq - 8, b.baseHP / 100, '#46A574');
+    const wwq = (HQ_H * 112) / 160;
+    ctx.drawImage(hq, 4, groundTop - HQ_H, wwq, HQ_H);
+    hpBar(ctx, 8, groundTop - HQ_H - 8, wwq - 8, b.baseHP / 100, '#46A574');
   } else {
-    drawBase(ctx, 8, GROUND_Y - 50, 40, 64, '#46A574', '#0C1A12', b.baseHP / 100, '사옥');
+    drawBase(ctx, 8, groundTop - HQ_H, 80, HQ_H, '#46A574', '#0C1A12', b.baseHP / 100, '사옥');
   }
   if (b.rageStage > 0) { // FR-6.10b 위기 반격 — 적 본진 붉은 오라 펄스
     const pulse = (0.22 + 0.14 * Math.sin(b.t * 5)) * b.rageStage;
-    const cxr = W - 64;
-    const grad = ctx.createRadialGradient(cxr, groundTop - 44, 8, cxr, groundTop - 44, 116);
+    const cxr = W - 122;
+    const grad = ctx.createRadialGradient(cxr, groundTop - 88, 8, cxr, groundTop - 88, 200);
     grad.addColorStop(0, `rgba(232,101,79,${Math.min(pulse, 0.55)})`);
     grad.addColorStop(1, 'rgba(232,101,79,0)');
     ctx.fillStyle = grad;
-    ctx.fillRect(W - 190, groundTop - 164, 190, 172);
+    ctx.fillRect(W - 310, groundTop - FOE_H - 40, 310, FOE_H + 48);
   }
   const foe = spr(`foe_${hpState(b.enemyBaseHP / 300)}`);
   if (foe) {
-    const hh = 88;
-    const wwf = (hh * 176) / 128;
-    ctx.drawImage(foe, W - wwf - 2, groundTop - hh, wwf, hh);
-    hpBar(ctx, W - wwf + 2, groundTop - hh - 8, wwf - 8, b.enemyBaseHP / 300, '#E8654F');
+    const wwf = (FOE_H * 176) / 128;
+    ctx.drawImage(foe, W - wwf - 2, groundTop - FOE_H, wwf, FOE_H);
+    hpBar(ctx, W - wwf + 2, groundTop - FOE_H - 8, wwf - 8, b.enemyBaseHP / 300, '#E8654F');
   } else {
-    drawBase(ctx, W - 48, GROUND_Y - 50, 40, 64, '#A83A2E', '#FFE9C4', b.enemyBaseHP / 300, '베어');
+    drawBase(ctx, W - 96, groundTop - FOE_H, 88, FOE_H, '#A83A2E', '#FFE9C4', b.enemyBaseHP / 300, '베어');
   }
   ctx.imageSmoothingEnabled = true; // 벡터 팩은 스무딩 렌더
 
@@ -340,7 +340,6 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   });
 
   // 타워 — FR-6.3c: 슬롯 0·1은 사옥 탑재(옥상·중층), 2 이상은 지면. 신규 포탑 스프라이트 사용
-  const HQ_H = 116; // 사옥 높이 (아래 기지 렌더와 동일)
   const slotBaseY = (s2: number) => (b.isBaseSlot(s2)
     ? groundTop - (s2 === 0 ? HQ_H : HQ_H * 0.5) // 0 = 옥상 / 1 = 중층 (등분)
     : groundTop);

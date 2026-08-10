@@ -1,7 +1,7 @@
 // 헤드리스 E2E — §4 첫 세션 여정을 실제 서버에 대해 실시간으로 재현한다.
 // 사용: npx tsx scripts/e2e.ts   (server :3000 필요, 소요 ~5분: TUT 75초 + R1 195초 @2x)
 import WebSocket from 'ws';
-import { Battle, type BarsFile, type FinishRes, type StageParams } from '@tf/shared';
+import { BALANCE, Battle, type BarsFile, type FinishRes, type StageParams } from '@tf/shared';
 
 const BASE = 'http://localhost:3000';
 let TOKEN = '';
@@ -128,8 +128,8 @@ console.log('▶ R1 여의도 (~4분 @2x, p=0.9 고수 봇, 이지 모드)…');
 let r1 = await playStage('R1', 0.9, 'easy');
 check('FR-2.6 이지 모드 파라미터 완화',
   r1.params.mode === 'easy'
-  && Math.abs(r1.params.enemyHpMult - 1.3 * 0.55) < 1e-9
-  && Math.abs(r1.params.enemyCountMult - 0.7) < 1e-9,
+  && Math.abs(r1.params.enemyHpMult - BALANCE.ENEMY_HP_MULT * BALANCE.EASY_HP_MULT) < 1e-9
+  && Math.abs(r1.params.enemyCountMult - BALANCE.EASY_COUNT_MULT) < 1e-9,
   `hp×${r1.params.enemyHpMult.toFixed(3)} dps×${r1.params.enemyDpsMult.toFixed(3)} cnt×${r1.params.enemyCountMult}`);
 // 봇 클리어율은 확률적 (§9.3 의도된 고난이도) — 사람의 재도전처럼 최대 6회 시도 (기능 검증이 목적)
 for (let attempt = 2; attempt <= 6 && r1.finish.status !== 'cleared'; attempt++) {

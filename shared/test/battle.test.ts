@@ -131,14 +131,17 @@ describe('Battle 엔진', () => {
     b.useSkill(); // 마법 80 → 즉사
     expect(b.aumEarned).toBe(2);
   });
-  it('본진 도달로 소멸한 적은 AUM을 주지 않는다', () => {
+  it('사옥에 닿은 적은 소멸하지 않고 그 자리에서 사옥을 계속 때린다 (FR-6.11)', () => {
     const b = new Battle(params(), []);
-    const anyB = b as unknown as { enemies: unknown[] };
-    anyB.enemies.push({ id: 701, type: 'grunt', x: 14, hp: 100, maxHp: 100, baseSpeed: 60, dps: 0, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 10, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false } as never);
+    const anyB = b as unknown as { enemies: { x: number; hp: number }[] };
+    anyB.enemies.push({ id: 701, type: 'grunt', x: 14, hp: 100, maxHp: 100, baseSpeed: 60, dps: 0, armor: 0, mr: 0, air: false, size: 8, wave: 1, baseDmg: 10, healPerSec: 0, slowUntil: 0, slowPct: 0, stunUntil: 0 } as never);
     const hp0 = b.baseHP;
-    b.advanceTo(b.t + 1); // 본진 도달
-    expect(b.baseHP).toBeLessThan(hp0);
-    expect(b.aumEarned).toBe(0);
+    b.advanceTo(b.t + 1);
+    const hp1 = b.baseHP;
+    expect(hp1).toBeLessThan(hp0);
+    expect(anyB.enemies[0].hp).toBeGreaterThan(0); // 통과 소멸 없음
+    b.advanceTo(b.t + 1);
+    expect(b.baseHP).toBeLessThan(hp1); // 계속 깎는다
   });
   it('적 본진 HP 0 → 즉시 승리 (FR-6.10 조기 승리)', () => {
     const b = new Battle(params(), []);
