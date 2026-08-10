@@ -12,8 +12,9 @@ export interface PreviewSpec {
   kind: PreviewKind;
 }
 
-/** 적 일반 유닛 크기 배수 — 보스는 제외(1.0). 2026-08-10: 화면이 적으로 꽉 차 보여 70%로 축소 */
+/** 전장 캐릭터 크기 배수 — 보스만 원래 크기(1.0). 2026-08-10: 스프라이트가 커서 70%로 축소 */
 export const ENEMY_SCALE = 0.7;
+export const UNIT_SCALE = 0.7;
 
 // SPRITES.md 로스터 (아군 10 / 적 지상 4 / 공중 2 / 보스 2)
 export const PREVIEW_ROSTER: PreviewSpec[] = [

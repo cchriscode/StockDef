@@ -6,7 +6,7 @@ import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
 import { // [임시] 신규 아트 로스터 (아군·적군 전면 교체)
   SHEET_UNIT, SHOT_SHEET, SKILL_TOTAL_MS, drawPreviews, drawSheetChar, drawShot, drawSkill,
-  ENEMY_SCALE, enemySheetId, hasSkillSheet, sheetCharHeight, drawStrikeFx, drawTurret, drawTurretShot, TURRET_SHOT_IMPACT_S, TURRET_BY_TYPE,
+  ENEMY_SCALE, UNIT_SCALE, enemySheetId, hasSkillSheet, sheetCharHeight, drawStrikeFx, drawTurret, drawTurretShot, TURRET_SHOT_IMPACT_S, TURRET_BY_TYPE,
 } from './previewSprites.js';
 
 const AIR_Y = 96;
@@ -457,21 +457,21 @@ export function drawBattle(
       const skEl = b.t - u.lastSkillAt;
       const skTotal = (SKILL_TOTAL_MS[sid] ?? 0) / 1000;
       if (hasSkillSheet(sid) && skEl >= 0 && skEl < skTotal) {
-        drawSkill(ctx, sid, skEl, ux, groundTop);
-        hpBar(ctx, ux - 9, groundTop - sheetCharHeight(sid) - 8, 18, u.hp / u.maxHp, '#7BD8A0');
+        drawSkill(ctx, sid, skEl, ux, groundTop, UNIT_SCALE);
+        hpBar(ctx, ux - 7, groundTop - sheetCharHeight(sid, UNIT_SCALE) - 8, 14, u.hp / u.maxHp, '#7BD8A0');
         st.prevUnits.set(u.id, { key: u.key, x: u.x });
         continue;
       }
       const atkEl = atkDur(u.key) - u.shotCd;
       const phase = u.shotCd > 0 && atkEl >= 0 && atkEl < 0.5 ? atkEl / 0.5 : null;
-      if (!drawSheetChar(ctx, sid, 'ground', phase, b.t, ux, groundTop)) {
+      if (!drawSheetChar(ctx, sid, 'ground', phase, b.t, ux, groundTop, UNIT_SCALE)) {
         ctx.fillStyle = '#7BD8A0';
         ctx.beginPath();
         ctx.arc(ux, groundTop - 10, 8, 0, Math.PI * 2);
         ctx.fill();
       }
       // 체력바는 실제 키 위에 (저격수처럼 큰 유닛의 얼굴을 가리지 않도록)
-      hpBar(ctx, ux - 9, groundTop - sheetCharHeight(SHEET_UNIT[u.key]) - 8, 18, u.hp / u.maxHp, '#7BD8A0');
+      hpBar(ctx, ux - 7, groundTop - sheetCharHeight(SHEET_UNIT[u.key], UNIT_SCALE) - 8, 14, u.hp / u.maxHp, '#7BD8A0');
       st.prevUnits.set(u.id, { key: u.key, x: u.x });
       continue;
     }
@@ -644,7 +644,9 @@ export function drawBattle(
   const liveProj = new Set<number>();
   for (const p of b.projectiles) {
     liveProj.add(p.id);
-    const px = sx(p.x);
+    // 유닛 스프라이트를 축소했으므로 총구 전방 오프셋(엔진 값)도 그만큼 당겨 그린다
+    const mfx = (MUZZLE[p.srcKey ?? '']?.fx ?? 0) * (1 - UNIT_SCALE);
+    const px = sx(p.x - (p.fromTower ? 0 : mfx));
     const prev = st.prevProj.get(p.id);
     const x0 = prev?.x0 ?? p.x;
     const slot = p.fromTower && (p.srcKey ?? '').startsWith('tower:') ? Number((p.srcKey ?? '').slice(6)) : -1;
@@ -652,7 +654,7 @@ export function drawBattle(
     const turretId = tw ? TURRET_BY_TYPE[tw.key] : undefined;
     const laneY = (p.air ? AIR_Y : GROUND_Y) - 8;
     let shotAngle = 0;
-    const unitY = p.air ? AIR_Y : groundTop - (MUZZLE[p.srcKey ?? '']?.y ?? 34);
+    const unitY = p.air ? AIR_Y : groundTop - (MUZZLE[p.srcKey ?? '']?.y ?? 34) * UNIT_SCALE;
     let y = laneY;
     if (turretId) {
       // 포탑 종류별 탄도 — 박격 포대는 높이 띄우고, 대구경 곡사포는 낮고 빠르게,
