@@ -27,19 +27,16 @@ const JP_ON_WORLD = { x: 1020, y: 140 };
 interface Callout {
   k: string; x: number; y: number; // 리더선이 시작하는 지도 위 지점 (원본 8px 셀 기준 px)
   tick: number; drop: number;      // 가로로 꺾이는 길이 · 세로로 내려가는 길이
-  side: 'left' | 'right'; note: string;
+  side: 'left' | 'right';
 }
 const CALLOUTS: Callout[] = [
-  { k: 'k', x: 984, y: 154, tick: 74, drop: 82, side: 'left', note: '● 교전 중' },
-  { k: 'j', x: 1030, y: 150, tick: 40, drop: 132, side: 'left', note: '● 해금 예정' },
-  { k: 'c', x: 872, y: 150, tick: 92, drop: 40, side: 'left', note: '○ 잠김' },
+  { k: 'k', x: 984, y: 154, tick: 74, drop: 82, side: 'left' },
+  { k: 'j', x: 1030, y: 150, tick: 40, drop: 132, side: 'left' },
+  { k: 'c', x: 872, y: 150, tick: 92, drop: 40, side: 'left' },
   // 목업 원본 앵커(600,180)는 유럽(px y 40~152) 아래 아프리카에서 선이 시작했다 → 유럽 중심으로 교정
-  { k: 'e', x: 604, y: 96, tick: 70, drop: 64, side: 'left', note: '○ 잠김' },
-  { k: 'n', x: 220, y: 140, tick: 66, drop: 52, side: 'right', note: '○ 잠김' },
+  { k: 'e', x: 604, y: 96, tick: 70, drop: 64, side: 'left' },
+  { k: 'n', x: 220, y: 140, tick: 66, drop: 52, side: 'right' },
 ];
-
-const STATUS_LABEL = { open: '진행 중', next: '해금 예정', locked: '잠김' } as const;
-const STATUS_COLOR = { open: '#7BD8A0', next: '#FF9E86', locked: '#4E5B72' } as const;
 
 /** 패널 크기에 맞는 **정수** 셀 크기를 고른다.
  *  CSS scale로 늘리면 8px 셀이 소수 픽셀에 앉아 가장자리가 뭉개진다 —
@@ -119,6 +116,22 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
   const sel = regions.find((r) => r.regionId === selRegion) ?? regions.find((r) => r.state === 'open') ?? regions[0];
   const country = COUNTRIES.find((c) => c.key === selCountry)!;
   const isKr = view === 'kr';
+
+  // 전역 상태는 실제 점령 현황에서 파생한다 (하드코딩하면 클리어해도 "교전 중"으로 남는다).
+  // 일본은 한국을 전부 점령해야 다음 전역으로 예고된다.
+  const allCaptured = regions.length > 0 && regions.every((r) => r.state === 'captured');
+  const LOCKED = { mark: '○', markColor: '#E8654F', label: '잠김', color: '#4E5B72', live: false };
+  const theaterState = (key: string): { mark: string; markColor: string; label: string; color: string; live: boolean } => {
+    if (key === 'k') {
+      return allCaptured
+        ? { mark: '●', markColor: '#7BD8A0', label: '점령 완료', color: '#7BD8A0', live: false }
+        : { mark: '●', markColor: '#7BD8A0', label: '교전 중', color: '#7BD8A0', live: true };
+    }
+    if (key === 'j' && allCaptured) {
+      return { mark: '●', markColor: '#FF9E86', label: '해금 예정', color: '#FF9E86', live: true };
+    }
+    return LOCKED;
+  };
 
   const enterRegion = (regionId: RegionId, state: string) => {
     if (state === 'locked') {
@@ -272,7 +285,14 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
                       >
                         <b>{c.name}</b>
                         <em style={{ color: c.color }}>{c.en}{co.k === 'k' ? ` · R1-R${regions.length}` : ''}</em>
-                        <em style={{ color: c.status === 'open' ? '#7BD8A0' : c.status === 'next' ? '#FF9E86' : '#4E5B72' }}>{co.note}</em>
+                        {(() => {
+                          const t = theaterState(co.k);
+                          return (
+                            <em className={`stat ${t.live ? 'live' : ''}`} style={{ color: t.color }}>
+                              <u style={{ color: t.markColor }}>{t.mark}</u> {t.label}
+                            </em>
+                          );
+                        })()}
                       </span>
                     </div>
                   );
@@ -307,9 +327,14 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
                   <span className="en" style={{ color: country.color }}>{country.en}</span>
                 </div>
                 <div className="tcol right">
-                  <span className="chip" style={{ color: STATUS_COLOR[country.status], borderColor: STATUS_COLOR[country.status] }}>
-                    {STATUS_LABEL[country.status]}
-                  </span>
+                  {(() => {
+                    const t = theaterState(country.key);
+                    return (
+                      <span className={`chip ${t.live ? 'live' : ''}`} style={{ color: t.color, borderColor: t.color }}>
+                        <u style={{ color: t.markColor }}>{t.mark}</u> {t.label}
+                      </span>
+                    );
+                  })()}
                   <span className="lbl">{country.key === 'k' ? `${regions.length} STAGES` : `${country.stages} STAGES`}</span>
                 </div>
               </div>
@@ -380,7 +405,14 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
                 >
                   <span className="sw" style={{ background: c.color }} />
                   <span className="nm">{c.name}</span>
-                  <span className="st" style={{ color: STATUS_COLOR[c.status] }}>{STATUS_LABEL[c.status]}</span>
+                  {(() => {
+                    const t = theaterState(c.key);
+                    return (
+                      <span className={`st ${t.live ? 'live' : ''}`} style={{ color: t.color }}>
+                        <u style={{ color: t.markColor }}>{t.mark}</u> {t.label}
+                      </span>
+                    );
+                  })()}
                 </button>
               ))}
             </div>

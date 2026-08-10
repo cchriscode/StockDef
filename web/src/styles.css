@@ -664,6 +664,11 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .wr-callout .lb { position: absolute; display: flex; flex-direction: column; gap: 3px; }
 .wr-callout .lb b { font-size: 14px; font-weight: 400; color: var(--text); text-shadow: 0 0 8px #070A12; white-space: nowrap; }
 .wr-callout .lb em { font-family: var(--fm); font-size: 9px; font-style: normal; letter-spacing: 1px; white-space: nowrap; }
+/* 상태 줄은 한눈에 들어오게 조금 크게 + 부드럽게 점멸 (교전 중·해금 예정에만) */
+.wr-callout .lb em.stat { font-size: 11px; }
+u { text-decoration: none; } /* 상태 마커(●○) 전용 색 래퍼 */
+.live { animation: wr-soft 1.2s ease-in-out infinite; }
+@keyframes wr-soft { 0%, 100% { opacity: 1; } 50% { opacity: .38; } }
 
 /* 패널 장식: 코너 브래킷 + 위에서 아래로 훑는 스캔 밴드 */
 .wr-corner { position: absolute; width: 26px; height: 26px; pointer-events: none; }
@@ -710,7 +715,7 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .wr-theater .lbl { font-family: var(--fm); font-size: 9px; color: var(--dim); letter-spacing: 1px; }
 .wr-theater .nm { font-family: var(--ft); font-size: 24px; line-height: 1.1; }
 .wr-theater .en { font-family: var(--fm); font-size: 10px; letter-spacing: 1px; }
-.wr-theater .chip { font-family: var(--fm); font-size: 10px; padding: 3px 8px; border: 1px solid; }
+.wr-theater .chip { font-family: var(--fm); font-size: 11px; padding: 3px 8px; border: 1px solid; }
 .wr-theater .desc { font-size: 12px; color: var(--mut); line-height: 1.6; }
 .wr-locked { padding: 18px 15px; font-size: 12px; color: var(--dim); text-align: center; }
 .wr-panel.queue { display: flex; flex-direction: column; min-height: 0; }
