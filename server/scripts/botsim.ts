@@ -37,7 +37,7 @@ function makeParams(region: RegionId): StageParams {
     aum: BALANCE.AUM_BY_DESK_LV[captured],
     totalBaseIncome: income.total, incomePerWave: income.perWave, incomeLastWave: income.lastWave,
     heat: heatOf(captured), lossRate: BALANCE.LOSS_RATE[region], maxLossRate: BALANCE.MAX_LOSS_RATE, maxLeverage: 1, payoutBase: BALANCE.PAYOUT_BASE,
-    drawBand: BALANCE.DRAW_BAND, towerSlots: 6, maxPositions: BALANCE.MAX_POSITIONS, waveCount: 13,
+    drawBand: BALANCE.DRAW_BAND, towerSlots: 6, maxPositions: BALANCE.MAX_POSITIONS, // FR-5.13 기본 10회 waveCount: 13,
     unitHpMult: 1, towerDmgMult: 1, unitCostMult: 1, hasInfoResearch: false,
     waveTable: WAVE_TABLES[region],
   };

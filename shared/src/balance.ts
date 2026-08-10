@@ -10,7 +10,8 @@ export const BALANCE = {
   MAX_LOSS_RATE: 0.95, // 포지션당 최대 손실 (stake 대비) — 하방 클램프
   DRAW_BAND: 0.25, // |g| < 0.25 → 통계상 DRAW (손익은 연속)
   Z_CAP: 3.0, // 정규화 수익 g의 상방 클램프 → 최대 배당 1 + B×3
-  MAX_POSITIONS: 30,
+  MAX_POSITIONS: 10, // FR-5.13: 스테이지당 거래 횟수 (리서치 데스크 부서로 확장)
+  POSITIONS_PER_DESK_LV: 5, // 부서 레벨당 +5회
   MAX_CONCURRENT: 1,
   OPEN_RATE_LIMIT_MS: 1000,
   STAKE_PCTS: [0.1, 0.25, 0.5, 1.0],
@@ -399,6 +400,7 @@ export const DEPTS: DeptSpec[] = [
   { key: 'legal', name: '법무팀', desc: (lv) => `손실률 −${[0, 0.05, 0.1][lv - 1].toFixed(2)}`, maxLv: 3, costs: [1500, 3500] },
   { key: 'ir', name: 'IR팀', desc: (lv) => `정산 보너스 +${[0, 5, 10][lv - 1]}%`, maxLv: 3, costs: [1000, 2500] },
   { key: 'margin', name: '마진 데스크', desc: (lv) => `레버리지 최대 ${[1, 3, 5][lv - 1]}×`, maxLv: 3, costs: [1200, 3200] }, // FR-5.6b: Lv2 → 2·3× / Lv3 → 5× 해금
+  { key: 'research', name: '리서치 데스크', desc: (lv) => `스테이지당 거래 ${[10, 15, 20][lv - 1]}회`, maxLv: 3, costs: [900, 2400] }, // FR-5.13
 ];
 
 export const DEPT_EFFECTS = {
@@ -407,4 +409,5 @@ export const DEPT_EFFECTS = {
   legalCut: (lv: number) => [0, 0.05, 0.1][lv - 1],
   irBonus: (lv: number) => [0, 0.05, 0.1][lv - 1],
   maxLeverage: (lv: number) => [1, 3, 5][lv - 1],
+  maxPositions: (lv: number) => BALANCE.MAX_POSITIONS + (lv - 1) * BALANCE.POSITIONS_PER_DESK_LV,
 };

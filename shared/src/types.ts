@@ -27,7 +27,7 @@ export interface BarsFile {
 
 export type RegionId = 'R1' | 'R2' | 'R3' | 'TUT';
 export type RewardLine = 'finance' | 'info' | 'defense' | 'offense';
-export type DeptKey = 'trading_desk' | 'rnd' | 'hr' | 'legal' | 'ir' | 'margin';
+export type DeptKey = 'trading_desk' | 'rnd' | 'hr' | 'legal' | 'ir' | 'margin' | 'research';
 export type Grade = 'S' | 'A' | 'B' | 'C';
 export type Outcome = 'win' | 'lose' | 'draw';
 export type Direction = 'long' | 'short';

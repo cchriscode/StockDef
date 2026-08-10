@@ -475,7 +475,12 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
             ))}
           </div>
           <div className="pos-box">
-            <div className="pr"><span>POSITION</span><span>{hud.posCount}/{p.maxPositions}</span></div>
+            <div className="pr">
+              <span>거래 횟수</span>
+              <span className={p.maxPositions - hud.posCount <= 2 ? 'down' : ''}>
+                {hud.posCount}/{p.maxPositions} (남은 {Math.max(0, p.maxPositions - hud.posCount)}회)
+              </span>
+            </div>
             {hasPosition ? (
               <>
                 <div className="pr">

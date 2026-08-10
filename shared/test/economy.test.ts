@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { baseIncome, heatOf, judge, settle, splitPayout } from '../src/economy.js';
+import { BALANCE, DEPT_EFFECTS } from '../src/balance.js';
 
 describe('FR-6.8 기본 수입 — 총액 우선 분배', () => {
   it('점령 2개 → 총 275, 웨이브 1~12 각 21, 웨이브 13 = 23 (PRD 예시)', () => {
@@ -100,5 +101,14 @@ describe('FR-8 정산·등급·보상 자격', () => {
   it('DRAW는 적중률 분모에서 제외', () => {
     const r = settle({ goldLeft: 0, goldEarnedTotal: 1000, aumLeft: 0, aumInitial: 0, hpLeft: 10, wins: 6, loses: 4, enemyBaseDestroyed: false, isRetry: false, irBonus: 0 });
     expect(r.accuracy).toBeCloseTo(0.6);
+  });
+});
+
+describe('FR-5.13 거래 횟수 제한', () => {
+  it('기본 10회, 리서치 데스크 레벨당 +5회', () => {
+    expect(BALANCE.MAX_POSITIONS).toBe(10);
+    expect(DEPT_EFFECTS.maxPositions(1)).toBe(10);
+    expect(DEPT_EFFECTS.maxPositions(2)).toBe(15);
+    expect(DEPT_EFFECTS.maxPositions(3)).toBe(20);
   });
 });
