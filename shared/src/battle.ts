@@ -6,7 +6,8 @@
 //  - Bloons TD: 타워 타겟팅 모드 first/last/strong/close
 //  - Age of War: 블로커+원거리 역할 조합, 화면 클리어 스킬
 import {
-  BALANCE, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, ENEMY_SKILL_HITS, ATTACK_CUE_S, MUZZLE, TOWER_FIRE_CUE_S, SKILL_CUE_S, SPAWN_GLOBAL_CD, UNIT_SPAWN_CD, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
+  BALANCE, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, ENEMY_SKILL_HITS, ATTACK_CUE_S, MUZZLE, TOWER_FIRE_CUE_S, SKILL_CUE_S,
+  UNIT_ATK_PERIOD, UNIT_ATK_PERIOD_DEFAULT, SPAWN_GLOBAL_CD, UNIT_SPAWN_CD, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
   type DmgType, type EnemyTypeSpec, type TargetingMode, type TowerSpec, type UnitSpec,
 } from './balance.js';
 import type { MarketEvent, RegionId, StageParams } from './types.js';
@@ -119,7 +120,7 @@ export interface Projectile {
 }
 
 export interface Fx {
-  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'bomb' | 'aum' | 'gold' | 'strike'; // bomb = 공시폭탄 / strike = 번개왕 낙뢰(대상 위치)
+  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'bomb' | 'aum' | 'gold' | 'strike' | 'blast'; // strike = 번개왕 낙뢰 / blast = 융단 포격 착탄
   x: number;
   air: boolean;
   amount: number;
@@ -801,7 +802,10 @@ export class Battle {
       } else if (e.type === 'tank') { // 다연장 포병 — 다지점 융단 포격
         const ts = [...this.units].sort((a, b) => b.x - a.x).slice(0, ES.spots as number);
         if (ts.length) {
-          for (const u of ts) this.damageUnit(u, e.dps * (ES.mult as number));
+          for (const u of ts) {
+            this.pushFx('blast', u.x, false, 0); // 착탄 지점마다 폭발 (없으면 피해만 들어가고 화면엔 아무 일도 없다)
+            this.damageUnit(u, e.dps * (ES.mult as number));
+          }
           cast = true;
         }
       } else if (e.type === 'air') { // 연 정찰기 — 체력 최저 아군에 표식
@@ -986,7 +990,7 @@ export class Battle {
       if (targets.length) {
         if (u.shotCd <= 0) {
           // FR-6.5d: 판정·발사는 모션의 타격 프레임에 (즉시 쏘면 총구 화염보다 먼저 탄이 나간다)
-          u.shotCd = 0.8;
+          u.shotCd = UNIT_ATK_PERIOD[u.key] ?? UNIT_ATK_PERIOD_DEFAULT; // FR-6.5g 유닛별 평타 주기
           u.atkCount += 1; // 평타 누적 (스킬 발동 조건)
           this.pendingSkills.push({ kind: 'atk', id: u.id, at: t + ATTACK_CUE_S });
         }
@@ -995,7 +999,7 @@ export class Battle {
         // 렌더는 shotCd로 공격 모션을 재생한다 — 본진을 때릴 때도 같은 주기를 돌려
         // 유닛이 가만히 선 채 건물이 깎이는 것처럼 보이지 않게 한다.
         // 스킬 누적(atkCount)은 올리지 않는다 — 유닛 스킬은 적 대상이 있어야 성립한다.
-        if (u.shotCd <= 0) u.shotCd = 0.8;
+        if (u.shotCd <= 0) u.shotCd = UNIT_ATK_PERIOD[u.key] ?? UNIT_ATK_PERIOD_DEFAULT;
       } else {
         u.x += u.spec.speed * (t < u.slowUntil ? 1 - u.slowPct : 1) * dt; // 둔화 반영
       }

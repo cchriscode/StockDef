@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  BALANCE, judge, splitPayout, sltpHit, sltpValid, sltpWickHit, tradeFee,
+  BALANCE, judge, splitPayout, sltpHit, sltpValid, sltpWickHit, tradeAllowance, tradeFee,
   type BarsFile, type Direction, type StageParams, type WsErrorCode, type WsServerMsg,
 } from '@tf/shared';
 import type { WebSocket } from 'ws';
@@ -100,7 +100,12 @@ export class LiveSession {
     if (now - this.lastOpenAt < BALANCE.OPEN_RATE_LIMIT_MS) return err('RATE_LIMITED');
     this.lastOpenAt = now;
     if (this.open != null) return err('POSITION_ALREADY_OPEN');
-    if (this.positionCount >= this.params.maxPositions) return err('MAX_POSITIONS');
+    // FR-5.13b 웨이브 진행분만큼만 열린다 (전체 상한도 함께 본다)
+    const allowed = Math.min(
+      this.params.maxPositions,
+      tradeAllowance(this.serverBarIdx(now), this.params.waveCount, this.params.tradeBonus ?? 0),
+    );
+    if (this.positionCount >= allowed) return err('MAX_POSITIONS');
     if (!Number.isInteger(stake) || stake <= 0 || stake > this.aum) return err('INSUFFICIENT_AUM');
     if (direction !== 'long' && direction !== 'short') return err('INVALID_SEQ');
     if (!Number.isInteger(seq) || seq !== this.positionCount + 1) return err('INVALID_SEQ');

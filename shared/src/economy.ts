@@ -41,6 +41,15 @@ export function judge(
 }
 
 /**
+ * FR-5.13b 현재까지 열린 거래 허용치 — 웨이브가 하나 시작될 때마다 TRADES_PER_WAVE만큼 열린다.
+ * 리서치 데스크 보너스는 처음부터 더해진다 (부서 값이 곧 여유분).
+ */
+export function tradeAllowance(barIdx: number, waveCount: number, bonus = 0): number {
+  const started = Math.max(1, Math.min(waveCount, Math.floor(Math.max(barIdx, 0) / BALANCE.CYCLE_SECONDS) + 1));
+  return started * BALANCE.TRADES_PER_WAVE + bonus;
+}
+
+/**
  * FR-5.14 거래 수수료 — 명목가 × FEE_RATE, 진입·청산 각각 1회. 최소 1 (0으로 반올림되면 존재감이 없다).
  * 청산 수수료도 진입 명목가로 계산한다 — 진입 시점에 왕복 비용을 확정해 보여줄 수 있어야 하기 때문.
  */

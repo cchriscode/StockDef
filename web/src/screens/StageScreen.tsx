@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  BALANCE, Battle, ENEMY_TYPES, TOWERS, TUT_HOLD_BARS, TUT_MIN_ENTRY_BAR, UNITS, judge, liquidationDeltaPct, tradeFee,
+  BALANCE, Battle, ENEMY_TYPES, TOWERS, TUT_HOLD_BARS, TUT_MIN_ENTRY_BAR, UNITS, judge, liquidationDeltaPct, tradeAllowance, tradeFee,
   type BarsFile, type Direction, type FinishRes, type RegionId, type StageMode, type StageStartRes, type WsServerMsg,
 } from '@tf/shared';
 import { api, getSettings, getToken, track } from '../net/api.js';
@@ -12,6 +12,9 @@ import { ENEMY_INFO, TOWER_INFO, UNIT_INFO, enemyStatsLine, towerStatsLine, unit
 import { RIG_UNIT } from '../game/rigFrames.js';
 import { RigPreview } from '../ui/RigPreview.js';
 import { SHEET_UNIT, TURRET_BY_TYPE, enemySheetId, hasSkillSheet } from '../game/previewSprites.js';
+
+/** 보스는 지역별 아트 변주 — 이름도 그에 맞춘다 (R3는 드릴 워커) */
+const bossName = (region: string) => (region === 'R3' ? '드릴 워커' : '번개 왕');
 
 // 튜토리얼 첫 거래 규칙은 서버와 공유한다 (진입 창을 서버가 실제 차트에서 계산해 내려준다)
 const TUT_CLOSE_HOLD_BARS = TUT_HOLD_BARS;
@@ -349,10 +352,18 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTut, guide, phase, hud.barF]);
 
+  // FR-5.13b 지금까지 열린 거래 허용치 (웨이브 진행 + 리서치 데스크 여유분).
+  // 렌더 하단의 p(params)보다 앞서 쓰이므로 ref에서 직접 읽는다.
+  const tradesOpen = (() => {
+    const sp = g.current.start?.params;
+    if (!sp) return 0;
+    return Math.min(sp.maxPositions, tradeAllowance(hud.barF, sp.waveCount, sp.tradeBonus ?? 0));
+  })();
+
   const canOpen = (() => {
     const s = g.current;
     if (phase !== 'playing' || s.pendingOpen || s.openMarker || !s.start) return false;
-    if (s.seq >= s.start.params.maxPositions) return false;
+    if (s.seq >= tradesOpen) return false; // FR-5.13b 웨이브 진행분까지만 열린다
     if (s.aum < 1) return false;
     if (hud.barF + 3 >= hud.barCount) return false; // 종료 직전엔 체결 불가
     if (isTut && guide < 1) return false;
@@ -685,8 +696,9 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
           <div className="pos-box">
             <div className="pr">
               <span>거래 횟수</span>
-              <span className={p.maxPositions - hud.posCount <= 2 ? 'down' : ''}>
-                {hud.posCount}/{p.maxPositions} (남은 {Math.max(0, p.maxPositions - hud.posCount)}회)
+              <span className={tradesOpen - hud.posCount <= 1 ? 'down' : ''}>
+                {hud.posCount}/{tradesOpen}
+                <i className="dim" style={{ fontStyle: 'normal' }}> (웨이브당 +{BALANCE.TRADES_PER_WAVE} · 총 {p.maxPositions})</i>
               </span>
             </div>
             {hasPosition ? (
@@ -861,7 +873,7 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
             {Object.keys(ENEMY_INFO).map((k) => (
               <span key={k} className="ub-wrap">
                 <button onClick={() => setInfoKey({ kind: 'enemy', key: k })}>
-                  {ENEMY_TYPES[k as keyof typeof ENEMY_TYPES].name}
+                  {k === 'boss' ? bossName(regionId) : ENEMY_TYPES[k as keyof typeof ENEMY_TYPES].name}
                   {ENEMY_TYPES[k as keyof typeof ENEMY_TYPES].isAir ? ' ✈' : k === 'boss' ? ' ★' : ''}
                 </button>
               </span>
@@ -877,7 +889,7 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
         const card = isEnemy ? ENEMY_INFO[infoKey.key]
           : isUnit ? UNIT_INFO[infoKey.key as keyof typeof UNIT_INFO]
             : TOWER_INFO[infoKey.key as keyof typeof TOWER_INFO];
-        const name = isEnemy ? ENEMY_TYPES[infoKey.key as keyof typeof ENEMY_TYPES].name
+        const name = isEnemy ? (infoKey.key === 'boss' ? bossName(regionId) : ENEMY_TYPES[infoKey.key as keyof typeof ENEMY_TYPES].name)
           : isUnit ? UNITS.find((u) => u.key === infoKey.key)!.name
             : TOWERS.find((t) => t.key === infoKey.key)!.name;
         const stats = isEnemy ? enemyStatsLine(infoKey.key, p.enemyHpMult, p.enemyDpsMult)
@@ -937,7 +949,9 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
             <p>
               ⏳ 진입했습니다! 가격이 오르는 동안 미실현 손익이 실시간으로 움직입니다. 충분히 오르면 <b>청산 ✕</b> 버튼으로 이익을 확정하세요.<br />
               💡 <b>차트를 위아래로 끌면</b> 손절·익절 선을 걸 수 있습니다 — 진입가보다 위를 잡으면 익절, 아래를 잡으면 손절입니다.
-              선에 붙은 라벨에는 그 가격에 닿았을 때의 손익이 뜨고, <b>×</b>로 해제합니다. 자리를 비워도 자동으로 체결됩니다.
+              선에 붙은 라벨에는 그 가격에 닿았을 때의 손익이 뜨고, <b>×</b>로 해제합니다. 자리를 비워도 자동으로 체결됩니다.<br />
+              📊 거래 횟수는 <b>웨이브가 하나 시작될 때마다 {BALANCE.TRADES_PER_WAVE}회씩</b> 열립니다. 초반에 다 쓰지 말고 아껴 두세요.
+              거래마다 <b>수수료</b>(명목가의 {(BALANCE.FEE_RATE * 100).toFixed(1)}%)가 진입·청산 양쪽에서 빠집니다.
             </p>
           )}
           {guide === 3 && <p>💰 골드가 입금됐습니다! 이 돈으로 방어하세요. 아래 커맨드 바의 <b>타워 버튼</b>을 누른 다음, 전장에서 <b>설치할 위치(점선 슬롯)</b>를 클릭하면 지어집니다.</p>}

@@ -53,7 +53,9 @@ export function buildStageParams(accountId: string, regionId: RegionId, mode: St
     drawBand: BALANCE.DRAW_BAND,
     // FR-6.4e 사옥 2칸 + 시설팀이 여는 지면 칸 + 점령(방어 계열) 보상
     towerSlots: Math.min(BALANCE.BASE_TOWER_SLOTS + DEPT_EFFECTS.groundSlots(depts.facility) + defenseRewards, BALANCE.TOWER_SLOTS_MAX),
-    maxPositions: DEPT_EFFECTS.maxPositions(depts.research), // FR-5.13 리서치 데스크로 확장
+    // FR-5.13b 거래 횟수는 웨이브마다 +2로 열린다. maxPositions는 스테이지 전체 상한(표시·검증용).
+    tradeBonus: DEPT_EFFECTS.maxPositions(depts.research) - BALANCE.MAX_POSITIONS, // 리서치 데스크 여유분
+    maxPositions: waveCount * BALANCE.TRADES_PER_WAVE + (DEPT_EFFECTS.maxPositions(depts.research) - BALANCE.MAX_POSITIONS),
     waveCount,
     unitHpMult: DEPT_EFFECTS.unitHpMult(depts.hr),
     towerDmgMult: DEPT_EFFECTS.towerDmgMult(depts.rnd),

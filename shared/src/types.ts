@@ -51,7 +51,8 @@ export interface StageParams {
   payoutBase: number;
   drawBand: number;
   towerSlots: number;
-  maxPositions: number;
+  maxPositions: number; // 스테이지 전체 상한
+  tradeBonus?: number; // FR-5.13b 리서치 데스크 여유분 (웨이브 허용치에 더해진다)
   waveCount: number;
   unitHpMult: number;
   towerDmgMult: number;

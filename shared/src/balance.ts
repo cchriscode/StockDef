@@ -10,7 +10,8 @@ export const BALANCE = {
   MAX_LOSS_RATE: 0.95, // 포지션당 최대 손실 (stake 대비) — 하방 클램프
   DRAW_BAND: 0.25, // |g| < 0.25 → 통계상 DRAW (손익은 연속)
   Z_CAP: 3.0, // 정규화 수익 g의 상방 클램프 → 최대 배당 1 + B×3
-  MAX_POSITIONS: 10, // FR-5.13: 스테이지당 거래 횟수 (리서치 데스크 부서로 확장)
+  MAX_POSITIONS: 10, // FR-5.13 기준값 (리서치 데스크 보너스 산정 기준)
+  TRADES_PER_WAVE: 2, // FR-5.13b 웨이브가 하나 시작될 때마다 거래 가능 횟수 +2
   POSITIONS_PER_DESK_LV: 5, // 부서 레벨당 +5회
   MAX_CONCURRENT: 1,
   OPEN_RATE_LIMIT_MS: 1000,
@@ -18,7 +19,7 @@ export const BALANCE = {
   GOLD_PER_TRADE_CAP: 500, // FR-5.5c: 청산 1건당 골드 환전 상한 — 초과 수익은 AUM으로 적립
   // FR-5.14 거래 수수료 — 명목가(스테이크 × 배율) 기준으로 진입·청산 양쪽에서 AUM에서 빠진다.
   // 배율을 올리면 수수료도 비례해 늘어 "무조건 최대 배율"이 정답이 되지 않게 하는 장치.
-  FEE_RATE: 0.004,
+  FEE_RATE: 0.02, // 2026-08-10 5배 상향 (0.004 → 0.02)
   LEVERAGES: [1, 2, 3, 5] as number[], // 진입 시 선택하는 배율 — g에 곱해 손익 양방향 증폭 (손실은 MAX_LOSS_RATE 클램프 유지)
 
   // §9.2 경제 파라미터
@@ -175,7 +176,7 @@ export const UNITS: UnitSpec[] = [
   { key: 'shutter', name: '셔터 장교', cost: 90, hp: 190, dps: 9, speed: 20, range: 20, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'gasmask', name: '방독면 포수', cost: 95, hp: 85, dps: 16, speed: 20, range: 110, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'foreman', name: '망치 작업반장', cost: 110, hp: 240, dps: 12, speed: 20, range: 24, cleave: 2, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'sniper', name: '저격수', cost: 120, hp: 70, dps: 22, speed: 20, range: 135, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'sniper', name: '저격수', cost: 120, hp: 70, dps: 17.6, speed: 20, range: 108, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'pistol', name: '권총 장교', cost: 60, hp: 80, dps: 14, speed: 20, range: 120, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
 ];
 
@@ -243,6 +244,12 @@ export const UNIT_SKILL = {
  * 유닛은 교전 중에만 평타를 치므로, 실제로 싸운 만큼만 스킬이 나간다.
  * 평타 주기는 0.8초이므로 N×0.8초가 최소 간격이 된다.
  */
+// FR-6.5g 유닛 평타 주기(초) — 미기재는 기본 0.8. 값이 클수록 느리다.
+export const UNIT_ATK_PERIOD: Record<string, number> = {
+  sniper: 1.0, // 2026-08-10 저격수 너프: 공격 속도 0.8배 (0.8초 → 1.0초)
+};
+export const UNIT_ATK_PERIOD_DEFAULT = 0.8;
+
 export const UNIT_SKILL_HITS: Record<string, number> = {
   apprentice: 5, // 4.0초 — 가장 빠른 회전
   scissor: 7, // 5.6초
@@ -374,21 +381,21 @@ export const BOSS_WAVES: Record<RegionId, number[]> = { R1: [13], R2: [7, 13], R
 // 지수형 곡선 (2026-08-05 개정): 초반은 가볍게 시작해 후반으로 갈수록 물량·HP가 가파르게 상승.
 // 앞 웨이브는 트레이딩·배치에 집중할 여유를 주고, W10+는 확실한 위협이 되도록.
 const R1_WAVES: WaveSpec[] = [
-  // 2026-08-10 후반 곡선 재조정: 지수 상승은 유지하되 상단을 아군 화력 도달권으로 낮춘다
-  // (기존 W13 총 실효 12,849 HP = 아군 20초 화력의 4.4배 → 산술적으로 클리어 불가였음)
+  // 2026-08-10 (2차) 체력 곡선 완만화: W1→W13 상승폭이 6.4배로 과했다 → 2.8배로.
+  // 물량(2→16기)과 개체 공격력(2.1배)은 그대로라 후반 압박은 유지된다.
   { count: 2, hp: 45, speed: 1.0, air: false },
-  { count: 3, hp: 52, speed: 1.0, air: false },
-  { count: 3, hp: 62, speed: 1.0, air: true },
-  { count: 4, hp: 75, speed: 1.0, air: false },
-  { count: 5, hp: 92, speed: 1.0, air: true },
-  { count: 6, hp: 112, speed: 1.0, air: false },
-  { count: 7, hp: 135, speed: 1.05, air: true },
-  { count: 8, hp: 160, speed: 1.05, air: true },
-  { count: 9, hp: 190, speed: 1.05, air: false },
-  { count: 11, hp: 215, speed: 1.1, air: true },
-  { count: 12, hp: 240, speed: 1.1, air: true },
-  { count: 14, hp: 265, speed: 1.1, air: true },
-  { count: 16, hp: 290, speed: 1.15, air: true },
+  { count: 3, hp: 50, speed: 1.0, air: false },
+  { count: 3, hp: 56, speed: 1.0, air: true },
+  { count: 4, hp: 62, speed: 1.0, air: false },
+  { count: 5, hp: 68, speed: 1.0, air: true },
+  { count: 6, hp: 75, speed: 1.0, air: false },
+  { count: 7, hp: 82, speed: 1.05, air: true },
+  { count: 8, hp: 89, speed: 1.05, air: true },
+  { count: 9, hp: 96, speed: 1.05, air: false },
+  { count: 11, hp: 104, speed: 1.1, air: true },
+  { count: 12, hp: 111, speed: 1.1, air: true },
+  { count: 14, hp: 118, speed: 1.1, air: true },
+  { count: 16, hp: 126, speed: 1.15, air: true },
 ];
 
 function scaleWaves(base: WaveSpec[], countMult: number, hpMult: number): WaveSpec[] {

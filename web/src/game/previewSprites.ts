@@ -12,6 +12,9 @@ export interface PreviewSpec {
   kind: PreviewKind;
 }
 
+/** 적 일반 유닛 크기 배수 — 보스는 제외(1.0). 2026-08-10: 화면이 적으로 꽉 차 보여 70%로 축소 */
+export const ENEMY_SCALE = 0.7;
+
 // SPRITES.md 로스터 (아군 10 / 적 지상 4 / 공중 2 / 보스 2)
 export const PREVIEW_ROSTER: PreviewSpec[] = [
   { id: 'A-01_1', name: '종머리 곤봉병', side: 'ally', kind: 'ground' },
@@ -52,8 +55,8 @@ const STANDING_PX: Record<string, number> = {
 };
 
 /** 시트 캐릭터의 화면상 키(px) — 체력바 위치 계산용 */
-export function sheetCharHeight(sheetId: string): number {
-  return (STANDING_PX[sheetId] ?? 344) * (64 / 344);
+export function sheetCharHeight(sheetId: string, scale = 1): number {
+  return (STANDING_PX[sheetId] ?? 344) * (64 / 344) * scale;
 }
 
 /** [임시] 1G 프리뷰 유닛 키 → 스프라이트 시트 id */
@@ -119,6 +122,7 @@ export function drawSkill(
   elapsedSec: number,
   cx: number,
   baseY: number,
+  scale = 1,
 ): boolean {
   const spec = SKILL_SPEC[sheetId];
   if (!spec) return false;
@@ -128,8 +132,8 @@ export function drawSkill(
   if (!img) return false;
   const cellW = img.naturalWidth / spec.frames;
   const cellH = img.naturalHeight;
-  const dw = cellW * SCALE;
-  const dh = cellH * SCALE;
+  const dw = cellW * SCALE * scale;
+  const dh = cellH * SCALE * scale;
   const oy = spec.cell === 'skillEffect' ? 0.5 : 0.9318;
   ctx.drawImage(img, f * cellW, 0, cellW, cellH, cx - dw / 2, baseY - dh * oy, dw, dh);
   return true;
@@ -208,6 +212,7 @@ export function drawSheetChar(
   t: number,
   cx: number,
   baseY: number,
+  scale = 1, // 개체별 크기 배수 (적 일반 유닛 축소 등)
 ): boolean {
   const attacking = attackPhase != null && attackPhase >= 0 && attackPhase < 1;
   const img = sheet(sheetId, attacking ? 'attack' : 'walk');
@@ -218,8 +223,8 @@ export function drawSheetChar(
     : Math.floor(t * cfg.fps) % cfg.frames;
   const cellW = img.naturalWidth / cfg.frames;
   const cellH = img.naturalHeight;
-  const dw = cellW * SCALE;
-  const dh = cellH * SCALE;
+  const dw = cellW * SCALE * scale;
+  const dh = cellH * SCALE * scale;
   ctx.drawImage(img, f * cellW, 0, cellW, cellH, cx - dw / 2, baseY - dh * ORIGIN_Y[kind], dw, dh);
   return true;
 }

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  BALANCE, Battle, WAVE_TABLES, baseIncome, heatOf, judge, splitPayout, tradeFee,
+  BALANCE, Battle, WAVE_TABLES, baseIncome, heatOf, judge, splitPayout, tradeAllowance, tradeFee,
   type BarsFile, type RegionId, type StageParams,
 } from '@tf/shared';
 
@@ -44,7 +44,7 @@ function makeParams(region: RegionId): StageParams {
     enemyDpsMult: BALANCE.ENEMY_DPS_MULT * (MODE === 'easy' ? BALANCE.EASY_DPS_MULT : 1),
     enemyCountMult: MODE === 'easy' ? BALANCE.EASY_COUNT_MULT : 1,
     payoutBase: BALANCE.PAYOUT_BASE,
-    drawBand: BALANCE.DRAW_BAND, towerSlots: 6, maxPositions: BALANCE.MAX_POSITIONS, waveCount: 13, // FR-5.13 거래 10회
+    drawBand: BALANCE.DRAW_BAND, towerSlots: 6, maxPositions: 13 * BALANCE.TRADES_PER_WAVE, tradeBonus: 0, waveCount: 13, // FR-5.13b 웨이브당 +2
     unitHpMult: 1, towerDmgMult: 1, unitCostMult: 1, hasInfoResearch: false,
     waveTable: WAVE_TABLES[region],
   };
@@ -108,7 +108,8 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
     }
 
     // 포지션 진입 (봇: 가능한 즉시, 25% 투입, 30봉 보유)
-    if (usePositions && !pending && bar > openUntil && bar + 32 < 390 && aum >= 4 && positions < params.maxPositions) {
+    const allowed = Math.min(params.maxPositions, tradeAllowance(bar, params.waveCount, params.tradeBonus ?? 0));
+    if (usePositions && !pending && bar > openUntil && bar + 32 < 390 && aum >= 4 && positions < allowed) {
       const openIdx = bar + 1;
       const closeIdx = openIdx + 30;
       const actualDelta = (bars.bars[closeIdx].c - bars.bars[openIdx].c) / bars.bars[openIdx].c;

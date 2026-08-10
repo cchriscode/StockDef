@@ -1,12 +1,12 @@
 // FR-6.1 일자형 전투 렌더러 — Battle 엔진 상태를 그리기만 한다 (로직·렌더 분리, §11)
 // 스프라이트: handoff 리그 팩 — 로드 시 rigFrames가 고프레임으로 구워둔 시퀀스를 blit
-import { ENEMY_TYPES, MUZZLE, TOWERS, TOWER_FIRE_ANIM_S, type Battle, type Enemy } from '@tf/shared';
+import { ENEMY_TYPES, MUZZLE, TOWERS, TOWER_FIRE_ANIM_S, UNIT_ATK_PERIOD, UNIT_ATK_PERIOD_DEFAULT, type Battle, type Enemy } from '@tf/shared';
 import { BACKDROPS, BACKDROP_GROUND, BACKDROP_H, BACKDROP_W, type Backdrop } from './battleBackdrops.js';
 import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
 import { // [임시] 신규 아트 로스터 (아군·적군 전면 교체)
   SHEET_UNIT, SHOT_SHEET, SKILL_TOTAL_MS, drawPreviews, drawSheetChar, drawShot, drawSkill,
-  enemySheetId, hasSkillSheet, sheetCharHeight, drawStrikeFx, drawTurret, drawTurretShot, TURRET_SHOT_IMPACT_S, TURRET_BY_TYPE,
+  ENEMY_SCALE, enemySheetId, hasSkillSheet, sheetCharHeight, drawStrikeFx, drawTurret, drawTurretShot, TURRET_SHOT_IMPACT_S, TURRET_BY_TYPE,
 } from './previewSprites.js';
 
 const AIR_Y = 96;
@@ -33,7 +33,8 @@ const MODE_LABEL = { first: '선두', last: '후미', strong: '강적', close: '
 
 // 렌더 모션 타이밍 (리그 저작 길이와 무관하게 게임 리듬에 맞춰 위상 스케일)
 const HIT_DUR = 0.4; // 피격 경직 연출 길이
-const UNIT_ATK_DUR = 0.8; // 유닛 발사 주기(shotCd 리셋값)에 공격 모션을 맞춘다
+// 유닛 발사 주기(shotCd 리셋값)에 공격 모션을 맞춘다 — 유닛마다 다르다 (FR-6.5g)
+const atkDur = (key: string) => UNIT_ATK_PERIOD[key] ?? UNIT_ATK_PERIOD_DEFAULT;
 const DEATH_DUR = 1.4; // 사망 붕괴 (저작 3s를 압축)
 const SKILL_DUR = 1.3; // 자동 스킬 시전 연출 길이 (저작 2s를 압축)
 
@@ -450,7 +451,7 @@ export function drawBattle(
     trackHit(st, `u${u.id}`, u.hp, b.t);
     const hitEl = b.t - (st.hitT.get(`u${u.id}`) ?? -9);
     const moved = Math.abs(u.x - (st.prevUnits.get(u.id)?.x ?? u.x)) > 0.01;
-    const atkEl = UNIT_ATK_DUR - u.shotCd; // 발사 시 shotCd=0.8 리셋 → 경과 위상
+    const atkEl = atkDur(u.key) - u.shotCd; // 발사 시 주기값으로 리셋 → 경과 위상
     if (SHEET_UNIT[u.key]) { // [임시] 신규 시트 유닛 — 리그 대신 PNG 시트 (스킬 모션 우선)
       const sid = SHEET_UNIT[u.key];
       const skEl = b.t - u.lastSkillAt;
@@ -461,7 +462,7 @@ export function drawBattle(
         st.prevUnits.set(u.id, { key: u.key, x: u.x });
         continue;
       }
-      const atkEl = UNIT_ATK_DUR - u.shotCd;
+      const atkEl = atkDur(u.key) - u.shotCd;
       const phase = u.shotCd > 0 && atkEl >= 0 && atkEl < 0.5 ? atkEl / 0.5 : null;
       if (!drawSheetChar(ctx, sid, 'ground', phase, b.t, ux, groundTop)) {
         ctx.fillStyle = '#7BD8A0';
@@ -490,7 +491,7 @@ export function drawBattle(
     let img: HTMLCanvasElement | null = null;
     if (hitEl < HIT_DUR) img = rigFrame(rigIdx, 'hit', hitEl / HIT_DUR, true);
     else if (skillEl >= 0 && skillEl < SKILL_DUR) img = rigFrame(rigIdx, 'skill', skillEl / SKILL_DUR, true);
-    else if (u.shotCd > 0 && atkEl < UNIT_ATK_DUR) img = rigFrame(rigIdx, 'attack', atkEl / UNIT_ATK_DUR, true);
+    else if (u.shotCd > 0 && atkEl < atkDur(u.key)) img = rigFrame(rigIdx, 'attack', atkEl / atkDur(u.key), true);
     else if (moved) img = rigFrame(rigIdx, 'walk', (b.t * 0.6 + u.id * 0.37) % 1, false); // 이동속도 절반에 맞춘 보폭
     else img = rigFrame(rigIdx, 'walk', (b.t * 0.35 + u.id * 0.37) % 1, false); // 대기 = 저속 제자리 걸음
     if (img) {
@@ -552,6 +553,7 @@ export function drawBattle(
     const eSkillEl = b.t - (e.lastSkillAt ?? -9); // FR-6.7b 적 자동 스킬 연출
     // [임시] 신규 시트 적 — 리그 대신 PNG 시트 (스킬 → 교전 → 이동 순 우선)
     const esid = enemySheetId(e.type, b.params.regionId);
+    const escale = e.type === 'boss' ? 1 : ENEMY_SCALE; // 보스만 원래 크기
     const eskTotal = (SKILL_TOTAL_MS[esid] ?? 0) / 1000;
     // 공중 띄움 — 기절 판정 동안 포물선으로 떴다가 착지 (연출 전용, 로직 영향 없음)
     const abDur = e.airborneUntil - e.airborneFrom;
@@ -560,20 +562,20 @@ export function drawBattle(
     const eBaseY = (e.air ? AIR_Y + hh / 2 : groundTop) - lift;
     let drawn = false;
     if (!stunned && hasSkillSheet(esid) && eSkillEl >= 0 && eSkillEl < eskTotal) {
-      drawn = drawSkill(ctx, esid, eSkillEl, ex, eBaseY);
+      drawn = drawSkill(ctx, esid, eSkillEl, ex, eBaseY, escale);
     }
     if (!drawn) {
       const engagedNow = !moved && !stunned;
       const aPhase = engagedNow ? ((b.t + e.id * 0.41) % 0.6) / 0.6 : null;
-      drawn = drawSheetChar(ctx, esid, e.type === 'boss' ? 'boss' : e.air ? 'air' : 'ground', aPhase, b.t + e.id * 0.41, ex, eBaseY);
+      drawn = drawSheetChar(ctx, esid, e.type === 'boss' ? 'boss' : e.air ? 'air' : 'ground', aPhase, b.t + e.id * 0.41, ex, eBaseY, escale);
     }
     if (drawn) {
       if (slowed) { // 슬로우 표시는 오버레이로 (시트에 필터를 걸면 매 프레임 비용이 큼)
         ctx.fillStyle = 'rgba(94,154,160,0.22)';
         ctx.fillRect(ex - 18, topY, 36, hh);
       }
-      const bw2 = e.type === 'boss' ? 34 : 18;
-      hpBar(ctx, ex - bw2 / 2, eBaseY - sheetCharHeight(esid) - 8, bw2, e.hp / e.maxHp, col);
+      const bw2 = e.type === 'boss' ? 34 : Math.round(18 * ENEMY_SCALE);
+      hpBar(ctx, ex - bw2 / 2, eBaseY - sheetCharHeight(esid, escale) - 8, bw2, e.hp / e.maxHp, col);
       if (lift > 2) { // 떠 있는 동안 발밑 그림자
         ctx.fillStyle = `rgba(6,10,18,${0.3 * (1 - lift / 26)})`;
         ctx.beginPath();
@@ -720,6 +722,8 @@ export function drawBattle(
     if (f.t <= st.lastFxT) continue;
     if (f.kind === 'gold' && f.amount > 0) {
       st.rigVfx.push({ idx: RIG_TOWER.dividend, motion: 'skill', x: f.x, y: groundTop, scale: 0.6, t0: f.t, dur: 0.9 });
+    } else if (f.kind === 'blast') { // 다연장 포병 융단 포격 — 착탄 지점 폭발
+      pushVfx(st, 'ally_pierce-shockwave', f.x, GROUND_Y - 14, b.t, 0.34, 14, 46);
     } else if (f.kind === 'strike') { // 번개왕 낙뢰 — 시전자가 아니라 대상 발밑
       st.strikes.push({ x: f.x, t0: f.t });
       if (st.strikes.length > 24) st.strikes.splice(0, st.strikes.length - 24);
