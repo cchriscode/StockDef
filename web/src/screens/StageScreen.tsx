@@ -13,9 +13,6 @@ import { RIG_UNIT } from '../game/rigFrames.js';
 import { RigPreview } from '../ui/RigPreview.js';
 import { SHEET_UNIT, TURRET_BY_TYPE, enemySheetId, hasSkillSheet } from '../game/previewSprites.js';
 
-/** 보스는 지역별 아트 변주 — 이름도 그에 맞춘다 (R3는 드릴 워커) */
-const bossName = (region: string) => (region === 'R3' ? '드릴 워커' : '번개 왕');
-
 // 튜토리얼 첫 거래 규칙은 서버와 공유한다 (진입 창을 서버가 실제 차트에서 계산해 내려준다)
 const TUT_CLOSE_HOLD_BARS = TUT_HOLD_BARS;
 
@@ -802,7 +799,7 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
                 <button className={isTut && guide === 4 ? 'pulse' : ''}
                   disabled={hud.gold < cost || phase !== 'playing' || (hud.unitCd[u.key] ?? 0) > 0}
                   onClick={() => spawnUnit(u.key)}>
-                  {u.name}
+                  <span className="nm">{u.name}</span>
                   <span className="cost">
                     {(hud.unitCd[u.key] ?? 0) > 0 ? `${Math.ceil(hud.unitCd[u.key])}s` : `${cost} G`}
                   </span>
@@ -873,8 +870,8 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
             {Object.keys(ENEMY_INFO).map((k) => (
               <span key={k} className="ub-wrap">
                 <button onClick={() => setInfoKey({ kind: 'enemy', key: k })}>
-                  {k === 'boss' ? bossName(regionId) : ENEMY_TYPES[k as keyof typeof ENEMY_TYPES].name}
-                  {ENEMY_TYPES[k as keyof typeof ENEMY_TYPES].isAir ? ' ✈' : k === 'boss' ? ' ★' : ''}
+                  {ENEMY_TYPES[k as keyof typeof ENEMY_TYPES].name}
+                  {ENEMY_TYPES[k as keyof typeof ENEMY_TYPES].isAir ? ' ✈' : k.startsWith('boss') ? ' ★' : ''}
                 </button>
               </span>
             ))}
@@ -889,7 +886,7 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
         const card = isEnemy ? ENEMY_INFO[infoKey.key]
           : isUnit ? UNIT_INFO[infoKey.key as keyof typeof UNIT_INFO]
             : TOWER_INFO[infoKey.key as keyof typeof TOWER_INFO];
-        const name = isEnemy ? (infoKey.key === 'boss' ? bossName(regionId) : ENEMY_TYPES[infoKey.key as keyof typeof ENEMY_TYPES].name)
+        const name = isEnemy ? ENEMY_TYPES[infoKey.key as keyof typeof ENEMY_TYPES].name
           : isUnit ? UNITS.find((u) => u.key === infoKey.key)!.name
             : TOWERS.find((t) => t.key === infoKey.key)!.name;
         const stats = isEnemy ? enemyStatsLine(infoKey.key, p.enemyHpMult, p.enemyDpsMult)

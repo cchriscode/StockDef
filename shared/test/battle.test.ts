@@ -108,7 +108,9 @@ describe('Battle 엔진', () => {
     expect(w6).toBe(6); // R1 W6 count=6, 보스 없음
     expect(b.previewWave(7).find((c) => c.type === 'boss')).toBeUndefined();
     const w13 = b.previewWave(13);
-    expect(w13.find((c) => c.type === 'boss')?.count).toBe(1);
+    // FR-6.7e 최종 웨이브 보스는 드릴 워커, 중간(W7)은 번개 왕
+    expect(w13.find((c) => c.type === 'boss_drill')?.count).toBe(1);
+    expect(w13.find((c) => c.type === 'boss')).toBeUndefined();
     expect(w13.reduce((s, c) => s + c.count, 0)).toBe(16 + 1); // W13 count=16 + 보스 (08-10 곡선 재조정)
   });
   it('타겟팅 모드 순환: first → last → strong → close → first (Bloons)', () => {

@@ -6,7 +6,7 @@ import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
 import { // [임시] 신규 아트 로스터 (아군·적군 전면 교체)
   SHEET_UNIT, SHOT_SHEET, SKILL_TOTAL_MS, drawPreviews, drawSheetChar, drawShot, drawSkill,
-  ENEMY_SCALE, UNIT_SCALE, enemySheetId, hasSkillSheet, sheetCharHeight, drawStrikeFx, drawTurret, drawTurretShot, TURRET_SHOT_IMPACT_S, TURRET_BY_TYPE,
+  ENEMY_SCALE, UNIT_SCALE, enemySheetId, isBossType, hasSkillSheet, sheetCharHeight, drawStrikeFx, drawTurret, drawTurretShot, TURRET_SHOT_IMPACT_S, TURRET_BY_TYPE,
 } from './previewSprites.js';
 
 const AIR_Y = 96;
@@ -25,7 +25,7 @@ const GROUND_Y = 258; // 캔버스 1400×300 기준 — 스프라이트는 고�
 
 const ENEMY_COLORS: Record<Enemy['type'], string> = {
   grunt: '#E8654F', runner: '#FF9E86', tank: '#A83A2E', shield: '#C9A84A',
-  healer: '#8FD8B0', air: '#E8A0B4', boss: '#C22A2A',
+  healer: '#8FD8B0', air: '#E8A0B4', boss: '#C22A2A', boss_drill: '#E07A2A',
 };
 const UNIT_COLORS: Record<string, string> = { intern: '#7BD8A0', analyst: '#46A574', trader: '#3E8C68', lancer: '#6BAF8C', mage: '#9B6BFF', riskmgr: '#5EC0B0', cane: '#D8C4A8' };
 const TOWER_COLORS: Record<string, string> = { limit: '#4E7FB8', cannon: '#B85A4E', spire: '#9B6BFF', flame: '#E8A54F', dividend: '#FFC53D', barrier: '#7C89A3' };
@@ -111,6 +111,7 @@ interface RenderFxState {
   prevProj: Map<number, { x: number; y: number; air: boolean; fromTower: boolean; turretId?: string; x0?: number }>;
   shotImpacts: { id: string; x: number; y: number; t0: number }[]; // 포탑 탄 착탄 (impact 2·3 프레임)
   strikes: { x: number; t0: number }[]; // 번개왕 낙뢰 — 맞은 아군 위치에 기둥
+  shells: { x0: number; x1: number; t0: number }[]; // 포격 포탄 — 발사관 → 착탄점 포물선
   lastHp: Map<string, number>; // 'u3'/'e17'/'t0' → 지난 프레임 hp (피격 감지)
   hitT: Map<string, number>; // 피격 애니메이션 시작 시각
   prevUnits: Map<number, { key: string; x: number }>;
@@ -127,7 +128,7 @@ function fxStateOf(b: Battle): RenderFxState {
   if (!st) {
     st = {
       lastFxT: 0, prevProj: new Map(), lastHp: new Map(), hitT: new Map(),
-      prevUnits: new Map(), prevEnemies: new Map(), prevTowers: [], corpses: [], vfx: [], rigVfx: [], shotImpacts: [], strikes: [],
+      prevUnits: new Map(), prevEnemies: new Map(), prevTowers: [], corpses: [], vfx: [], rigVfx: [], shotImpacts: [], strikes: [], shells: [],
     };
     fxStates.set(b, st);
   }
@@ -553,7 +554,7 @@ export function drawBattle(
     const eSkillEl = b.t - (e.lastSkillAt ?? -9); // FR-6.7b 적 자동 스킬 연출
     // [임시] 신규 시트 적 — 리그 대신 PNG 시트 (스킬 → 교전 → 이동 순 우선)
     const esid = enemySheetId(e.type, b.params.regionId);
-    const escale = e.type === 'boss' ? 1 : ENEMY_SCALE; // 보스만 원래 크기
+    const escale = isBossType(e.type) ? 1 : ENEMY_SCALE; // 보스만 원래 크기
     const eskTotal = (SKILL_TOTAL_MS[esid] ?? 0) / 1000;
     // 공중 띄움 — 기절 판정 동안 포물선으로 떴다가 착지 (연출 전용, 로직 영향 없음)
     const abDur = e.airborneUntil - e.airborneFrom;
@@ -567,14 +568,14 @@ export function drawBattle(
     if (!drawn) {
       const engagedNow = !moved && !stunned;
       const aPhase = engagedNow ? ((b.t + e.id * 0.41) % 0.6) / 0.6 : null;
-      drawn = drawSheetChar(ctx, esid, e.type === 'boss' ? 'boss' : e.air ? 'air' : 'ground', aPhase, b.t + e.id * 0.41, ex, eBaseY, escale);
+      drawn = drawSheetChar(ctx, esid, isBossType(e.type) ? 'boss' : e.air ? 'air' : 'ground', aPhase, b.t + e.id * 0.41, ex, eBaseY, escale);
     }
     if (drawn) {
       if (slowed) { // 슬로우 표시는 오버레이로 (시트에 필터를 걸면 매 프레임 비용이 큼)
         ctx.fillStyle = 'rgba(94,154,160,0.22)';
         ctx.fillRect(ex - 18, topY, 36, hh);
       }
-      const bw2 = e.type === 'boss' ? 34 : Math.round(18 * ENEMY_SCALE);
+      const bw2 = isBossType(e.type) ? 34 : Math.round(18 * ENEMY_SCALE);
       hpBar(ctx, ex - bw2 / 2, eBaseY - sheetCharHeight(esid, escale) - 8, bw2, e.hp / e.maxHp, col);
       if (lift > 2) { // 떠 있는 동안 발밑 그림자
         ctx.fillStyle = `rgba(6,10,18,${0.3 * (1 - lift / 26)})`;
@@ -625,7 +626,7 @@ export function drawBattle(
     if (!stunned && eSkillEl >= 0 && eSkillEl < SKILL_DUR) {
       drawRigVfx(ctx, rigIdx, 'skill', eSkillEl / SKILL_DUR, ex, e.air ? AIR_Y + hh / 2 : groundTop, hh / 95);
     }
-    const bw = e.type === 'boss' ? 34 : 18;
+    const bw = isBossType(e.type) ? 34 : 18;
     hpBar(ctx, ex - bw / 2, topY - 7, bw, e.hp / e.maxHp, col);
     st.prevEnemies.set(e.id, { type: e.type, x: e.x, air: e.air, h: hh });
   }
@@ -724,8 +725,9 @@ export function drawBattle(
     if (f.t <= st.lastFxT) continue;
     if (f.kind === 'gold' && f.amount > 0) {
       st.rigVfx.push({ idx: RIG_TOWER.dividend, motion: 'skill', x: f.x, y: groundTop, scale: 0.6, t0: f.t, dur: 0.9 });
-    } else if (f.kind === 'blast') { // 다연장 포병 융단 포격 — 착탄 지점 폭발
-      pushVfx(st, 'ally_pierce-shockwave', f.x, GROUND_Y - 14, b.t, 0.34, 14, 46);
+    } else if (f.kind === 'blast') { // 포격 — 발사 지점이 있으면 포탄이 날아간 뒤 터진다
+      if (f.fromX != null) st.shells.push({ x0: f.fromX, x1: f.x, t0: b.t });
+      else pushVfx(st, 'ally_pierce-shockwave', f.x, GROUND_Y - 14, b.t, 0.34, 14, 46);
     } else if (f.kind === 'strike') { // 번개왕 낙뢰 — 시전자가 아니라 대상 발밑
       st.strikes.push({ x: f.x, t0: f.t });
       if (st.strikes.length > 24) st.strikes.splice(0, st.strikes.length - 24);
@@ -736,18 +738,33 @@ export function drawBattle(
   }
   st.lastFxT = b.t;
 
-  // 보스 스킬 착탄 연출 (270ms). 낙뢰 기둥 아트는 번개 왕(enemy_d_1)에만 있으므로,
-  // 드릴 워커(R3)는 낙뢰 대신 지면 충격파로 표현한다 — 드릴이 번개를 떨구면 어색하다.
+  // 포격 포탄 — 등의 발사관에서 솟았다 착탄점으로 떨어지고, 닿으면 폭발로 넘긴다 (다연장 포병)
+  const SHELL_FLIGHT = 0.45;
+  st.shells = st.shells.filter((sh) => {
+    const q = (b.t - sh.t0) / SHELL_FLIGHT;
+    if (q >= 1) {
+      pushVfx(st, 'ally_pierce-shockwave', sh.x1, GROUND_Y - 14, b.t, 0.34, 14, 46);
+      return false;
+    }
+    if (q < 0) return true;
+    const x = sh.x0 + (sh.x1 - sh.x0) * q;
+    const y = GROUND_Y - 30 - 70 * Math.sin(Math.PI * q);
+    ctx.save();
+    ctx.fillStyle = '#FFC48E';
+    ctx.shadowColor = '#F08B2E';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(sx(x), y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return true;
+  });
+
+  // 번개 왕 낙뢰 기둥 (270ms). 드릴 워커는 굴착이라 엔진이 'blast'(지면 충격)를 따로 쏜다.
   st.strikes = st.strikes.filter((k) => {
     const el = b.t - k.t0;
     if (el > 0.27) return false;
-    if (el >= 0) {
-      if (b.params.regionId === 'R3') {
-        if (el < 0.02) pushVfx(st, 'ally_pierce-shockwave', k.x, GROUND_Y - 12, b.t, 0.3, 14, 40);
-      } else {
-        drawStrikeFx(ctx, el, sx(k.x), GROUND_Y);
-      }
-    }
+    if (el >= 0) drawStrikeFx(ctx, el, sx(k.x), GROUND_Y); // 'strike'는 번개 왕만 쏜다
     return true;
   });
 

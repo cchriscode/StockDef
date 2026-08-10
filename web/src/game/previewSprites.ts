@@ -75,12 +75,14 @@ export const SHEET_ENEMY: Record<string, string> = {
   shield: 'enemy_a_2', // 방패 파쇄병
   healer: 'enemy_c_2', // 확성기 드론
   air: 'enemy_c_1', // 연 정찰기
-  boss: 'enemy_d_1', // 번개 왕 (R3는 드릴 워커)
+  boss: 'enemy_d_1', // 번개 왕 (중간 보스)
+  boss_drill: 'enemy_d_2', // 드릴 워커 (최종 보스) (R3는 드릴 워커)
 };
-export function enemySheetId(type: string, regionId: string): string {
-  if (type === 'boss' && regionId === 'R3') return 'enemy_d_2'; // 드릴 워커
+export function enemySheetId(type: string, _regionId?: string): string {
   return SHEET_ENEMY[type] ?? 'enemy_a_1';
 }
+/** 보스 계열인지 (크기·체력바·연출 분기) */
+export const isBossType = (type: string) => type === 'boss' || type === 'boss_drill';
 
 // ─── 스킬 시트 (skills.json 요약) — cueFrame에 판정·투사체 생성 ───
 interface SkillSpec { frames: number; durationsMs: number[]; cueFrame: number; cell: 'skill' | 'skillEffect' }

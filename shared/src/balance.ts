@@ -11,7 +11,7 @@ export const BALANCE = {
   DRAW_BAND: 0.25, // |g| < 0.25 → 통계상 DRAW (손익은 연속)
   Z_CAP: 3.0, // 정규화 수익 g의 상방 클램프 → 최대 배당 1 + B×3
   MAX_POSITIONS: 10, // FR-5.13 기준값 (리서치 데스크 보너스 산정 기준)
-  TRADES_PER_WAVE: 2, // FR-5.13b 웨이브가 하나 시작될 때마다 거래 가능 횟수 +2
+  TRADES_PER_WAVE: 2, // FR-5.13b 첫 웨이브 이후 웨이브마다 거래 가능 횟수 +2 (시작은 MAX_POSITIONS)
   POSITIONS_PER_DESK_LV: 5, // 부서 레벨당 +5회
   MAX_CONCURRENT: 1,
   OPEN_RATE_LIMIT_MS: 1000,
@@ -217,6 +217,7 @@ export const ENEMY_SKILL_PERIOD: Record<EnemyTypeSpec['key'], number> = {
   healer: 10, // 선동 방송 — 반경 내 적 공격력 +12% (자신은 받는 피해 +20%)
   air: 11, // 표적 지정 — 체력 최저 아군에 6초간 받는 피해 +12% 표식 (피해 없음)
   boss: 15, // 낙뢰 심판 — 앞선 아군 2기에 피해 ×0.8 + 기절 0.5초 + 표식
+  boss_drill: 13, // 관통 굴착 — 앞선 아군 3기 관통 피해 ×0.95 + 둔화 45%(2.5초) + 방어 감소
 };
 
 /**
@@ -268,6 +269,7 @@ export const ATTACK_CUE_S = 0.3;
 
 /** 스킬 큐 프레임까지의 지연(초) — 이 시점에 판정·투사체가 나가야 모션과 맞는다 */
 export const SKILL_CUE_S: Record<string, number> = {
+  boss_drill: 0.45,
   club: 0.27, scissor: 0.27, foreman: 0.27, apprentice: 0.09,
   gasmask: 0.27, sniper: 0.27, roundshield: 0.27, shutter: 0.27, bricker: 0.27,
   grunt: 0.27, shield: 0.27, runner: 0.27, tank: 0.27, air: 0.20, healer: 0.27, boss: 0.45,
@@ -282,6 +284,7 @@ export const ENEMY_SKILL = {
   air: { markPct: 0.12, markDur: 6 }, // 연 정찰기 표적 지정
   healer: { dpsBuff: 0.12, dur: 5, radius: 340, selfVuln: 0.2 }, // 확성기 드론 선동 방송
   boss: { mult: 0.8, targets: 2, stun: 0.5, markPct: 0.12, markDur: 3 }, // 번개 왕 낙뢰 심판
+  boss_drill: { mult: 1.1, targets: 3, slowPct: 0.45, slowDur: 2.5, armorCut: 0.25 }, // 드릴 워커 관통 굴착
 } as const;
 
 /**
@@ -328,7 +331,7 @@ export const TOWER_FIRE_ANIM_S = 0.52;
 
 // 적 아키타입 — Kingdom Rush식 카운터 관계 (armor ↔ 마법, 공중 ↔ 대공/애널리스트)
 export interface EnemyTypeSpec {
-  key: 'grunt' | 'runner' | 'tank' | 'shield' | 'healer' | 'air' | 'boss';
+  key: 'grunt' | 'runner' | 'tank' | 'shield' | 'healer' | 'air' | 'boss' | 'boss_drill';
   name: string;
   icon: string;
   hpMult: number;
@@ -351,7 +354,9 @@ export const ENEMY_TYPES: Record<EnemyTypeSpec['key'], EnemyTypeSpec> = {
   // 확성기 드론 스프라이트를 쓰므로 실제로도 공중 유닛 (지상 판정이면 드론이 걸어 다닌다)
   healer: { key: 'healer', name: '리스크 헤지', icon: '➕', hpMult: 0.9, speedMult: 0.9, armor: 0, mr: 0.3, dpsMult: 0.5, healPerSec: 6, baseDmg: 8, isAir: true, size: 8, aumBounty: 3 },
   air: { key: 'air', name: '드론', icon: '✈', hpMult: 0.8, speedMult: 1.15, armor: 0, mr: 0.3, dpsMult: 0.8, healPerSec: 0, baseDmg: 10, isAir: true, size: 8, aumBounty: 2 },
-  boss: { key: 'boss', name: '베어 간부', icon: '👹', hpMult: 5.5, speedMult: 0.45, armor: 0.25, mr: 0.2, dpsMult: 3, healPerSec: 0, baseDmg: 30, isAir: false, size: 15, aumBounty: 12 },
+  boss: { key: 'boss', name: '번개 왕', icon: '⚡', hpMult: 4.5, speedMult: 0.5, armor: 0.2, mr: 0.25, dpsMult: 2.6, healPerSec: 0, baseDmg: 26, isAir: false, size: 15, aumBounty: 10 }, // 중간 보스 — 제압형
+  // FR-6.7e 드릴 워커 — 굴착기형 보스. 번개 왕보다 단단·느리고 화력은 낮은 대신 전열을 갈아 넣는다
+  boss_drill: { key: 'boss_drill', name: '드릴 워커', icon: '🛠', hpMult: 7, speedMult: 0.4, armor: 0.35, mr: 0.1, dpsMult: 3.2, healPerSec: 0, baseDmg: 34, isAir: false, size: 15, aumBounty: 15 }, // 최종 보스 — 전열 갈이형
 };
 
 // 웨이브 조합 (비율) — 지역별로 성격이 다르다: R2 고속·공중 / R3 중장갑
@@ -377,6 +382,10 @@ const COMP_TUT: CompRatio[] = [{ grunt: 1 }, { grunt: 1 }, { grunt: 2, runner: 1
 
 export const WAVE_COMPS: Record<RegionId, CompRatio[]> = { R1: COMP_R1, R2: COMP_R2, R3: COMP_R3, TUT: COMP_TUT };
 export const BOSS_WAVES: Record<RegionId, number[]> = { R1: [13], R2: [7, 13], R3: [7, 13], TUT: [] };
+/** FR-6.7e 보스는 둘 — 중간(번개 왕)은 제압형, 최종(드릴 워커)은 물량 갈이형 */
+export function bossTypeForWave(wave: number, waveCount: number): 'boss' | 'boss_drill' {
+  return wave >= waveCount ? 'boss_drill' : 'boss';
+}
 
 // §9.4 웨이브 테이블 — R1 원본, R2/R3는 배수 스케일
 // 지수형 곡선 (2026-08-05 개정): 초반은 가볍게 시작해 후반으로 갈수록 물량·HP가 가파르게 상승.

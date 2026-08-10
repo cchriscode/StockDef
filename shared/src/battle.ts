@@ -6,7 +6,7 @@
 //  - Bloons TD: 타워 타겟팅 모드 first/last/strong/close
 //  - Age of War: 블로커+원거리 역할 조합, 화면 클리어 스킬
 import {
-  BALANCE, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, ENEMY_SKILL_HITS, ATTACK_CUE_S, MUZZLE, TOWER_FIRE_CUE_S, SKILL_CUE_S,
+  BALANCE, BOSS_WAVES, bossTypeForWave, ENEMY_SKILL_PERIOD, ENEMY_SKILL, ENEMY_SKILL_HITS, ATTACK_CUE_S, MUZZLE, TOWER_FIRE_CUE_S, SKILL_CUE_S,
   UNIT_ATK_PERIOD, UNIT_ATK_PERIOD_DEFAULT, SPAWN_GLOBAL_CD, UNIT_SPAWN_CD, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
   type DmgType, type EnemyTypeSpec, type TargetingMode, type TowerSpec, type UnitSpec,
 } from './balance.js';
@@ -120,8 +120,9 @@ export interface Projectile {
 }
 
 export interface Fx {
-  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'bomb' | 'aum' | 'gold' | 'strike' | 'blast'; // strike = 번개왕 낙뢰 / blast = 융단 포격 착탄
+  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'bomb' | 'aum' | 'gold' | 'strike' | 'blast'; // strike = 번개왕 낙뢰 / blast = 포격 착탄
   x: number;
+  fromX?: number; // 있으면 이 지점에서 x까지 포탄이 날아간 뒤 터진다 (다연장 포병 등)
   air: boolean;
   amount: number;
   t: number; // 발생 시각 (battle.t)
@@ -338,13 +339,13 @@ export class Battle {
     const list = this.compose(w);
     const agg = new Map<EnemyTypeSpec['key'], number>();
     for (const t of list) agg.set(t, (agg.get(t) ?? 0) + 1);
-    if (BOSS_WAVES[this.params.regionId].includes(w)) agg.set('boss', 1);
+    if (BOSS_WAVES[this.params.regionId].includes(w)) agg.set(bossTypeForWave(w, this.params.waveCount), 1);
     return [...agg.entries()].map(([type, count]) => ({ type, count }));
   }
 
   // ─── 내부 ───
-  private pushFx(kind: Fx['kind'], x: number, air: boolean, amount: number) {
-    this.fx.push({ kind, x, air, amount, t: this.t });
+  private pushFx(kind: Fx['kind'], x: number, air: boolean, amount: number, fromX?: number) {
+    this.fx.push({ kind, x, air, amount, t: this.t, fromX });
     if (this.fx.length > 90) this.fx.splice(0, this.fx.length - 90);
   }
 
@@ -449,9 +450,10 @@ export class Battle {
       });
     });
     if (BOSS_WAVES[this.params.regionId].includes(w)) {
-      const et = ENEMY_TYPES.boss;
+      const bossKey = bossTypeForWave(w, this.params.waveCount); // 중간=번개 왕 / 최종=드릴 워커
+      const et = ENEMY_TYPES[bossKey];
       this.pending.push({
-        at: waveStart + 2, wave: w, type: 'boss',
+        at: waveStart + 2, wave: w, type: bossKey,
         hp: spec.hp * buff * this.params.heat * mod.enemyHpMult * et.hpMult,
         speed: 15 * spec.speed * et.speedMult,
       });
@@ -803,7 +805,7 @@ export class Battle {
         const ts = [...this.units].sort((a, b) => b.x - a.x).slice(0, ES.spots as number);
         if (ts.length) {
           for (const u of ts) {
-            this.pushFx('blast', u.x, false, 0); // 착탄 지점마다 폭발 (없으면 피해만 들어가고 화면엔 아무 일도 없다)
+            this.pushFx('blast', u.x, false, 0, e.x); // 등의 발사관에서 포탄이 날아가 착탄
             this.damageUnit(u, e.dps * (ES.mult as number));
           }
           cast = true;
@@ -826,6 +828,17 @@ export class Battle {
         e.vulnPct = ES.selfVuln as number;
         this.pushFx('heal', e.x, e.air, 0);
         cast = buffed.length > 0;
+      } else if (e.type === 'boss_drill') { // 드릴 워커 — 앞선 아군을 관통 굴착 (둔화 + 방어 감소)
+        const ts = [...this.units].sort((a, b) => b.x - a.x).slice(0, ES.targets as number);
+        for (const u of ts) {
+          this.pushFx('blast', u.x, false, 0); // 지면을 파고드는 충격
+          this.damageUnit(u, e.dps * (ES.mult as number));
+          u.slowUntil = t + (ES.slowDur as number);
+          u.slowPct = Math.max(u.slowPct, ES.slowPct as number);
+          u.markUntil = t + (ES.slowDur as number); // 파인 자리는 방어가 무너진다
+          u.markPct = Math.max(u.markPct, ES.armorCut as number);
+        }
+        cast = ts.length > 0;
       } else if (e.type === 'boss') { // 번개 왕 — 다지점 낙뢰 (기절 + 표식)
         const ts = [...this.units].sort((a, b) => b.x - a.x).slice(0, ES.targets as number);
         if (ts.length) {

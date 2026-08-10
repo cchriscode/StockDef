@@ -471,7 +471,11 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
   min-width: 0; width: 100%; padding: 8px 4px; background: var(--panel); border-color: var(--green);
   position: relative; font-size: clamp(10px, 1.05vw, 13px); white-space: nowrap; overflow: hidden;
 }
-.cmd-units button .cost { font-family: var(--fm); font-size: clamp(9px, 0.85vw, 11px); color: var(--gold); }
+.cmd-units button .nm {
+  /* 이름은 어떤 폭에서도 한 줄 — 넘치면 말줄임 (줄바꿈되면 버튼 높이가 들쭉날쭉해진다) */
+  display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cmd-units button .cost { font-family: var(--fm); font-size: clamp(9px, 0.85vw, 11px); color: var(--gold); white-space: nowrap; }
 .cmd-units .ub-wrap { display: flex; }
 .cmd-units button.skill { border-color: var(--gold); }
 .cmd-units button:disabled { border-color: var(--line2); }

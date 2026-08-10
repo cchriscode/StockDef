@@ -46,7 +46,8 @@ export function judge(
  */
 export function tradeAllowance(barIdx: number, waveCount: number, bonus = 0): number {
   const started = Math.max(1, Math.min(waveCount, Math.floor(Math.max(barIdx, 0) / BALANCE.CYCLE_SECONDS) + 1));
-  return started * BALANCE.TRADES_PER_WAVE + bonus;
+  // 시작 시점부터 기본 10회를 주고, 웨이브가 하나 넘어갈 때마다 +2
+  return BALANCE.MAX_POSITIONS + (started - 1) * BALANCE.TRADES_PER_WAVE + bonus;
 }
 
 /**
