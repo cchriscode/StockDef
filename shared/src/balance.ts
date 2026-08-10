@@ -49,12 +49,14 @@ export const BALANCE = {
   // 계수는 봇 시뮬 실측으로 정한다 (R1 p=55% 기준 이지 50~60%가 목표).
   // 골드를 늘리는 방식은 +100%를 줘도 10→13%에 그쳐(전열이 먼저 무너짐) 스탯 완화로 간다.
   // 2026-08-10 재조정: 적이 사옥 앞에 쌓여 계속 싸우게 되면서(FR-6.11) 압력이 올라 한 단계 더 완화.
-  EASY_HP_MULT: 0.4, // 이지: 적 체력 −60%
-  EASY_DPS_MULT: 0.45, // 이지: 적 공격력 −55%
+  EASY_HP_MULT: 0.35, // 이지: 적 체력 −65% (하드 상향분 1.3→1.5를 상쇄해 이지 체감 유지)
+  EASY_DPS_MULT: 0.39, // 이지: 적 공격력 −61% (동상)
   EASY_COUNT_MULT: 0.6, // 이지: 적 수 −40%
   EASY_CAPITAL_MULT: 0.7, // 이지: 자본금 보상 70% (쉬운 만큼 성장은 느리게)
-  ENEMY_HP_MULT: 1.3, // 2026-08-05 전 지역 적 체력 +30% (플레이테스트 "너무 쉽다" 반영)
-  ENEMY_DPS_MULT: 1.3, // 적 공격력 +30%
+  // 2026-08-10 재상향: 플레이테스트에서 하드가 쉽다는 피드백 (봇 시뮬은 낮게 나오지만
+  // 사람이 잘 하면 여유가 있다 — 실제 플레이 감각을 기준으로 잡는다)
+  ENEMY_HP_MULT: 1.5, // 전 지역 적 체력 +50%
+  ENEMY_DPS_MULT: 1.5, // 적 공격력 +50%
   // FR-6.10b 위기 반격 충격파 — 본진 앞까지 밀고 온 아군을 중원까지 밀어낸다 (러시 견제)
   RAGE_PUSH_TO_X: 500, // 밀려나는 목표 지점 (필드 중앙)
   RAGE_PUSH_SECONDS: 0.9, // 밀려나는 시간 (이 동안 이동·공격 불가)
@@ -171,7 +173,7 @@ export const UNITS: UnitSpec[] = [
   { key: 'shutter', name: '셔터 장교', cost: 90, hp: 190, dps: 9, speed: 20, range: 20, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'gasmask', name: '방독면 포수', cost: 95, hp: 85, dps: 16, speed: 20, range: 110, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'foreman', name: '망치 작업반장', cost: 110, hp: 240, dps: 12, speed: 20, range: 24, cleave: 2, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'sniper', name: '저격수', cost: 120, hp: 70, dps: 22, speed: 20, range: 170, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'sniper', name: '저격수', cost: 120, hp: 70, dps: 22, speed: 20, range: 135, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'pistol', name: '권총 장교', cost: 60, hp: 80, dps: 14, speed: 20, range: 120, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
 ];
 
