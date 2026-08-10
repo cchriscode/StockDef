@@ -301,8 +301,9 @@ export const MUZZLE: Record<string, { fx: number; y: number }> = {
 // 2026-08-10: 사옥 자동 포탑(BASE_TURRET) 제거 — 방어는 플레이어가 세운 포탑·유닛으로만 한다.
 
 // 포탑 발사 모션의 섬광 프레임(f1) 시각 — 유닛 평타와 같이 모션 뒤에 투사체가 나가게 맞춘다
-export const TOWER_FIRE_CUE_S = 0.08;
-export const TOWER_FIRE_ANIM_S = 0.38; // fire 4프레임 총 재생 길이
+// turrets.json 실측: fire durationsMs [90,110,140,180] = 520ms, cueFrame 1(=90ms)에서 포구 섬광
+export const TOWER_FIRE_CUE_S = 0.09;
+export const TOWER_FIRE_ANIM_S = 0.52;
 
 // 적 아키타입 — Kingdom Rush식 카운터 관계 (armor ↔ 마법, 공중 ↔ 대공/애널리스트)
 export interface EnemyTypeSpec {
