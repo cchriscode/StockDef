@@ -761,3 +761,50 @@ u { text-decoration: none; } /* 상태 마커(●○) 전용 색 래퍼 */
   .wr-side { width: auto; }
   .wr-queue { max-height: none; }
 }
+
+/* ═══ 자본 배분 데스크 (목업 "Dead Cat Bounce - Upgrade") ═══ */
+.map-room.desk .wr-body { align-items: flex-start; }
+.dk-cap { font-size: 12px; color: var(--mut); }
+.dk-cap b { color: var(--gold); font-family: var(--fm); font-size: 15px; }
+
+.dk-grid { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; align-content: start; }
+.dk-card {
+  border: 2px solid #1B2A42; background: #0B111C; padding: 12px 13px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.dk-card.ready { border-color: var(--green); }
+.dk-card.maxed { border-color: var(--gold-dk); background: #0E1220; }
+.dk-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.dk-name { display: flex; flex-direction: column; gap: 3px; }
+.dk-name b { font-size: 15px; }
+.dk-name em { font-family: var(--fm); font-size: 9px; font-style: normal; color: var(--dim); letter-spacing: 1px; }
+.dk-lv { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.dk-lv span { font-family: var(--fm); font-size: 11px; color: var(--mut); }
+.dk-lv .pips { display: flex; gap: 3px; }
+.dk-lv .pips i { width: 9px; height: 9px; background: #1B2A42; }
+.dk-lv .pips i.on { background: var(--green2); }
+
+.dk-eff { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12px; }
+.dk-eff .cur { color: var(--mut); }
+.dk-eff .arw { color: var(--dim); }
+.dk-eff .nxt { color: var(--green2); }
+
+.dk-buy { display: flex; flex-direction: column; gap: 6px; }
+.dk-buy .bar, .dk-cap-panel .bar { height: 6px; background: #16233A; }
+.dk-buy .bar i, .dk-cap-panel .bar i { display: block; height: 100%; background: var(--green); }
+.dk-buy button { min-height: 34px; font-family: var(--fm); font-size: 12px; }
+.dk-buy .req { font-family: var(--fm); font-size: 9px; color: var(--dim); letter-spacing: 1px; }
+.dk-buy .max { font-family: var(--fm); font-size: 11px; color: var(--gold); }
+
+.dk-cap-panel { padding: 12px 13px; display: flex; flex-direction: column; gap: 6px; }
+.dk-cap-panel .big { font-family: var(--fm); font-size: 26px; color: var(--gold); }
+.dk-build { padding: 6px 13px 12px; }
+.dk-build .kv { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid #16233A; font-size: 12px; }
+.dk-build .kv:last-child { border-bottom: none; }
+.dk-build .kv span:first-child { color: var(--mut); }
+.dk-build .kv span:last-child { font-family: var(--fm); color: var(--text); }
+.dk-queue { padding: 6px 0; }
+.dk-queue .qrow { display: flex; gap: 9px; align-items: baseline; padding: 7px 13px; border-bottom: 1px solid #16233A; font-size: 12px; color: var(--mut); }
+.dk-queue .qrow:last-child { border-bottom: none; }
+.dk-queue .qrow .no { font-family: var(--fm); font-size: 11px; color: var(--green2); }
+.center { text-align: center; }
