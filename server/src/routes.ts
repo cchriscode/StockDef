@@ -173,6 +173,7 @@ router.post('/stage/finish', (req, res) => {
   // FR-6.10 조기 승리(적 본진 파괴)는 러시로 매우 이르게 끝날 수 있다 — 실측상 스테이지의 ~24%도 가능.
   // 최소 10%(웨이브 1~2 진행분)만 요구해 즉시 클리어 조작만 차단한다.
   if (cleared && elapsed < stageMs * (enemyBaseDestroyed ? 0.1 : 0.95)) {
+    console.warn(`[finish] 시간 게이트 반려 session=${sessionId} region=${row.region_id} elapsed=${elapsed}ms stage=${stageMs}ms ebd=${enemyBaseDestroyed} hp=${hpLeft}`);
     db.prepare("UPDATE stage_sessions SET status = 'abandoned', ended_at = datetime('now') WHERE id = ?").run(sessionId);
     dropLive(sessionId);
     return res.json({ status: 'invalid', grade: null, accuracy: 0, returnPct: 0, aumLeftRate: 0, capitalAwarded: 0, eligibleLines: [], alreadyOwnedLines: [], isRetry: !!row.is_retry, capitalTotal: accountRow(accountId).capital } satisfies FinishRes);
@@ -183,9 +184,10 @@ router.post('/stage/finish', (req, res) => {
   const barIdxAtEnd = live.serverBarIdx();
   const serverEarned = live.incomeSoFar(barIdxAtEnd) + live.goldSum;
   const claimed = Math.round(goldLeft + goldSpent);
-  const tolerance = Math.max(serverEarned * 0.05, 15);
+  const tolerance = Math.max(serverEarned * 0.05, params.incomePerWave + 15); // 웨이브 경계 레이스 허용
   const valid = Math.abs(claimed - serverEarned) <= tolerance && goldLeft >= 0 && goldSpent >= 0;
   if (!valid) {
+    console.warn(`[finish] 골드 검증 반려 session=${sessionId} region=${row.region_id} claimed=${claimed} server=${serverEarned} tol=${tolerance} bar=${barIdxAtEnd}`);
     db.prepare("UPDATE stage_sessions SET status = 'abandoned', ended_at = datetime('now') WHERE id = ?").run(sessionId);
     dropLive(sessionId);
     return res.json({ status: 'invalid', grade: null, accuracy: 0, returnPct: 0, aumLeftRate: 0, capitalAwarded: 0, eligibleLines: [], alreadyOwnedLines: [], isRetry: !!row.is_retry, capitalTotal: accountRow(accountId).capital } satisfies FinishRes);

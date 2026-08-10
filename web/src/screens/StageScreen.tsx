@@ -115,7 +115,7 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
       const res = await api.stageFinish(s.start.sessionId, {
         goldLeft: Math.floor(b.gold),
         goldSpent: Math.floor(b.goldSpent),
-        hpLeft: giveUp ? 0 : Math.max(0, Math.round(b.baseHP)),
+        hpLeft: giveUp ? 0 : Math.max(0, Math.ceil(b.baseHP)), // 살아 있으면 절대 0으로 내리지 않는다 (0 = 패배 판정)
         enemyBaseDestroyed: b.enemyBaseDestroyed,
       });
       onFinish(s.start.sessionId, { ...res, endReason }, regionId);

@@ -119,7 +119,7 @@ export interface Projectile {
 }
 
 export interface Fx {
-  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'bomb' | 'aum' | 'gold'; // bomb = 공시폭탄 전용 (메테오 낙하 연출)
+  kind: 'dmg' | 'death' | 'heal' | 'stun' | 'bomb' | 'aum' | 'gold' | 'strike'; // bomb = 공시폭탄 / strike = 번개왕 낙뢰(대상 위치)
   x: number;
   air: boolean;
   amount: number;
@@ -811,6 +811,7 @@ export class Battle {
         const ts = [...this.units].sort((a, b) => b.x - a.x).slice(0, ES.targets as number);
         if (ts.length) {
           for (const u of ts) {
+            this.pushFx('strike', u.x, false, 0); // 낙뢰는 시전자가 아니라 맞은 아군 발밑에 떨어진다
             this.damageUnit(u, e.dps * (ES.mult as number));
             if (t >= u.stunImmuneUntil) {
               u.stunUntil = t + (ES.stun as number);

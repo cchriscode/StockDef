@@ -6,7 +6,7 @@ import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
 import { // [임시] 신규 아트 로스터 (아군·적군 전면 교체)
   SHEET_UNIT, SHOT_SHEET, SKILL_TOTAL_MS, drawPreviews, drawSheetChar, drawShot, drawSkill,
-  enemySheetId, hasSkillSheet, sheetCharHeight, drawTurret, drawTurretShot, TURRET_SHOT_IMPACT_S, TURRET_BY_TYPE,
+  enemySheetId, hasSkillSheet, sheetCharHeight, drawStrikeFx, drawTurret, drawTurretShot, TURRET_SHOT_IMPACT_S, TURRET_BY_TYPE,
 } from './previewSprites.js';
 
 const AIR_Y = 96;
@@ -102,6 +102,7 @@ interface RenderFxState {
   lastFxT: number;
   prevProj: Map<number, { x: number; y: number; air: boolean; fromTower: boolean; turretId?: string; x0?: number }>;
   shotImpacts: { id: string; x: number; y: number; t0: number }[]; // 포탑 탄 착탄 (impact 2·3 프레임)
+  strikes: { x: number; t0: number }[]; // 번개왕 낙뢰 — 맞은 아군 위치에 기둥
   lastHp: Map<string, number>; // 'u3'/'e17'/'t0' → 지난 프레임 hp (피격 감지)
   hitT: Map<string, number>; // 피격 애니메이션 시작 시각
   prevUnits: Map<number, { key: string; x: number }>;
@@ -118,7 +119,7 @@ function fxStateOf(b: Battle): RenderFxState {
   if (!st) {
     st = {
       lastFxT: 0, prevProj: new Map(), lastHp: new Map(), hitT: new Map(),
-      prevUnits: new Map(), prevEnemies: new Map(), prevTowers: [], corpses: [], vfx: [], rigVfx: [], shotImpacts: [],
+      prevUnits: new Map(), prevEnemies: new Map(), prevTowers: [], corpses: [], vfx: [], rigVfx: [], shotImpacts: [], strikes: [],
     };
     fxStates.set(b, st);
   }
@@ -677,12 +678,23 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     if (f.t <= st.lastFxT) continue;
     if (f.kind === 'gold' && f.amount > 0) {
       st.rigVfx.push({ idx: RIG_TOWER.dividend, motion: 'skill', x: f.x, y: groundTop, scale: 0.6, t0: f.t, dur: 0.9 });
+    } else if (f.kind === 'strike') { // 번개왕 낙뢰 — 시전자가 아니라 대상 발밑
+      st.strikes.push({ x: f.x, t0: f.t });
+      if (st.strikes.length > 24) st.strikes.splice(0, st.strikes.length - 24);
     } else if (f.kind === 'bomb') { // 공시폭탄 전용 — 다른 스킬이 메테오를 부르지 않도록 종류를 분리
       st.rigVfx.push({ idx: 5, motion: 'skill', x: f.x, y: groundTop, scale: 1.6, t0: f.t, dur: 1.1 });
     }
     if (st.rigVfx.length > 40) st.rigVfx.splice(0, st.rigVfx.length - 40);
   }
   st.lastFxT = b.t;
+
+  // 번개왕 낙뢰 기둥 재생 (60+70+140 = 270ms)
+  st.strikes = st.strikes.filter((k) => {
+    const el = b.t - k.t0;
+    if (el > 0.27) return false;
+    if (el >= 0) drawStrikeFx(ctx, el, sx(k.x), GROUND_Y);
+    return true;
+  });
 
   // 리그 VFX 원샷 재생
   st.rigVfx = st.rigVfx.filter((v) => {
