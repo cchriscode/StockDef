@@ -13,6 +13,9 @@ import { RIG_UNIT } from '../game/rigFrames.js';
 import { RigPreview } from '../ui/RigPreview.js';
 import { PREVIEW_ROSTER, SHEET_UNIT, TURRET_BY_TYPE, clearPreviews, hasSkillSheet, spawnPreview } from '../game/previewSprites.js'; // [임시] 신규 아트 프리뷰
 
+// 튜토리얼 첫 거래는 WIN이 보장되는 상승 구간을 지난 뒤에만 청산할 수 있다
+const TUT_CLOSE_HOLD_BARS = 26;
+
 interface Props {
   regionId: RegionId;
   mode?: StageMode;
@@ -326,8 +329,15 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
   const canClose = (() => {
     const s = g.current;
     if (phase !== 'playing' || !s.openMarker || s.openMarker.basePrice <= 0) return false;
-    if (isTut && guide === 2 && hud.barF < s.openMarker.openBarIdx + 26) return false;
+    if (isTut && guide === 2 && hud.barF < s.openMarker.openBarIdx + TUT_CLOSE_HOLD_BARS) return false;
     return true;
+  })();
+
+  // 대기가 의도된 것임을 알리려고 남은 시간을 버튼에 띄운다 (튜토리얼은 1배속 고정 = 1봉 1초)
+  const closeWaitS = (() => {
+    const s = g.current;
+    if (canClose || phase !== 'playing' || !isTut || guide !== 2 || !s.openMarker) return 0;
+    return Math.max(0, Math.ceil(s.openMarker.openBarIdx + TUT_CLOSE_HOLD_BARS - hud.barF));
   })();
 
   const closePosition = () => {
@@ -509,8 +519,12 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
                     {hud.upnl != null ? `${hud.upnl >= 0 ? '+' : ''}${hud.upnl.toLocaleString()} AUM` : '…'}
                   </span>
                 </div>
-                <button className={`close-pos ${isTut && guide === 2 && canClose ? 'pulse' : ''}`} disabled={!canClose} onClick={closePosition}>
-                  청산 ✕
+                <button
+                  className={`close-pos ${isTut && guide === 2 && canClose ? 'pulse' : ''} ${closeWaitS > 0 ? 'waiting' : ''}`}
+                  disabled={!canClose}
+                  onClick={closePosition}
+                >
+                  {closeWaitS > 0 ? `${closeWaitS}초 후 청산 가능` : '청산 ✕'}
                 </button>
               </>
             ) : (
