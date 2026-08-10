@@ -1,12 +1,12 @@
 // FR-6.1 일자형 전투 렌더러 — Battle 엔진 상태를 그리기만 한다 (로직·렌더 분리, §11)
 // 스프라이트: handoff 리그 팩 — 로드 시 rigFrames가 고프레임으로 구워둔 시퀀스를 blit
-import { BASE_TURRET, ENEMY_TYPES, MUZZLE, TOWERS, type Battle, type Enemy } from '@tf/shared';
+import { ENEMY_TYPES, MUZZLE, TOWERS, TOWER_FIRE_ANIM_S, type Battle, type Enemy } from '@tf/shared';
 import { BACKDROPS, BACKDROP_GROUND, BACKDROP_H, BACKDROP_W, type Backdrop } from './battleBackdrops.js';
 import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
 import { // [임시] 신규 아트 로스터 (아군·적군 전면 교체)
   SHEET_UNIT, SHOT_SHEET, SKILL_TOTAL_MS, drawPreviews, drawSheetChar, drawShot, drawSkill,
-  enemySheetId, hasSkillSheet, sheetCharHeight, drawTurret, TURRET_BY_TYPE,
+  enemySheetId, hasSkillSheet, sheetCharHeight, drawTurret, drawTurretShot, TURRET_SHOT_IMPACT_S, TURRET_BY_TYPE,
 } from './previewSprites.js';
 
 const AIR_Y = 96;
@@ -96,7 +96,8 @@ interface Corpse { rigIdx: number; x: number; y: number; h: number; t0: number }
 interface VfxShot { name: string; x: number; y: number; t0: number; dur: number; s0: number; s1: number }
 interface RenderFxState {
   lastFxT: number;
-  prevProj: Map<number, { x: number; air: boolean; fromTower: boolean; base?: boolean; x0?: number }>;
+  prevProj: Map<number, { x: number; y: number; air: boolean; fromTower: boolean; turretId?: string; x0?: number }>;
+  shotImpacts: { id: string; x: number; y: number; t0: number }[]; // 포탑 탄 착탄 (impact 2·3 프레임)
   lastHp: Map<string, number>; // 'u3'/'e17'/'t0' → 지난 프레임 hp (피격 감지)
   hitT: Map<string, number>; // 피격 애니메이션 시작 시각
   prevUnits: Map<number, { key: string; x: number }>;
@@ -113,7 +114,7 @@ function fxStateOf(b: Battle): RenderFxState {
   if (!st) {
     st = {
       lastFxT: 0, prevProj: new Map(), lastHp: new Map(), hitT: new Map(),
-      prevUnits: new Map(), prevEnemies: new Map(), prevTowers: [], corpses: [], vfx: [], rigVfx: [],
+      prevUnits: new Map(), prevEnemies: new Map(), prevTowers: [], corpses: [], vfx: [], rigVfx: [], shotImpacts: [],
     };
     fxStates.set(b, st);
   }
@@ -295,7 +296,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     ctx.fill(); ctx.stroke();
   }
 
-  // 본진 (사옥 + 자동 포탑) / 적 본진 — 체력 3상태 스프라이트 (Bases 시트 유지)
+  // 본진 / 적 본진 — 체력 3상태 스프라이트 (Bases 시트 유지)
   ctx.imageSmoothingEnabled = false;
   const hpState = (rate: number) => (rate >= 0.6 ? '100' : rate >= 0.25 ? '59' : '24');
   const hq = spr(`hq_${hpState(b.baseHP / 100)}`);
@@ -307,10 +308,6 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   } else {
     drawBase(ctx, 8, GROUND_Y - 50, 40, 64, '#46A574', '#0C1A12', b.baseHP / 100, '사옥');
   }
-  ctx.fillStyle = '#C39C4C'; // 사옥 옥상 투척대 (자동 포탑 발사 원점)
-  ctx.fillRect(38, groundTop - 124, 12, 6);
-  ctx.fillStyle = '#FFE9C4';
-  ctx.fillRect(41, groundTop - 127, 6, 3);
   if (b.rageStage > 0) { // FR-6.10b 위기 반격 — 적 본진 붉은 오라 펄스
     const pulse = (0.22 + 0.14 * Math.sin(b.t * 5)) * b.rageStage;
     const cxr = W - 64;
@@ -369,9 +366,9 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     }
     const spec = TOWERS.find((t) => t.key === tw.key)!;
     if (tw.maxHp > 0) trackHit(st, `t${s}`, tw.hp, b.t);
-    const cycle = spec.rate > 0 ? 1 / spec.rate : 0;
-    const firedEl = spec.rate > 0 ? cycle - tw.cooldown : -1;
-    const firePhase = firedEl >= 0 && firedEl < 0.38 ? firedEl / 0.38 : null;
+    // 발사 시각을 엔진이 직접 기록하므로 연사 속도와 무관하게 모션이 매번 온전히 재생된다
+    const firedEl = b.t - tw.fireT;
+    const firePhase = firedEl >= 0 && firedEl < TOWER_FIRE_ANIM_S ? firedEl / TOWER_FIRE_ANIM_S : null;
     const aim01 = tw.lastTargetX != null ? Math.min(1, Math.abs(tw.lastTargetX - b.towerSlotX(s)) / spec.range) : 0.4;
     const turretId = TURRET_BY_TYPE[tw.key]; // 타입별 스프라이트 (없으면 리그 스프라이트)
     let towerDrawn = false;
@@ -606,37 +603,29 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     void RIG_ENEMY;
   }
 
-  // 투사체 — 사옥 자동 포탑=옥상 투척 골드 주머니(포물선) / 타워·유닛=팔레트 볼트, 소멸 시 충격파 vfx
+  // 투사체 — 포탑은 전용 shot 시트(포구→목표 하강), 유닛은 시트별 탄, 나머지는 팔레트 볼트
+  const enemyX = new Map(b.enemies.map((e) => [e.id, e.x]));
   const liveProj = new Set<number>();
   for (const p of b.projectiles) {
     liveProj.add(p.id);
     const px = sx(p.x);
     const prev = st.prevProj.get(p.id);
-    const isBase = prev ? !!prev.base : p.fromTower && p.x < 70; // 사옥 발사 원점(x=20) 식별
     const x0 = prev?.x0 ?? p.x;
-    if (isBase) {
-      // 투척 궤적: 옥상에서 목표 레인까지 포물선 낙하
-      const laneY = (p.air ? AIR_Y : GROUND_Y) - 8;
-      const roofY = groundTop - 118;
-      const prog = Math.max(0, Math.min(1, (p.x - x0) / 220));
-      const y = roofY + (laneY - roofY) * prog - 46 * Math.sin(Math.PI * prog);
-      ctx.save();
-      ctx.shadowColor = '#FFC53D';
-      ctx.shadowBlur = 14;
-      ctx.fillStyle = '#C39C4C';
-      ctx.beginPath();
-      ctx.arc(px, y, 7.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = '#8A6510'; // 주머니 매듭
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(px, y - 6, 2.6, 0, Math.PI * 2);
-      ctx.stroke();
-      const spin = b.t * 9 + p.id;
-      ctx.fillStyle = '#FFE9C4';
-      ctx.fillRect(px + Math.cos(spin) * 3 - 1.5, y + Math.sin(spin) * 3 - 1.5, 3, 3);
-      ctx.restore();
+    const slot = p.fromTower && (p.srcKey ?? '').startsWith('tower:') ? Number((p.srcKey ?? '').slice(6)) : -1;
+    const tw = slot >= 0 ? b.towers[slot] : null;
+    const turretId = tw ? TURRET_BY_TYPE[tw.key] : undefined;
+    const laneY = (p.air ? AIR_Y : GROUND_Y) - 8;
+    let y = laneY;
+    if (turretId) {
+      // 포구에서 출발해 목표 레인까지 완만히 하강 — 사옥 탑재 포탑도 궤적이 이어져 보인다
+      const muzzleY = slotBaseY(slot) - (b.isBaseSlot(slot) ? 38 : 58);
+      const tgt = enemyX.get(p.targetId);
+      const span = tgt != null ? Math.abs(tgt - x0) : 220;
+      const prog = Math.max(0, Math.min(1, Math.abs(p.x - x0) / Math.max(span, 1)));
+      y = muzzleY + (laneY - muzzleY) * prog;
+    }
+    if (turretId && drawTurretShot(ctx, turretId, px, y, b.t + p.id, null)) {
+      // 포탑 탄 — travel 프레임 루프
     } else if (!p.fromTower && drawShot(
       ctx, SHOT_SHEET[(p.srcKey ?? '').split(':')[0]] ?? 'A-02_3', 'ally', b.t + p.id, px,
       p.air ? AIR_Y : groundTop - (MUZZLE[p.srcKey ?? '']?.y ?? 34), // 총구 높이로 비행
@@ -644,7 +633,8 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     )) {
       // [임시] 아군 유닛 투사체 — 발사 주체별 시트, 무기 끝에서 출발
     } else {
-      const y = (p.air ? AIR_Y : GROUND_Y) - (p.fromTower ? 14 : 4) + Math.sin(p.x * 0.15) * 2;
+      const by2 = (p.air ? AIR_Y : GROUND_Y) - (p.fromTower ? 14 : 4) + Math.sin(p.x * 0.15) * 2;
+      y = by2;
       const len = p.fromTower ? 16 : 11;
       const core = p.dmgType === 'magic' ? '#C4A8FF' : p.fromTower ? '#C39C4C' : '#E8D9A0';
       ctx.save();
@@ -653,22 +643,32 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       ctx.strokeStyle = core;
       ctx.lineWidth = p.fromTower ? 3 : 2;
       ctx.beginPath();
-      ctx.moveTo(px - len / 2, y);
-      ctx.lineTo(px + len / 2, y);
+      ctx.moveTo(px - len / 2, by2);
+      ctx.lineTo(px + len / 2, by2);
       ctx.stroke();
       ctx.fillStyle = '#FFF6E0';
-      ctx.fillRect(px + len / 2 - 2, y - 1.5, 3, 3);
+      ctx.fillRect(px + len / 2 - 2, by2 - 1.5, 3, 3);
       ctx.restore();
     }
-    st.prevProj.set(p.id, { x: p.x, air: p.air, fromTower: p.fromTower, base: isBase, x0 });
+    st.prevProj.set(p.id, { x: p.x, y, air: p.air, fromTower: p.fromTower, turretId, x0 });
   }
-  // 소멸한 투사체 → 착탄 충격파 (사옥 투척은 더 크게)
+  // 소멸한 투사체 → 착탄 (포탑 탄은 전용 impact 프레임, 그 외는 충격파 vfx)
   for (const [id, info] of st.prevProj) {
     if (liveProj.has(id)) continue;
     st.prevProj.delete(id);
-    const size = info.base ? 52 : info.fromTower ? 34 : 26;
-    pushVfx(st, 'ally_pierce-shockwave', info.x, (info.air ? AIR_Y : GROUND_Y) - 12, b.t, info.base ? 0.38 : 0.28, 12, size);
+    if (info.turretId) {
+      st.shotImpacts.push({ id: info.turretId, x: sx(info.x), y: info.y, t0: b.t });
+      if (st.shotImpacts.length > 24) st.shotImpacts.splice(0, st.shotImpacts.length - 24);
+    } else {
+      pushVfx(st, 'ally_pierce-shockwave', info.x, (info.air ? AIR_Y : GROUND_Y) - 12, b.t, 0.28, 12, info.fromTower ? 34 : 26);
+    }
   }
+  st.shotImpacts = st.shotImpacts.filter((im) => {
+    const ph = (b.t - im.t0) / TURRET_SHOT_IMPACT_S;
+    if (ph >= 1) return false;
+    if (ph >= 0) drawTurretShot(ctx, im.id, im.x, im.y, b.t, ph);
+    return true;
+  });
 
   // 엔진 fx 이벤트 → 리그 캔버스 VFX 원샷 (배당 지급=금고 코인 흡수 / 공시폭탄=메테오)
   for (const f of b.fx) {
@@ -792,4 +792,4 @@ function hpBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, r
   ctx.fillRect(x, y, w * Math.max(0, Math.min(1, rate)), 4);
 }
 
-export { ENEMY_TYPES, BASE_TURRET };
+export { ENEMY_TYPES };

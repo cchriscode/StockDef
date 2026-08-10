@@ -4,9 +4,9 @@
 // 심화 메커니즘 레퍼런스:
 //  - Kingdom Rush: armor(물리 감소)/마법 관통 이분법, 공중은 특정 타워만 요격, 힐러 저격
 //  - Bloons TD: 타워 타겟팅 모드 first/last/strong/close
-//  - Age of War: 블로커+원거리 역할 조합, 본진 자동 포탑, 화면 클리어 스킬
+//  - Age of War: 블로커+원거리 역할 조합, 화면 클리어 스킬
 import {
-  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, ENEMY_SKILL_HITS, ATTACK_CUE_S, MUZZLE, SKILL_CUE_S, SPAWN_GLOBAL_CD, UNIT_SPAWN_CD, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
+  BALANCE, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, ENEMY_SKILL_HITS, ATTACK_CUE_S, MUZZLE, TOWER_FIRE_CUE_S, SKILL_CUE_S, SPAWN_GLOBAL_CD, UNIT_SPAWN_CD, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
   type DmgType, type EnemyTypeSpec, type TargetingMode, type TowerSpec, type UnitSpec,
 } from './balance.js';
 import type { MarketEvent, RegionId, StageParams } from './types.js';
@@ -97,6 +97,7 @@ export interface Tower {
   nextIncomeAt: number; // 배당 파밍 다음 지급 시각 (비파밍 Infinity)
   lastTargetId: number | null; // 복리 화염: 직전 사격 대상 (같은 대상 연속 명중 추적)
   rampN: number; // 복리 화염: 연속 명중 수
+  fireT: number; // 마지막 발사 시각 (렌더가 발사 모션 재생에 사용)
 }
 
 export interface Projectile {
@@ -158,11 +159,12 @@ export class Battle {
   units: Unit[] = [];
   enemies: Enemy[] = [];
   projectiles: Projectile[] = [];
+  /** 큐 프레임 대기 중인 포탑 사격 (모션 → 섬광에서 발사) */
+  private pendingShots: { at: number; slot: number; targetId: number; dmg: number; spec: { dmgType: DmgType; projSpeed: number; splashRadius: number; slowPct: number; slowDur: number } }[] = [];
   fx: Fx[] = [];
   waveIdx = 0;
   phase: BattlePhase = 'prep';
   skillReadyAt = 0;
-  baseTurretCd = 0;
   rageStage = 0; // FR-6.10b 적 본진 위기 반격 (0 → 40% 돌파 시 1 → 20% 돌파 시 2)
   rageAt = -9; // 최근 반격 발동 시각 (충격파 연출 기준)
   /** FR-6.5e 유닛별 재소환 가능 시각 + 전역 간격 */
@@ -225,7 +227,7 @@ export class Battle {
     if (this.isBaseSlot(slot) && spec.barrierHP > 0) return false; // 사옥 위엔 경로 차단물을 놓을 수 없다
     if (!this.spend(spec.cost)) return false;
     this.towers[slot] = {
-      slot, key, lv: 1, cooldown: 0, mode: 'first', lastTargetX: null, lastTargetId: null, rampN: 0,
+      slot, key, lv: 1, cooldown: 0, mode: 'first', lastTargetX: null, lastTargetId: null, rampN: 0, fireT: -9,
       hp: spec.barrierHP, maxHp: spec.barrierHP,
       nextIncomeAt: spec.incomeAmount > 0 ? this.t + spec.incomePeriod : Infinity,
     };
@@ -1046,19 +1048,21 @@ export class Battle {
       const dmg = spec.dmg * (tw.lv === 2 ? spec.lv2Mult : 1) * this.params.towerDmgMult * atkMult * ramp;
       const slowPct = tw.lv === 2 && spec.slowPct > 0 ? spec.slowPct + 0.1 : spec.slowPct;
       const dmgType = spec.lv2Pierce && tw.lv === 2 ? 'magic' as const : spec.dmgType; // Lv2 철갑탄 (armor 관통)
-      this.fireProjectile(tx, target, dmg, { ...spec, dmgType, slowPct }, true);
+      // 발사 모션을 먼저 재생하고 섬광 프레임에서 탄이 나간다 (유닛 평타와 같은 규칙)
+      tw.fireT = this.t;
+      this.pendingShots.push({
+        at: this.t + TOWER_FIRE_CUE_S, slot: tw.slot, targetId: target.id, dmg,
+        spec: { dmgType, projSpeed: spec.projSpeed, splashRadius: spec.splashRadius, slowPct, slowDur: spec.slowDur },
+      });
     }
 
-    // 사옥 자동 포탑 (최후 방어선)
-    this.baseTurretCd -= dt;
-    if (this.baseTurretCd <= 0) {
-      const near = this.enemies.filter((e) => e.hp > 0 && e.x <= BASE_TURRET.range);
-      const target = this.pickTarget(near, 'first', 0);
-      if (target) {
-        this.baseTurretCd = 1 / BASE_TURRET.rate;
-        this.fireProjectile(20, target, BASE_TURRET.dmg * atkMult, { dmgType: BASE_TURRET.dmgType, projSpeed: 380, splashRadius: 0, slowPct: 0, slowDur: 0 }, true); // 투척 궤적에 맞춘 체공
-      }
-    }
+    // 예약된 포탑 사격 — 큐 프레임 도달분 발사 (대상이 이미 죽었으면 소멸)
+    this.pendingShots = this.pendingShots.filter((s) => {
+      if (this.t < s.at) return true;
+      const target = this.enemies.find((e) => e.id === s.targetId && e.hp > 0);
+      if (target) this.fireProjectile(this.towerSlotX(s.slot), target, s.dmg, s.spec, true, `tower:${s.slot}`);
+      return false;
+    });
 
     // 투사체 비행·명중
     const byId = new Map(this.enemies.map((e) => [e.id, e]));

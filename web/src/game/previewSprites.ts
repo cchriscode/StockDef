@@ -326,10 +326,10 @@ export const TURRET_BY_TYPE: Record<string, string> = {
   spire: 't_2', // 옵션 스파이어 → 다연장 포탑 (수직 구조)
   limit: 't_3', // 지정가 포탑 → 대구경 곡사포 (최장 사거리 단일 저격)
 };
-const FIRE_MS = [80, 90, 90, 120]; // fire 4프레임 (f1 = 발사 섬광)
+const FIRE_MS = [90, 110, 140, 180]; // fire 4프레임 (turrets.json durationsMs — f1 = 발사 섬광)
 export const TURRET_FIRE_CUE = 0.08; // f1 시작 시각(초)
 
-function turretImg(id: string, motion: 'idle' | 'aim' | 'fire'): HTMLImageElement | null {
+function turretImg(id: string, motion: 'idle' | 'aim' | 'fire' | 'shot'): HTMLImageElement | null {
   const key = motion === 'idle' ? id : `${id}_${motion}`;
   let img = imgCache.get(`turret:${key}`);
   if (!img) {
@@ -373,5 +373,25 @@ export function drawTurret(
   const dw = cw * TURRET_SCALE;
   const dh = ch * TURRET_SCALE;
   ctx.drawImage(img, frame * cw, 0, cw, ch, cx - dw * TURRET_CELL.ox, baseY - dh * TURRET_CELL.oy, dw, dh);
+  return true;
+}
+
+// 포탑 투사체 — turrets.json shotCell 규격 (travel 0·1 루프 16fps / impact 2·3 원샷)
+const TURRET_SHOT_ORIGIN = { ox: 0.75, oy: 0.4191 }; // 탄두 끝 / 비행선
+const TURRET_SHOT_SCALE = 0.42;
+export const TURRET_SHOT_IMPACT_S = 0.19; // impact 80+110ms
+
+export function drawTurretShot(
+  ctx: CanvasRenderingContext2D, id: string, cx: number, cy: number,
+  t: number, impactPhase: number | null,
+): boolean {
+  const img = turretImg(id, 'shot');
+  if (!img) return false;
+  const cw = img.naturalWidth / 4;
+  const ch = img.naturalHeight;
+  const frame = impactPhase == null ? Math.floor(t * 16) % 2 : (impactPhase < 0.42 ? 2 : 3);
+  const dw = cw * TURRET_SHOT_SCALE;
+  const dh = ch * TURRET_SHOT_SCALE;
+  ctx.drawImage(img, frame * cw, 0, cw, ch, cx - dw * TURRET_SHOT_ORIGIN.ox, cy - dh * TURRET_SHOT_ORIGIN.oy, dw, dh);
   return true;
 }
