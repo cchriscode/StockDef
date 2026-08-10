@@ -511,6 +511,11 @@ export class Battle {
     if (!due.length) return;
     this.pendingSkills = this.pendingSkills.filter((q) => q.at > this.t);
     for (const q of due) {
+      if (q.kind === 'enemy') {
+        const e = this.enemies.find((x) => x.id === q.id);
+        if (e && e.hp > 0 && this.t >= e.stunUntil) this.applyEnemySkill(e);
+        continue;
+      }
       const u = this.units.find((x) => x.id === q.id);
       if (!u || u.hp <= 0) continue; // 모션 도중 사망하면 불발
       if (q.kind === 'atk') this.performAttack(u, atkMult);
@@ -700,11 +705,22 @@ export class Battle {
     }
   }
 
-  /** FR-6.7b 적 자동 스킬 — 유형별 주기 시전 (스턴 중 불가) */
+  /** FR-6.7b 적 자동 스킬 — 주기가 되면 모션을 시작하고, 판정은 큐 프레임에 (아군과 동일 규칙) */
   private castEnemySkills() {
     const t = this.t;
     for (const e of this.enemies) {
       if (e.hp <= 0 || t < e.stunUntil || t < (e.nextSkillAt ?? Infinity)) continue;
+      if (!this.units.length && e.type !== 'healer') continue; // 때릴 대상이 없으면 시전하지 않는다
+      e.lastSkillAt = t;
+      e.nextSkillAt = t + ENEMY_SKILL_PERIOD[e.type];
+      this.pendingSkills.push({ kind: 'enemy', id: e.id, at: t + (SKILL_CUE_S[e.type] ?? 0.27) });
+    }
+  }
+
+  /** 적 스킬 효과 — 큐 프레임에 호출된다 (대상은 그 시점에 다시 확보) */
+  private applyEnemySkill(e: Enemy) {
+    const t = this.t;
+    {
       let cast = false;
       const ES = ENEMY_SKILL[e.type] as Record<string, number | boolean>;
       const nearUnits = (reach: number) => this.units
@@ -775,12 +791,7 @@ export class Battle {
           cast = true;
         }
       }
-      if (cast) {
-        e.lastSkillAt = t;
-        e.nextSkillAt = t + ENEMY_SKILL_PERIOD[e.type];
-      } else {
-        e.nextSkillAt = t + 1.5;
-      }
+      void cast; // 대상이 사라졌으면 불발 (아군 스킬과 동일)
     }
   }
 
