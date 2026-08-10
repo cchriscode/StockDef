@@ -291,6 +291,9 @@ b.danger { color: var(--red2); }
 
 .card.settings { min-width: 320px; display: flex; flex-direction: column; gap: 14px; text-align: left; }
 .card.settings label { display: flex; flex-direction: column; gap: 6px; }
+/* 체크박스는 세로로 쌓지 않고 문구 바로 옆에 둔다 */
+.card.settings label.check { flex-direction: row; align-items: center; gap: 10px; cursor: pointer; }
+.card.settings label.check input { width: 18px; height: 18px; flex: none; margin: 0; accent-color: var(--green2); cursor: pointer; }
 
 /* ── 스테이지 (목업 04번) ── */
 .stage { gap: 8px; max-width: none; transition: box-shadow 0.4s; } /* 지도처럼 전체화면 사용 */

@@ -29,11 +29,11 @@ export function SettingsOverlay({ onClose }: { onClose: () => void }) {
             onChange={(e) => apply({ volume: Number(e.target.value) / 100 })}
           />
         </label>
-        <label>
+        <label className="check">
           <input type="checkbox" checked={settings.colorBlind} onChange={(e) => apply({ colorBlind: e.target.checked })} />
           색약 모드 (상승/하락 → 황/청)
         </label>
-        <label>
+        <label className="check">
           <input type="checkbox" checked={settings.reduceShake} onChange={(e) => apply({ reduceShake: e.target.checked })} />
           화면 흔들림 감소
         </label>
