@@ -992,6 +992,10 @@ export class Battle {
         }
       } else if (u.x >= ENEMY_BASE_X - ENEMY_BASE_ATTACK_X) {
         this.enemyBaseHP -= u.spec.dps * atkMult * dt; // FR-6.10 적 본진 공격
+        // 렌더는 shotCd로 공격 모션을 재생한다 — 본진을 때릴 때도 같은 주기를 돌려
+        // 유닛이 가만히 선 채 건물이 깎이는 것처럼 보이지 않게 한다.
+        // 스킬 누적(atkCount)은 올리지 않는다 — 유닛 스킬은 적 대상이 있어야 성립한다.
+        if (u.shotCd <= 0) u.shotCd = 0.8;
       } else {
         u.x += u.spec.speed * (t < u.slowUntil ? 1 - u.slowPct : 1) * dt; // 둔화 반영
       }

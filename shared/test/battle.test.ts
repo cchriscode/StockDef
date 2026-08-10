@@ -65,6 +65,17 @@ describe('Battle 엔진', () => {
     b.upgradeTower(2);
     expect(b.sellTower(2)).toBe(Math.floor((225 + 315) * BALANCE.TOWER_SELL_RATE));
   });
+  it('적 본진을 때릴 때도 공격 모션 주기가 돈다 (shotCd 순환)', () => {
+    const b = new Battle(params(), []);
+    const anyB = b as unknown as { units: { x: number; shotCd: number }[] };
+    b.addGold(500);
+    b.spawnUnit('club');
+    anyB.units[0].x = 900; // 적 본진 사거리 안
+    const hp0 = b.enemyBaseHP;
+    b.advanceTo(b.t + 0.5);
+    expect(b.enemyBaseHP).toBeLessThan(hp0); // 본진은 깎이고
+    expect(anyB.units[0].shotCd).toBeGreaterThan(0); // 공격 모션 주기가 돌고 있다
+  });
   it('리스크 매니저: 사옥 체력을 회복시킨다 (BASE_HP 상한)', () => {
     const b = new Battle(params(), []);
     b.baseHP = 50;
