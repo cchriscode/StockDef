@@ -691,7 +691,9 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .wr-lock i { position: absolute; background: currentColor; }
 
 /* 우측 브리핑 패널 */
-.wr-side { width: 320px; flex: none; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.wr-side { width: 320px; flex: none; display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
+.wr-qrow .sw { width: 12px; height: 12px; flex: none; }
+.wr-panel.list .wr-queue { max-height: none; }
 .wr-panel { border: 2px solid #1B2A42; background: #0B111C; }
 .wr-panel .ph {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;

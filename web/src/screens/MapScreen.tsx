@@ -25,15 +25,17 @@ const JP_ON_WORLD = { x: 1020, y: 140 };
 
 // 목업 War Room Map의 지도 위 콜아웃 — 앵커에서 리더선이 꺾여 라벨로 이어진다 (원본 px 좌표)
 interface Callout {
-  k: string; x: number; y: number; tick: number; drop: number;
-  lx: number; ly: number; side: 'left' | 'right'; note: string;
+  k: string; x: number; y: number; // 리더선이 시작하는 지도 위 지점 (원본 8px 셀 기준 px)
+  tick: number; drop: number;      // 가로로 꺾이는 길이 · 세로로 내려가는 길이
+  side: 'left' | 'right'; note: string;
 }
 const CALLOUTS: Callout[] = [
-  { k: 'k', x: 984, y: 154, tick: 74, drop: 82, lx: -190, ly: 80, side: 'left', note: '● 교전 중' },
-  { k: 'j', x: 1030, y: 150, tick: 40, drop: 132, lx: -72, ly: 132, side: 'left', note: '● 해금 예정' },
-  { k: 'c', x: 872, y: 150, tick: 92, drop: 40, lx: -208, ly: 38, side: 'left', note: '○ 잠김' },
-  { k: 'e', x: 600, y: 180, tick: 70, drop: 64, lx: -186, ly: 62, side: 'left', note: '○ 잠김' },
-  { k: 'n', x: 220, y: 140, tick: 66, drop: 52, lx: 72, ly: 50, side: 'right', note: '○ 잠김' },
+  { k: 'k', x: 984, y: 154, tick: 74, drop: 82, side: 'left', note: '● 교전 중' },
+  { k: 'j', x: 1030, y: 150, tick: 40, drop: 132, side: 'left', note: '● 해금 예정' },
+  { k: 'c', x: 872, y: 150, tick: 92, drop: 40, side: 'left', note: '○ 잠김' },
+  // 목업 원본 앵커(600,180)는 유럽(px y 40~152) 아래 아프리카에서 선이 시작했다 → 유럽 중심으로 교정
+  { k: 'e', x: 604, y: 96, tick: 70, drop: 64, side: 'left', note: '○ 잠김' },
+  { k: 'n', x: 220, y: 140, tick: 66, drop: 52, side: 'right', note: '○ 잠김' },
 ];
 
 const STATUS_LABEL = { open: '진행 중', next: '해금 예정', locked: '잠김' } as const;
@@ -243,9 +245,16 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
                     <div key={co.k} className="wr-callout" style={{ left: co.x * wq, top: co.y * wq }}>
                       <i style={{ width: co.tick * wq, height: 2, background: c.color, transform: right ? undefined : `translateX(${-co.tick * wq}px)` }} />
                       <i style={{ left: (right ? co.tick : -co.tick) * wq, top: 0, width: 2, height: co.drop * wq, background: c.color }} />
+                      {/* 라벨은 세로선이 끝나는 지점에 가장자리를 맞춘다.
+                          폭을 고정하면 글자 길이·셀 배율에 따라 선 끝에서 떨어지므로,
+                          왼쪽 콜아웃은 right로, 오른쪽 콜아웃은 left로 붙여 내용 폭에 맡긴다. */}
                       <span
                         className="lb"
-                        style={{ left: co.lx * wq, top: co.ly * wq, width: 150 * wq, alignItems: right ? 'flex-start' : 'flex-end' }}
+                        style={
+                          right
+                            ? { left: (co.tick + 6) * wq, top: (co.drop - 2) * wq, alignItems: 'flex-start', textAlign: 'left' }
+                            : { right: co.tick * wq, top: (co.drop - 2) * wq, alignItems: 'flex-end', textAlign: 'right' }
+                        }
                       >
                         <b>{c.name}</b>
                         <em style={{ color: c.color }}>{c.en}{co.k === 'k' ? ` · R1-R${regions.length}` : ''}</em>
@@ -341,6 +350,27 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
               : !isKr ? '전 선 진 입'
                 : sel?.state === 'locked' ? '잠김 — 인접 점령 필요' : '작 전 개 시'}
           </button>
+
+          {/* 선택 가능한 전역 목록 — 지도에서 못 찾겠는 나라도 여기서 고른다 */}
+          <div className="wr-panel list">
+            <div className="ph">
+              <span>THEATER LIST</span>
+              <span>▸ {COUNTRIES.length} 전역</span>
+            </div>
+            <div className="wr-queue">
+              {COUNTRIES.map((c) => (
+                <button
+                  key={c.key}
+                  className={`wr-qrow ${c.status === 'open' ? 'open' : ''} ${selCountry === c.key ? 'sel' : ''}`}
+                  onClick={() => pickCountry(c.key)}
+                >
+                  <span className="sw" style={{ background: c.color }} />
+                  <span className="nm">{c.name}</span>
+                  <span className="st" style={{ color: STATUS_COLOR[c.status] }}>{STATUS_LABEL[c.status]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </aside>
       </div>
 
