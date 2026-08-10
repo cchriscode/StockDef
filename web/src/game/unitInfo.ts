@@ -66,20 +66,21 @@ export const UNIT_INFO: Record<UnitSpec['key'], InfoCard> = {
 export const TOWER_INFO: Record<TowerSpec['key'], InfoCard> = {
   limit: {
     role: '단일 저격 · 지상+공중',
-    desc: '사거리가 가장 길고 지상·공중을 모두 노리는 만능 화망입니다. 타겟팅 모드(선두/후미/강적/근접)를 상황에 맞게 바꾸세요.',
-    skill: 'Lv2 철갑탄 — 볼트가 마법 판정이 되어 중장갑(armor)을 관통합니다.',
+    desc: '사거리가 가장 길어 전선 뒤에서 꾸준히 화력을 보태는 기본 화망입니다. 지상·공중을 모두 노리므로 연 정찰기 같은 공중 유닛에도 대응합니다. 타겟팅 모드(선두/후미/강적/근접)를 상황에 맞게 바꾸세요.',
+    skill: 'Lv2 철갑탄 — 포탄이 마법 판정이 되어 중장갑(방패 파쇄병 등)을 관통합니다.',
   },
   cannon: {
     role: '광역 포격 · 지상 전용',
-    desc: '느리지만 착탄 지점 주변을 통째로 날립니다. 그런트·러너가 몰려오는 물량 웨이브 카운터. 공중은 못 맞춥니다.',
-    skill: '공매도 포탄 — 폭발 반경 60의 스플래시 피해 (Lv2 피해 ×1.8).',
+    desc: '느리지만 착탄 지점 주변을 통째로 날립니다. 창 망령·석궁 사수가 줄지어 몰려오는 물량 웨이브의 카운터입니다. 공중은 맞히지 못하니 지정가 포탑이나 스파이어와 함께 쓰세요.',
+    skill: '공매도 포탄 — 폭발 반경 60의 광역 피해 (Lv2 피해 ×1.8).',
   },
   spire: {
-    role: '마법 저격 + 슬로우 · 지상+공중',
-    desc: '마법 피해로 장갑을 무시하고, 명중한 적을 30% 느리게 만듭니다. 화망의 타격 시간을 늘려주는 컨트롤 타워입니다.',
+    role: '마법 저격 + 감속 · 지상+공중',
+    desc: '마법 피해라 방어를 무시하고, 맞은 적을 30% 느리게 만듭니다. 적이 화망 안에 머무는 시간을 늘려 다른 포탑의 딜을 끌어올리는 컨트롤 타워입니다.',
     skill: '콜/풋 감속 — 명중 시 1.5초간 이동 30% 감속 (Lv2 40%).',
   },
 };
+
 
 /** ? 카드 하단 수치 줄 — BALANCE 현재값으로 생성 */
 export function unitStatsLine(key: UnitSpec['key']): string {
@@ -100,7 +101,5 @@ export function towerStatsLine(key: TowerSpec['key']): string {
     if (t.splashRadius > 0) parts.push(`광역 ${t.splashRadius}`);
     if (t.slowPct > 0) parts.push(`슬로우 ${t.slowPct * 100}%`);
   }
-  if (t.incomeAmount > 0) parts.push(`+${t.incomeAmount}G/${t.incomePeriod}초`);
-  if (t.barrierHP > 0) parts.push(`내구 ${t.barrierHP}`);
   return parts.join(' · ');
 }

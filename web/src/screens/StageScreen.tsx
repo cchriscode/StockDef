@@ -9,9 +9,9 @@ import { clockLabel, drawChart, interpPct, pctOf, type OpenMarker } from '../gam
 import { drawBattle, slotScreenPos } from '../game/battleRender.js';
 import { sfx } from '../game/sfx.js';
 import { TOWER_INFO, UNIT_INFO, towerStatsLine, unitStatsLine } from '../game/unitInfo.js';
-import { RIG_TOWER, RIG_UNIT } from '../game/rigFrames.js';
+import { RIG_UNIT } from '../game/rigFrames.js';
 import { RigPreview } from '../ui/RigPreview.js';
-import { PREVIEW_ROSTER, SHEET_UNIT, clearPreviews, hasSkillSheet, spawnPreview } from '../game/previewSprites.js'; // [임시] 신규 아트 프리뷰
+import { PREVIEW_ROSTER, SHEET_UNIT, TURRET_BY_TYPE, clearPreviews, hasSkillSheet, spawnPreview } from '../game/previewSprites.js'; // [임시] 신규 아트 프리뷰
 
 interface Props {
   regionId: RegionId;
@@ -645,12 +645,16 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
         const stats = isUnit
           ? unitStatsLine(infoKey.key as keyof typeof UNIT_INFO)
           : towerStatsLine(infoKey.key as keyof typeof TOWER_INFO);
-        const rigIdx = isUnit ? RIG_UNIT[infoKey.key] : RIG_TOWER[infoKey.key];
+        // 타워는 실제로 세워지는 신규 포탑 스프라이트를 보여준다 (구 리그 그림이 뜨던 문제)
+        const turretId = !isUnit ? TURRET_BY_TYPE[infoKey.key] : undefined;
+        const rigIdx = isUnit ? RIG_UNIT[infoKey.key] : undefined;
         return (
           <div className="overlay center" onClick={() => setInfoKey(null)}>
             <div className="card info-card" onClick={(e) => e.stopPropagation()}>
               <h3>{name} <span className="small dim">{card.role}</span></h3>
-              {rigIdx != null ? (
+              {turretId ? (
+                <img src={`/assets/turrets/${turretId}.png`} alt="" style={{ height: 150, objectFit: 'contain', margin: '0 auto' }} />
+              ) : rigIdx != null ? (
                 <RigPreview unit={rigIdx} height={150} />
               ) : (
                 <img
