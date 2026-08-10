@@ -2,8 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  BALANCE, judge, splitPayout,
-  type BarsFile, type Direction, type StageParams, type WsServerMsg,
+  BALANCE, judge, splitPayout, sltpHit, sltpValid, tradeFee,
+  type BarsFile, type Direction, type StageParams, type WsErrorCode, type WsServerMsg,
 } from '@tf/shared';
 import type { WebSocket } from 'ws';
 import { db, SERVER_ROOT, type ChartSetRow, type SessionRow } from './db.js';
@@ -20,8 +20,9 @@ export class LiveSession {
   payoutSum = 0;
   stakeSum = 0; // 정산된 포지션의 총 투입 (수익률 = (payoutSum − stakeSum) / stakeSum)
   goldSum = 0; // 골드로 환전된 순수익 누적 (payout − 반환 스테이크)
+  feeSum = 0; // FR-5.14 거래 수수료 누적 (AUM에서 빠져나간 총액)
   wins = 0; loses = 0; draws = 0;
-  open: { seq: number; direction: Direction; stake: number; openBarIdx: number; basePrice: number; leverage: number } | null = null;
+  open: { seq: number; direction: Direction; stake: number; openBarIdx: number; basePrice: number; leverage: number; sl: number | null; tp: number | null } | null = null;
   positionCount = 0;
   combatCredited = 0; // 전투 처치로 크레딧된 AUM 누적 (상한 clamp)
   lastOpenAt = 0;
@@ -108,16 +109,18 @@ export class LiveSession {
     const i = this.serverBarIdx(now);
     if (i < 0 || i >= this.bars.barCount - 2) return err('SESSION_ENDED'); // 종료 직전 진입 불가
     const { price: basePrice, barIdx: openBarIdx } = this.interpPrice(now);
-    this.open = { seq, direction, stake, openBarIdx, basePrice, leverage };
+    const fee = tradeFee(stake, leverage); // FR-5.14 진입 수수료
+    this.open = { seq, direction, stake, openBarIdx, basePrice, leverage, sl: null, tp: null };
     this.positionCount += 1;
-    this.aum -= stake;
+    this.aum -= stake + fee;
+    this.feeSum += fee;
 
     db.prepare(
       `INSERT INTO positions (session_id, seq, direction, stake, open_bar_idx, base_price)
        VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(this.id, seq, direction, stake, openBarIdx, basePrice);
 
-    this.send({ op: 'position.opened', seq, openBarIdx, basePrice, aumLeft: this.aum });
+    this.send({ op: 'position.opened', seq, openBarIdx, basePrice, aumLeft: this.aum, fee });
   }
 
   // FR-5.4: 청산도 요청 순간 보간 가격으로 즉시 체결·정산
@@ -130,10 +133,29 @@ export class LiveSession {
     this.settleClose(Math.max(barIdx, this.open.openBarIdx), price, false);
   }
 
+  /** FR-5.15 손절·익절 지정 — 방향과 맞는 쪽인지 서버가 검증하고 확정값을 에코한다 */
+  setSltp(seq: number, sl: number | null, tp: number | null) {
+    const err = (code: Parameters<typeof this.errMsg>[0]) => this.send(this.errMsg(code, seq));
+    if (this.t0 == null) return err('SESSION_ENDED');
+    if (!this.open || this.open.seq !== seq) return err('NO_OPEN_POSITION');
+    const s = sl == null || !Number.isFinite(sl) ? null : sl;
+    const t = tp == null || !Number.isFinite(tp) ? null : tp;
+    if (!sltpValid(this.open.direction, this.open.basePrice, s, t)) return err('INVALID_SLTP');
+    this.open.sl = s;
+    this.open.tp = t;
+    this.send({ op: 'position.sltp', seq, sl: s, tp: t });
+  }
+
   /** FR-5.12: 손실률이 MAX_LOSS_RATE 도달 → 마진콜 (스테이크 전액 소멸 — 올인이면 파산 패배로 이어진다) */
   private checkLiquidation() {
     if (!this.open || this.t0 == null) return;
     const { price, barIdx } = this.interpPrice();
+    // FR-5.15: 지정 레벨 도달은 마진콜보다 먼저 본다 (손절이 마진콜 앞에서 손실을 끊는 게 지정 목적)
+    const hit = sltpHit(this.open.direction, price, this.open.sl, this.open.tp);
+    if (hit) {
+      this.settleClose(Math.max(barIdx, this.open.openBarIdx), hit.price, true, false, hit.kind);
+      return;
+    }
     const { direction, basePrice, leverage, openBarIdx } = this.open;
     const deltaPct = ((price - basePrice) / basePrice) * 100;
     const g = (direction === 'long' ? 1 : -1) * (deltaPct / Math.max(this.bars.sigma['30'], 1e-6)) * leverage;
@@ -142,7 +164,7 @@ export class LiveSession {
     }
   }
 
-  private settleClose(exitBarIdx: number, closePrice: number, forced: boolean, liquidated = false) {
+  private settleClose(exitBarIdx: number, closePrice: number, forced: boolean, liquidated = false, trigger?: 'sl' | 'tp') {
     if (!this.open) return;
     const { seq, direction, stake, basePrice, leverage } = this.open;
     const rj = judge(basePrice, closePrice, this.bars.sigma['30'], direction, stake, this.params.lossRate, leverage);
@@ -155,7 +177,10 @@ export class LiveSession {
     this.stakeSum += stake;
     // FR-5.5b/5.5c 정산 분해: 스테이크는 AUM 반환, 순수익은 상한(500G)까지 골드·초과분은 AUM
     const { returnToAum, goldGain } = splitPayout(r.payout, stake);
-    this.aum += returnToAum;
+    const fee = tradeFee(stake, leverage); // FR-5.14 청산 수수료 (진입 명목가 기준 — 왕복 비용을 미리 확정)
+    this.aum += returnToAum - fee;
+    if (this.aum < 0) this.aum = 0;
+    this.feeSum += fee;
     this.goldSum += goldGain;
     this.open = null;
 
@@ -168,7 +193,7 @@ export class LiveSession {
     this.send({
       op: 'position.closed', seq, outcome: r.outcome,
       deltaPct: Math.round(r.deltaPct * 100) / 100, g: Math.round(r.g * 1000) / 1000,
-      payout: r.payout, pnl: r.pnl, goldGain, exitBarIdx, forced, liquidated, earnedTotal, aumLeft: this.aum,
+      payout: r.payout, pnl: r.pnl, goldGain, exitBarIdx, forced, liquidated, earnedTotal, aumLeft: this.aum, fee, trigger,
     });
   }
 
@@ -208,7 +233,7 @@ export class LiveSession {
     }
   }
 
-  private errMsg(code: 'POSITION_ALREADY_OPEN' | 'NO_OPEN_POSITION' | 'RATE_LIMITED' | 'MAX_POSITIONS' | 'INSUFFICIENT_AUM' | 'SESSION_ENDED' | 'INVALID_SEQ', seq?: number): WsServerMsg {
+  private errMsg(code: WsErrorCode, seq?: number): WsServerMsg {
     return { op: 'error', code, seq };
   }
 }

@@ -35,6 +35,11 @@ async function playStage(regionId: string, p: number, mode: 'easy' | 'hard' = 'h
   let seq = 0;
   let nextOpenBar = regionId === 'TUT' ? 23 : 2; // 튜토리얼: WIN 보장 구간
   let resolvedCount = 0;
+  let feeSeen = 0;
+  let lastStake = 0;
+  let lastDir: 'long' | 'short' = 'long';
+  let lastOpen: { basePrice: number; stake: number } | null = null;
+  let sltpAck: { sl: number | null; tp: number | null } | null = null;
 
   const ws = new WebSocket(`ws://localhost:3000/ws/stage?session=${start.sessionId}&token=${TOKEN}`);
   await new Promise<void>((res, rej) => { ws.on('open', () => res()); ws.on('error', rej); });
@@ -45,8 +50,18 @@ async function playStage(regionId: string, p: number, mode: 'easy' | 'hard' = 'h
     else if (m.op === 'position.opened') {
       aum = m.aumLeft;
       openPending = false;
+      feeSeen += m.fee; // FR-5.14
+      lastOpen = { basePrice: m.basePrice, stake: lastStake };
       active = { seq: m.seq, closeTarget: m.openBarIdx + 30 }; // 봇: 30봉 보유 후 청산
+      // FR-5.15: 진입 직후 도달하지 않을 먼 레벨을 건다. 손절·익절 방향은 포지션 방향에 따라 뒤집힌다
+      const far = lastDir === 'long'
+        ? { sl: m.basePrice * 0.5, tp: m.basePrice * 1.9 }
+        : { sl: m.basePrice * 1.9, tp: m.basePrice * 0.5 };
+      ws.send(JSON.stringify({ op: 'position.sltp', seq: m.seq, ...far }));
+    } else if (m.op === 'position.sltp') {
+      sltpAck = { sl: m.sl, tp: m.tp };
     } else if (m.op === 'position.closed') {
+      feeSeen += m.fee;
       aum = m.aumLeft; // 스테이크(−손실)는 이미 서버에서 AUM 반환됨
       battle.addGold(m.goldGain); // 순수익만 골드 환전 (FR-5.5b)
       active = null;
@@ -79,7 +94,9 @@ async function playStage(regionId: string, p: number, mode: 'easy' | 'hard' = 'h
       const dir = Math.random() < p ? correct : correct === 'long' ? 'short' : 'long';
       seq += 1;
       openPending = true;
-      ws.send(JSON.stringify({ op: 'position.open', seq, direction: dir, stake: Math.max(1, Math.floor(aum * 0.5)) })); // 고수 플레이 가정 (기능 검증용)
+      lastStake = Math.max(1, Math.floor(aum * 0.5));
+      lastDir = dir;
+      ws.send(JSON.stringify({ op: 'position.open', seq, direction: dir, stake: lastStake })); // 고수 플레이 가정 (기능 검증용)
     }
     // 청산 요청: exitBar = 요청 시점 bar + 1 → closeTarget−1에 보내면 목표 봉에 체결
     if (active && !closeSent && bar >= active.closeTarget - 1) {
@@ -103,7 +120,7 @@ async function playStage(regionId: string, p: number, mode: 'easy' | 'hard' = 'h
     enemyBaseDestroyed: battle.enemyBaseDestroyed,
   });
   console.log(`  [${regionId}] ${finish.status} 등급=${finish.grade} 적중률=${(finish.accuracy * 100).toFixed(0)}% 자본금+${finish.capitalAwarded} (포지션 ${resolvedCount}건)`);
-  return { finish, sessionId: start.sessionId, params };
+  return { finish, sessionId: start.sessionId, params, feeSeen, sltpAck, lastOpen, lastDir };
 }
 
 // ── 여정 시작 ──
@@ -137,6 +154,13 @@ for (let attempt = 2; attempt <= 6 && r1.finish.status !== 'cleared'; attempt++)
   r1 = await playStage('R1', 0.9, 'easy');
 }
 check('R1 클리어 (봇 p=0.9, ≤6회 시도)', r1.finish.status === 'cleared');
+check('FR-5.14 거래 수수료 징수 (진입·청산 양쪽)', r1.feeSeen > 0, `누적 ${r1.feeSeen} AUM`);
+check('FR-5.15 손절·익절 서버 확정 에코 (방향별 검증 통과)',
+  !!r1.sltpAck && r1.sltpAck.sl != null && r1.sltpAck.tp != null && !!r1.lastOpen
+  && (r1.lastDir === 'long'
+    ? r1.sltpAck.sl < r1.lastOpen.basePrice && r1.sltpAck.tp > r1.lastOpen.basePrice
+    : r1.sltpAck.sl > r1.lastOpen.basePrice && r1.sltpAck.tp < r1.lastOpen.basePrice),
+  r1.sltpAck ? `${r1.lastDir} 손절 ${r1.sltpAck.sl?.toFixed(0)} / 익절 ${r1.sltpAck.tp?.toFixed(0)}` : '에코 없음');
 const r1Reveal = await req<{ companyName: string; tradeDate: string; positions: unknown[] }>(`/api/stage/${r1.sessionId}/reveal`);
 check('FR-9 공개: 실제 종목명·날짜 노출', !!r1Reveal.companyName && /^\d{4}-\d{2}-\d{2}$/.test(r1Reveal.tradeDate), `${r1Reveal.companyName} ${r1Reveal.tradeDate}`);
 

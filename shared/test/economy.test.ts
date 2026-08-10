@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseIncome, heatOf, judge, settle, splitPayout } from '../src/economy.js';
+import { baseIncome, heatOf, judge, settle, sltpHit, sltpValid, splitPayout, tradeFee } from '../src/economy.js';
 import { BALANCE, DEPT_EFFECTS } from '../src/balance.js';
 
 describe('FR-6.8 기본 수입 — 총액 우선 분배', () => {
@@ -110,5 +110,41 @@ describe('FR-5.13 거래 횟수 제한', () => {
     expect(DEPT_EFFECTS.maxPositions(1)).toBe(10);
     expect(DEPT_EFFECTS.maxPositions(2)).toBe(15);
     expect(DEPT_EFFECTS.maxPositions(3)).toBe(20);
+  });
+});
+
+describe('FR-5.14 거래 수수료', () => {
+  it('명목가(스테이크 × 배율) 비례 — 배율이 높을수록 비싸다', () => {
+    expect(tradeFee(1000, 1)).toBe(Math.round(1000 * BALANCE.FEE_RATE));
+    expect(tradeFee(1000, 5)).toBe(tradeFee(1000, 1) * 5);
+  });
+  it('반올림으로 0이 되지 않게 최소 1', () => {
+    expect(tradeFee(1, 1)).toBe(1);
+  });
+});
+
+describe('FR-5.15 손절·익절', () => {
+  it('롱은 손절이 진입가 아래·익절이 위여야 유효', () => {
+    expect(sltpValid('long', 100, 95, 110)).toBe(true);
+    expect(sltpValid('long', 100, 105, 110)).toBe(false); // 손절이 위
+    expect(sltpValid('long', 100, 95, 90)).toBe(false); // 익절이 아래
+  });
+  it('숏은 방향이 반대', () => {
+    expect(sltpValid('short', 100, 105, 90)).toBe(true);
+    expect(sltpValid('short', 100, 95, 90)).toBe(false);
+  });
+  it('한쪽만 지정해도 유효 (null = 미지정)', () => {
+    expect(sltpValid('long', 100, null, 110)).toBe(true);
+    expect(sltpValid('long', 100, 95, null)).toBe(true);
+  });
+  it('도달 시 레벨 가격으로 체결 — 롱', () => {
+    expect(sltpHit('long', 96, 95, 110)).toBeNull();
+    expect(sltpHit('long', 95, 95, 110)).toEqual({ kind: 'sl', price: 95 });
+    expect(sltpHit('long', 112, 95, 110)).toEqual({ kind: 'tp', price: 110 });
+  });
+  it('도달 시 레벨 가격으로 체결 — 숏', () => {
+    expect(sltpHit('short', 104, 105, 90)).toBeNull();
+    expect(sltpHit('short', 106, 105, 90)).toEqual({ kind: 'sl', price: 105 });
+    expect(sltpHit('short', 88, 105, 90)).toEqual({ kind: 'tp', price: 90 });
   });
 });

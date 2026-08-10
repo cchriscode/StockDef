@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  BALANCE, Battle, ENEMY_TYPES, TOWERS, UNITS, liquidationDeltaPct,
+  BALANCE, Battle, ENEMY_TYPES, TOWERS, UNITS, liquidationDeltaPct, tradeFee,
   type BarsFile, type Direction, type FinishRes, type RegionId, type StageMode, type StageStartRes, type WsServerMsg,
 } from '@tf/shared';
 import { api, getSettings, getToken, track } from '../net/api.js';
 import { StageWs } from '../net/stageWs.js';
-import { clockLabel, drawChart, interpPct, pctOf, type OpenMarker } from '../game/chart.js';
+import { chartScale, clockLabel, drawChart, interpPct, pctOf, type OpenMarker } from '../game/chart.js';
 import { drawBattle, slotScreenPos } from '../game/battleRender.js';
 import { sfx } from '../game/sfx.js';
 import { TOWER_INFO, UNIT_INFO, towerStatsLine, unitStatsLine } from '../game/unitInfo.js';
@@ -29,6 +29,7 @@ interface ResultPopup {
   goldGain: number; // 골드 환전액 (수익 × PROFIT_TO_GOLD)
   liquidated?: boolean; // FR-5.12 마진콜 — 스테이크 전액 소멸
   excessAum?: number; // FR-5.5c 골드 상한 초과분 (AUM 적립)
+  trigger?: 'sl' | 'tp'; // FR-5.15 지정 레벨 자동 체결
 }
 
 type GuideStep = 0 | 1 | 2 | 3 | 4 | 5; // FR-12.2 강제 가이드
@@ -38,6 +39,13 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
   const settings = getSettings();
 
   const chartRef = useRef<HTMLCanvasElement>(null);
+  // FR-5.15 손절·익절 (시가 대비 %) / FR-5.16 이동평균선 표시
+  const [sltp, setSltp] = useState<{ slPct: number | null; tpPct: number | null }>({ slPct: null, tpPct: null });
+  const [showMA, setShowMA] = useState(true);
+  const dragRef = useRef<'sl' | 'tp' | null>(null);
+  const sltpRef = useRef<{ slPct: number | null; tpPct: number | null }>({ slPct: null, tpPct: null });
+  const applySltp = (next: { slPct: number | null; tpPct: number | null }) => { sltpRef.current = next; setSltp(next); };
+  const [feeInfo, setFeeInfo] = useState<{ open: number; total: number }>({ open: 0, total: 0 });
   const battleRef = useRef<HTMLCanvasElement>(null);
   const lastHud = useRef(0);
 
@@ -166,10 +174,14 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
           stake: s.openMarker?.stake ?? 0,
           leverage: s.openMarker?.leverage ?? 1,
         };
+        applySltp({ slPct: null, tpPct: null }); // FR-5.15 새 포지션은 레벨 없이 시작
+        setFeeInfo((f) => ({ open: m.fee, total: f.total + m.fee }));
       } else if (m.op === 'position.closed') {
         s.aum = m.aumLeft;
         const holdBars = s.openMarker ? m.exitBarIdx - s.openMarker.openBarIdx : null;
         s.openMarker = null;
+        applySltp({ slPct: null, tpPct: null });
+        setFeeInfo((f) => ({ open: 0, total: f.total + m.fee }));
         s.battle?.addGold(m.goldGain); // FR-5.5b: 순수익만 골드로 자동 환전 (스테이크는 AUM 반환)
         if (m.outcome === 'win') sfx.win();
         else if (m.outcome === 'lose') sfx.lose();
@@ -178,10 +190,14 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
         setPopup({
           outcome: m.outcome, amount: m.pnl, goldGain: m.goldGain, liquidated: !!m.liquidated,
           excessAum: Math.max(0, m.pnl - m.goldGain), // 골드 상한 초과분은 AUM으로
+          trigger: m.trigger, // FR-5.15 손절·익절 자동 체결
         });
         setTimeout(() => setPopup(null), m.liquidated ? 1400 : 800); // FR-5.9 (마진콜은 조금 더 길게)
         track('position_closed', { outcome: m.outcome, g: m.g, payout: m.payout, pnl: m.pnl, goldGain: m.goldGain, holdBars, forced: m.forced, liquidated: !!m.liquidated });
         if (isTut) setGuide((cur) => (cur === 2 ? 3 : cur));
+      } else if (m.op === 'position.sltp') {
+        const op = s.bars!.openPrice; // 서버 확정 레벨을 차트 좌표(%)로
+        applySltp({ slPct: m.sl == null ? null : pctOf(m.sl, op), tpPct: m.tp == null ? null : pctOf(m.tp, op) });
       } else if (m.op === 'aum.update') {
         s.aum = m.aumLeft; // 전투 처치 AUM 크레딧 (서버 clamp 결과)
       } else if (m.op === 'clock.resync') {
@@ -230,6 +246,8 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
           colorBlind: settings.colorBlind,
           marker: s.openMarker,
           showResearch: s.start!.params.hasInfoResearch,
+          showMA,
+          sltp: s.openMarker ? sltpRef.current : null,
         });
       }
       if (battleRef.current) {
@@ -339,6 +357,54 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
     if (canClose || phase !== 'playing' || !isTut || guide !== 2 || !s.openMarker) return 0;
     return Math.max(0, Math.ceil(s.openMarker.openBarIdx + TUT_CLOSE_HOLD_BARS - hud.barF));
   })();
+
+  // FR-5.15 손절·익절 드래그 — 차트 위에서 선을 잡아 끌어 레벨을 정한다 (실거래소 방식).
+  // 진입가 위/아래 어느 쪽을 잡았는지로 익절/손절을 자동 판별한다.
+  const sltpFromEvent = (e: React.PointerEvent<HTMLCanvasElement>): number | null => {
+    const s = g.current;
+    const cv = chartRef.current;
+    if (!cv || !s.bars || !s.openMarker) return null;
+    const r = cv.getBoundingClientRect();
+    const yCanvas = ((e.clientY - r.top) / r.height) * cv.height;
+    const sc = chartScale(s.bars, hud.barF, s.openMarker, cv.height);
+    if (yCanvas > sc.priceH) return null; // 거래량 영역
+    return sc.pctOfY(yCanvas);
+  };
+
+  const onChartDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const s = g.current;
+    if (!s.openMarker) return;
+    const pct = sltpFromEvent(e);
+    if (pct == null) return;
+    const long = s.openMarker.direction === 'long';
+    // 진입가보다 유리한 쪽 = 익절, 불리한 쪽 = 손절
+    const kind: 'sl' | 'tp' = (long ? pct > s.openMarker.basePricePct : pct < s.openMarker.basePricePct) ? 'tp' : 'sl';
+    dragRef.current = kind;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    applySltp({ ...sltpRef.current, [kind === 'sl' ? 'slPct' : 'tpPct']: pct });
+  };
+
+  const onChartMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!dragRef.current) return;
+    const pct = sltpFromEvent(e);
+    if (pct == null) return;
+    applySltp({ ...sltpRef.current, [dragRef.current === 'sl' ? 'slPct' : 'tpPct']: pct });
+  };
+
+  const onChartUp = () => {
+    const s = g.current;
+    if (!dragRef.current || !s.openMarker || !s.bars || !s.ws) { dragRef.current = null; return; }
+    dragRef.current = null;
+    const op = s.bars.openPrice;
+    const toPrice = (pct: number | null) => (pct == null ? null : op * (1 + pct / 100));
+    s.ws.setSltp(s.seq, toPrice(sltpRef.current.slPct), toPrice(sltpRef.current.tpPct)); // 확정은 서버 판정
+  };
+
+  const clearSltp = () => {
+    const s = g.current;
+    applySltp({ slPct: null, tpPct: null });
+    if (s.openMarker && s.ws) s.ws.setSltp(s.seq, null, null);
+  };
 
   const closePosition = () => {
     const s = g.current;
@@ -452,7 +518,25 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
       {/* 차트 밴드: 좌 차트 + 우 트레이드 패널 (FR-5.1 자유 진입·청산) */}
       <div className="chart-band">
         <div className="chart-area">
-          <canvas ref={chartRef} width={1500} height={252} className="chart" />
+          <canvas
+            ref={chartRef}
+            width={1500}
+            height={252}
+            className={`chart ${g.current.openMarker ? 'sltp-ready' : ''}`}
+            onPointerDown={onChartDown}
+            onPointerMove={onChartMove}
+            onPointerUp={onChartUp}
+            onPointerCancel={onChartUp}
+          />
+          <div className="chart-tools">
+            <button className={`ghost small ${showMA ? 'on' : ''}`} onClick={() => setShowMA((v) => !v)}>MA 5·20·60</button>
+            {g.current.openMarker && (
+              <>
+                <span className="small dim">차트를 끌어 손절·익절 지정</span>
+                {(sltp.slPct != null || sltp.tpPct != null) && <button className="ghost small" onClick={clearSltp}>지정 해제</button>}
+              </>
+            )}
+          </div>
         </div>
         <div className="trade-panel">
           <div className="ls-row">
@@ -484,6 +568,13 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
                 {v}×{v > p.maxLeverage ? ' 🔒' : ''}
               </button>
             ))}
+          </div>
+          <div className="fee-row">
+            <span className="lbl">수수료</span>
+            <span className="mono dim">
+              왕복 {(tradeFee(Math.max(1, Math.floor(hud.aum * stakePct)), leverage) * 2).toLocaleString()} AUM
+              <i className="hint"> (명목가 {(BALANCE.FEE_RATE * 100).toFixed(1)}% ×2)</i>
+            </span>
           </div>
           <div className="pos-box">
             <div className="pr">
@@ -556,7 +647,9 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
           <div className={`popup ${popup.outcome}`}>
             {popup.liquidated
               ? `⚠ 강제청산 ${popup.amount.toLocaleString()} AUM 전액 소멸`
-              : popup.outcome === 'win'
+              : popup.trigger
+                ? `${popup.trigger === 'tp' ? '익절' : '손절'} 체결 ${popup.amount >= 0 ? '+' : ''}${popup.amount.toLocaleString()} AUM`
+                : popup.outcome === 'win'
                 ? `WIN +${popup.goldGain.toLocaleString()} G 입금${popup.excessAum ? ` · +${popup.excessAum.toLocaleString()} AUM` : ''}`
                 : popup.outcome === 'lose'
                   ? `LOSE ${popup.amount.toLocaleString()} AUM`

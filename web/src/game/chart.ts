@@ -10,6 +10,41 @@ export interface OpenMarker {
 
 const VISIBLE = 64;
 
+/** FR-5.16 이동평균 — 널리 쓰는 3종. 현재 봉까지만 계산해 미래 정보가 새지 않는다 */
+export const MA_PERIODS = [5, 20, 60] as const;
+const MA_COLORS: Record<number, string> = { 5: '#E8D9A0', 20: '#FFC53D', 60: '#6E8FB5' };
+
+export interface SltpLevels {
+  slPct: number | null; // 시가 대비 % (차트 좌표계와 동일 단위)
+  tpPct: number | null;
+}
+
+/** 차트 Y축 스케일 — 드래그 히트테스트가 화면 좌표 ↔ % 를 오갈 때 쓴다 */
+export function chartScale(data: BarsFile, barF: number, marker: OpenMarker | null, canvasH: number) {
+  const volH = 34;
+  const priceH = canvasH - volH - 6;
+  const iNow = Math.min(Math.floor(barF), data.barCount - 1);
+  const start = Math.max(0, iNow - VISIBLE + 8);
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let i = start; i <= Math.min(iNow, data.barCount - 1); i++) {
+    lo = Math.min(lo, pctOf(data.bars[i].l, data.openPrice));
+    hi = Math.max(hi, pctOf(data.bars[i].h, data.openPrice));
+  }
+  if (!Number.isFinite(lo)) { lo = -0.5; hi = 0.5; }
+  const pad = Math.max((hi - lo) * 0.18, 0.15);
+  lo -= pad; hi += pad;
+  if (marker) {
+    lo = Math.min(lo, marker.basePricePct - 0.05);
+    hi = Math.max(hi, marker.basePricePct + 0.05);
+  }
+  return {
+    priceH,
+    yOf: (pct: number) => priceH - ((pct - lo) / (hi - lo)) * priceH,
+    pctOfY: (y: number) => lo + ((priceH - y) / priceH) * (hi - lo),
+  };
+}
+
 export function pctOf(price: number, openPrice: number): number {
   return (price / openPrice - 1) * 100;
 }
@@ -27,7 +62,7 @@ export function drawChart(
   canvas: HTMLCanvasElement,
   data: BarsFile,
   barF: number,
-  opts: { colorBlind: boolean; marker: OpenMarker | null; showResearch: boolean },
+  opts: { colorBlind: boolean; marker: OpenMarker | null; showResearch: boolean; showMA?: boolean; sltp?: SltpLevels | null },
 ) {
   const ctx = canvas.getContext('2d')!;
   const W = canvas.width;
@@ -108,6 +143,53 @@ export function drawChart(
     ctx.fillStyle = col;
     ctx.textAlign = 'left';
     ctx.fillText(`${c > 0 ? '+' : ''}${c.toFixed(2)}%`, 4, y(c) - 4);
+  }
+
+  // FR-5.16 이동평균선 — 현재 봉까지만
+  if (opts.showMA) {
+    ctx.lineWidth = 1.5;
+    for (const period of MA_PERIODS) {
+      ctx.strokeStyle = MA_COLORS[period];
+      ctx.beginPath();
+      let drawn = false;
+      for (let i = Math.max(start, period - 1); i <= Math.min(iNow, end - 1); i++) {
+        let sum = 0;
+        for (let k = i - period + 1; k <= i; k++) sum += data.bars[k].c;
+        const yy = y(pctOf(sum / period, data.openPrice));
+        if (drawn) ctx.lineTo(x(i), yy);
+        else { ctx.moveTo(x(i), yy); drawn = true; }
+      }
+      if (drawn) ctx.stroke();
+    }
+    ctx.lineWidth = 1;
+    ctx.textAlign = 'left';
+    ctx.font = '10px monospace';
+    let lx = 4;
+    for (const period of MA_PERIODS) {
+      ctx.fillStyle = MA_COLORS[period];
+      ctx.fillText(`MA${period}`, lx, 11);
+      lx += 34;
+    }
+  }
+
+  // FR-5.15 손절·익절 라인 (드래그로 설정)
+  if (opts.sltp) {
+    const line = (pct: number | null, color: string, label: string) => {
+      if (pct == null) return;
+      const ly = y(pct);
+      ctx.strokeStyle = color;
+      ctx.setLineDash([3, 3]);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(W, ly); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineWidth = 1;
+      ctx.fillStyle = color;
+      ctx.textAlign = 'right';
+      ctx.font = '10px monospace';
+      ctx.fillText(`${label} ${pct > 0 ? '+' : ''}${pct.toFixed(2)}%`, W - 46, ly - 3);
+    };
+    line(opts.sltp.slPct, '#E8654F', '손절');
+    line(opts.sltp.tpPct, '#46A574', '익절');
   }
 
   // FR-5.8 진입 마커

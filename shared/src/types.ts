@@ -78,15 +78,18 @@ export type WsClientMsg =
   | { op: 'start' }
   | { op: 'position.open'; seq: number; direction: Direction; stake: number; leverage?: number }
   | { op: 'position.close'; seq: number }
+  | { op: 'position.sltp'; seq: number; sl: number | null; tp: number | null } // FR-5.15 손절·익절 지정가
   | { op: 'combat.aum'; earned: number } // 전투 처치 AUM 누적 보고 (서버가 상한 clamp)
   | { op: 'clock.sync'; clientBarIdx: number };
 
 export type WsServerMsg =
   | { op: 'started'; serverT0: number }
-  | { op: 'position.opened'; seq: number; openBarIdx: number; basePrice: number; aumLeft: number }
+  | { op: 'position.opened'; seq: number; openBarIdx: number; basePrice: number; aumLeft: number; fee: number }
+  | { op: 'position.sltp'; seq: number; sl: number | null; tp: number | null } // 서버가 확정한 레벨 (에코)
   | {
       op: 'position.closed'; seq: number; outcome: Outcome; deltaPct: number; g: number; goldGain: number;
       payout: number; pnl: number; exitBarIdx: number; forced: boolean; liquidated?: boolean; earnedTotal: number; aumLeft: number;
+      fee: number; trigger?: 'sl' | 'tp'; // FR-5.14/5.15 청산 수수료 · 자동 체결 사유
     }
   | { op: 'aum.update'; aumLeft: number; combatCredited: number }
   | { op: 'clock.resync'; serverBarIdx: number }
@@ -99,7 +102,8 @@ export type WsErrorCode =
   | 'MAX_POSITIONS'
   | 'INSUFFICIENT_AUM'
   | 'SESSION_ENDED'
-  | 'INVALID_SEQ';
+  | 'INVALID_SEQ'
+  | 'INVALID_SLTP'; // FR-5.15 방향과 맞지 않는 손절·익절 레벨
 
 export interface FinishReq {
   goldLeft: number;

@@ -305,8 +305,16 @@ b.danger { color: var(--red2); }
 
 /* 차트 밴드: 좌 차트 + 우 트레이드 패널 */
 .chart-band { display: flex; gap: 10px; background: #0C111C; border: 2px solid var(--line); padding: 10px; }
-.chart-band .chart-area { flex: 1; min-width: 0; display: flex; }
-canvas.chart { width: 100%; background: var(--bg2); border: 1px solid var(--line); }
+.chart-band .chart-area { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+canvas.chart { width: 100%; background: var(--bg2); border: 1px solid var(--line); touch-action: none; }
+/* FR-5.15 포지션이 있을 때만 차트가 드래그 대상이 된다 */
+canvas.chart.sltp-ready { cursor: ns-resize; }
+.chart-tools { display: flex; align-items: center; gap: 8px; }
+.chart-tools button.on { border-color: var(--gold); color: var(--gold); }
+/* FR-5.14 수수료 안내 */
+.fee-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; }
+.fee-row .lbl { color: var(--dim); }
+.fee-row .hint { font-style: normal; color: var(--dim); }
 .trade-panel { width: 250px; flex: none; display: flex; flex-direction: column; gap: 8px; }
 .ls-row { display: flex; gap: 8px; }
 .ls-row button {

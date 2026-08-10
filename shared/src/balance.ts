@@ -16,6 +16,9 @@ export const BALANCE = {
   OPEN_RATE_LIMIT_MS: 1000,
   STAKE_PCTS: [0.1, 0.25, 0.5, 1.0],
   GOLD_PER_TRADE_CAP: 500, // FR-5.5c: 청산 1건당 골드 환전 상한 — 초과 수익은 AUM으로 적립
+  // FR-5.14 거래 수수료 — 명목가(스테이크 × 배율) 기준으로 진입·청산 양쪽에서 AUM에서 빠진다.
+  // 배율을 올리면 수수료도 비례해 늘어 "무조건 최대 배율"이 정답이 되지 않게 하는 장치.
+  FEE_RATE: 0.004,
   LEVERAGES: [1, 2, 3, 5] as number[], // 진입 시 선택하는 배율 — g에 곱해 손익 양방향 증폭 (손실은 MAX_LOSS_RATE 클램프 유지)
 
   // §9.2 경제 파라미터

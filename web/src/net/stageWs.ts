@@ -41,6 +41,11 @@ export class StageWs {
     this.send({ op: 'position.close', seq });
   }
 
+  /** FR-5.15 손절·익절 레벨 지정 (가격 기준 — 서버가 검증·판정) */
+  setSltp(seq: number, sl: number | null, tp: number | null) {
+    this.send({ op: 'position.sltp', seq, sl, tp });
+  }
+
   reportCombatAum(earned: number) {
     this.send({ op: 'combat.aum', earned });
   }

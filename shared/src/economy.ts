@@ -41,6 +41,48 @@ export function judge(
 }
 
 /**
+ * FR-5.14 거래 수수료 — 명목가 × FEE_RATE, 진입·청산 각각 1회. 최소 1 (0으로 반올림되면 존재감이 없다).
+ * 청산 수수료도 진입 명목가로 계산한다 — 진입 시점에 왕복 비용을 확정해 보여줄 수 있어야 하기 때문.
+ */
+export function tradeFee(stake: number, leverage = 1): number {
+  return Math.max(1, Math.round(stake * leverage * BALANCE.FEE_RATE));
+}
+
+/**
+ * FR-5.15 손절/익절 도달 판정 — 방향별로 어느 쪽을 넘어야 체결인지 결정한다.
+ * 반환값이 있으면 그 가격에 체결한다 (레벨 자체로 체결 — 봉 해상도가 1초라 슬리피지를 만들지 않는다).
+ */
+export function sltpHit(
+  direction: 'long' | 'short',
+  price: number,
+  sl: number | null,
+  tp: number | null,
+): { kind: 'sl' | 'tp'; price: number } | null {
+  if (direction === 'long') {
+    if (sl != null && price <= sl) return { kind: 'sl', price: sl };
+    if (tp != null && price >= tp) return { kind: 'tp', price: tp };
+  } else {
+    if (sl != null && price >= sl) return { kind: 'sl', price: sl };
+    if (tp != null && price <= tp) return { kind: 'tp', price: tp };
+  }
+  return null;
+}
+
+/** 손절/익절 레벨이 방향상 올바른 쪽에 있는지 (롱: 손절 < 진입 < 익절) */
+export function sltpValid(direction: 'long' | 'short', basePrice: number, sl: number | null, tp: number | null): boolean {
+  if (sl != null && (!Number.isFinite(sl) || sl <= 0)) return false;
+  if (tp != null && (!Number.isFinite(tp) || tp <= 0)) return false;
+  if (direction === 'long') {
+    if (sl != null && sl >= basePrice) return false;
+    if (tp != null && tp <= basePrice) return false;
+  } else {
+    if (sl != null && sl <= basePrice) return false;
+    if (tp != null && tp >= basePrice) return false;
+  }
+  return true;
+}
+
+/**
  * FR-5.5b/5.5c 청산 분해 — 스테이크(−손실)는 AUM 반환, 순수익은 **GOLD_PER_TRADE_CAP까지만** 골드로
  * 환전하고 초과분은 AUM에 쌓인다 (한 방 대박이 전투 경제를 무너뜨리지 않도록).
  */

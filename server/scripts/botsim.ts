@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  BALANCE, Battle, WAVE_TABLES, baseIncome, heatOf, judge, splitPayout,
+  BALANCE, Battle, WAVE_TABLES, baseIncome, heatOf, judge, splitPayout, tradeFee,
   type BarsFile, type RegionId, type StageParams,
 } from '@tf/shared';
 
@@ -102,7 +102,7 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
       if (r.outcome === 'win') wins += 1;
       else if (r.outcome === 'lose') loses += 1;
       const split = splitPayout(r.payout, pending.stake); // FR-5.5c 골드 상한 반영
-      aum += split.returnToAum;
+      aum += split.returnToAum - tradeFee(pending.stake, 1); // FR-5.14 청산 수수료
       b.addGold(split.goldGain);
       pending = null;
     }
@@ -115,7 +115,7 @@ function runStage(region: RegionId, p: number, usePositions: boolean): RunResult
       const correctDir: 'long' | 'short' = actualDelta > 0 ? 'long' : 'short';
       const dir = Math.random() < p ? correctDir : correctDir === 'long' ? 'short' : 'long';
       const stake = Math.max(1, Math.floor(aum * 0.25));
-      aum -= stake;
+      aum -= stake + tradeFee(stake, 1); // FR-5.14 진입 수수료
       pending = { stake, dir, openIdx, closeIdx };
       positions += 1;
       openUntil = closeIdx + 2;
