@@ -22,8 +22,8 @@ async function req<T>(path: string, body?: unknown): Promise<T> {
 }
 
 /** 실시간 헤드리스 스테이지 플레이 (승률 p 봇, speed 2x) */
-async function playStage(regionId: string, p: number): Promise<{ finish: FinishRes; sessionId: string }> {
-  const start = await req<{ sessionId: string; barsUrl: string; params: StageParams }>('/api/stage/start', { regionId, speed: 2 });
+async function playStage(regionId: string, p: number, mode: 'easy' | 'hard' = 'hard'): Promise<{ finish: FinishRes; sessionId: string; params: StageParams }> {
+  const start = await req<{ sessionId: string; barsUrl: string; params: StageParams }>('/api/stage/start', { regionId, speed: 2, mode });
   const bars = (await fetch(BASE + start.barsUrl).then((r) => r.json())) as BarsFile;
   const params = start.params;
   const battle = new Battle(params, bars.events);
@@ -103,7 +103,7 @@ async function playStage(regionId: string, p: number): Promise<{ finish: FinishR
     enemyBaseDestroyed: battle.enemyBaseDestroyed,
   });
   console.log(`  [${regionId}] ${finish.status} 등급=${finish.grade} 적중률=${(finish.accuracy * 100).toFixed(0)}% 자본금+${finish.capitalAwarded} (포지션 ${resolvedCount}건)`);
-  return { finish, sessionId: start.sessionId };
+  return { finish, sessionId: start.sessionId, params };
 }
 
 // ── 여정 시작 ──
@@ -124,12 +124,17 @@ check('튜토리얼 첫 예측 WIN 보장 (적중률 100%)', tut.finish.accuracy
 const revealTut = await req<{ companyName: string; ticker: string }>(`/api/stage/${tut.sessionId}/reveal`);
 check('FR-9.3 공개 API (튜토리얼 = 고정 실제 차트)', revealTut.ticker !== 'TUT' && revealTut.companyName.length > 0);
 
-console.log('▶ R1 여의도 (~4분 @2x, p=0.9 고수 봇)…');
-let r1 = await playStage('R1', 0.9);
+console.log('▶ R1 여의도 (~4분 @2x, p=0.9 고수 봇, 이지 모드)…');
+let r1 = await playStage('R1', 0.9, 'easy');
+check('FR-2.6 이지 모드 파라미터 완화',
+  r1.params.mode === 'easy'
+  && Math.abs(r1.params.enemyHpMult - 1.3 * 0.55) < 1e-9
+  && Math.abs(r1.params.enemyCountMult - 0.7) < 1e-9,
+  `hp×${r1.params.enemyHpMult.toFixed(3)} dps×${r1.params.enemyDpsMult.toFixed(3)} cnt×${r1.params.enemyCountMult}`);
 // 봇 클리어율은 확률적 (§9.3 의도된 고난이도) — 사람의 재도전처럼 최대 6회 시도 (기능 검증이 목적)
 for (let attempt = 2; attempt <= 6 && r1.finish.status !== 'cleared'; attempt++) {
   console.log(`  미클리어 → 재도전 ${attempt}/6…`);
-  r1 = await playStage('R1', 0.9);
+  r1 = await playStage('R1', 0.9, 'easy');
 }
 check('R1 클리어 (봇 p=0.9, ≤6회 시도)', r1.finish.status === 'cleared');
 const r1Reveal = await req<{ companyName: string; tradeDate: string; positions: unknown[] }>(`/api/stage/${r1.sessionId}/reveal`);
@@ -149,8 +154,13 @@ if (r1.finish.status === 'cleared') {
   } else {
     check('FR-8.5 자격 없음 → 기본 보상만', true, '보상 자격 없음 (스킵)');
   }
-  const codex = await req<{ entries: unknown[] }>('/api/codex');
+  const codex = await req<{ entries: { region_id: string; best_mode: string; date_start: string | null; trade_date: string; spark: number[] }[] }>('/api/codex');
   check('FR-10.1 도감 등록', codex.entries.length === 1);
+  const ce = codex.entries[0];
+  check('FR-10.2 도감 카드에 스테이지·난이도·기간·실차트',
+    ce?.region_id === 'R1' && ce?.best_mode === 'easy'
+    && /^\d{4}-\d{2}-\d{2}$/.test(String(ce?.date_start)) && ce?.spark?.length > 1,
+    `${ce?.region_id}/${ce?.best_mode} ${ce?.date_start}~${ce?.trade_date} 봉 ${ce?.spark?.length}점`);
 } else {
   check('R1 클리어 (봇 패배 — 재실행 필요)', false, 'p=0.65 봇이 패배함');
 }

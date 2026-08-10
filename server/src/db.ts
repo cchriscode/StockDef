@@ -144,6 +144,12 @@ if (hasExpiry.n > 0) {
   `);
 }
 
+// 마이그레이션: 도감에 클리어 난이도 기록 (FR-10.1 / FR-2.6)
+const hasMode = db
+  .prepare("SELECT COUNT(*) AS n FROM pragma_table_info('codex_entries') WHERE name = 'best_mode'")
+  .get() as { n: number };
+if (hasMode.n === 0) db.exec("ALTER TABLE codex_entries ADD COLUMN best_mode TEXT NOT NULL DEFAULT 'hard'");
+
 export interface ChartSetRow {
   id: string; ticker: string; company_name: string; trade_date: string;
   market: string; sector: string; cap_tier: string; region_id: string;

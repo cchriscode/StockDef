@@ -354,7 +354,7 @@ export class Battle {
   private compose(w: number): EnemyTypeSpec['key'][] {
     const spec = this.params.waveTable[w - 1];
     const mod = this.waveMods[w];
-    const total = Math.ceil(spec.count * this.params.heat * mod.countMult);
+    const total = Math.max(1, Math.ceil(spec.count * this.params.heat * mod.countMult * this.params.enemyCountMult));
     const ratios = WAVE_COMPS[this.params.regionId][w - 1] ?? { grunt: 1 };
     const entries = Object.entries(ratios) as [EnemyTypeSpec['key'], number][];
     const rsum = entries.reduce((s, [, r]) => s + r, 0);
@@ -418,7 +418,7 @@ export class Battle {
     const types = this.compose(w);
     const interval = BALANCE.WAVE_SECONDS / types.length;
     const waveStart = (w - 1) * BALANCE.CYCLE_SECONDS + BALANCE.PREP_SECONDS;
-    const buff = this.params.regionId === 'TUT' ? 1 : BALANCE.ENEMY_HP_MULT; // 튜토리얼은 난이도 상향 제외
+    const buff = this.params.regionId === 'TUT' ? 1 : this.params.enemyHpMult; // 모드별 계수 (튜토리얼 제외)
     types.forEach((type, i) => {
       const et = ENEMY_TYPES[type];
       this.pending.push({
@@ -445,7 +445,7 @@ export class Battle {
       hp: p.hp, maxHp: p.hp, baseSpeed: p.speed,
       // 2026-08-10: 적 공격력 성장 완화 (1.2→0.6). 아군 유닛 체력은 고정인데 적 dps만 웨이브에 비례해
       // 커져 후반에 전열이 통째로 녹았다 — 물량·체력(웨이브 표)으로 난이도를 주고 개체 화력은 완만하게.
-      dps: (6 + p.wave * 0.6) * et.dpsMult * (this.params.regionId === 'TUT' ? 1 : BALANCE.ENEMY_DPS_MULT),
+      dps: (6 + p.wave * 0.6) * et.dpsMult * (this.params.regionId === 'TUT' ? 1 : this.params.enemyDpsMult),
       armor: et.armor, mr: et.mr, air: et.isAir, size: et.size,
       wave: p.wave, baseDmg: et.baseDmg, healPerSec: et.healPerSec,
       slowUntil: 0, slowPct: 0, stunUntil: 0, leaked: false,

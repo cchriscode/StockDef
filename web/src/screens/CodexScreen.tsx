@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { REGION_META } from '@tf/shared';
 import { api, type CodexEntry } from '../net/api.js';
 
 // FR-10 차트 도감 — 열람 전용, 로고 없이 티커 텍스트 + 섹터 색상 (C3)
@@ -6,22 +7,26 @@ import { api, type CodexEntry } from '../net/api.js';
 const RARITY_KO: Record<string, string> = { common: '일반', rare: '희귀', epic: '영웅', legendary: '전설' };
 const SECTORS = ['금융', 'IT·플랫폼', '중공업·에너지'];
 
-/** 장식용 미니 바 차트 — 티커+날짜 해시 시드, 등락 부호에 맞춰 추세 편향 (실데이터 아님) */
-function miniBars(seedStr: string, changePct: number): { h: number; up: boolean }[] {
-  let seed = 0;
-  for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0;
-  const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
-  const upBias = changePct >= 0 ? 0.65 : 0.35;
-  const bars: { h: number; up: boolean }[] = [];
-  let level = changePct >= 0 ? 25 : 75;
-  for (let i = 0; i < 8; i++) {
-    const up = rnd() < upBias;
-    level += (up ? 1 : -1) * (6 + rnd() * 10);
-    level = Math.max(12, Math.min(92, level));
-    bars.push({ h: Math.round(level), up });
-  }
-  return bars;
+const CHART_W = 260;
+const CHART_H = 92;
+
+/** 실제 플레이한 종가 시계열을 카드 크기에 맞춘 SVG 패스로 변환 */
+function chartPaths(spark: number[]): { line: string; area: string } | null {
+  if (spark.length < 2) return null;
+  const lo = Math.min(...spark);
+  const hi = Math.max(...spark);
+  const span = hi - lo || 1;
+  const pad = 6;
+  const pts = spark.map((c, i) => {
+    const x = (i / (spark.length - 1)) * CHART_W;
+    const y = pad + (1 - (c - lo) / span) * (CHART_H - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return { line: `M${pts.join('L')}`, area: `M0,${CHART_H} L${pts.join('L')} L${CHART_W},${CHART_H} Z` };
 }
+
+/** 2024-03-05 → 24.03.05 */
+const shortDate = (d: string) => d.slice(2).replace(/-/g, '.');
 
 export function CodexScreen({ onBack }: { onBack: () => void }) {
   const [entries, setEntries] = useState<CodexEntry[]>([]);
@@ -66,22 +71,29 @@ export function CodexScreen({ onBack }: { onBack: () => void }) {
       <div className="codex-grid">
         {entries.map((e) => {
           const pos = e.day_change_pct >= 0;
+          const paths = chartPaths(e.spark ?? []);
+          const region = REGION_META[e.region_id]?.name ?? e.region_id;
+          const period = e.date_start ? `${shortDate(e.date_start)} ~ ${shortDate(e.trade_date)}` : e.trade_date;
           return (
             <div key={`${e.ticker}-${e.trade_date}`} className={`codex-card rarity-${e.rarity}`}>
               <div className="chead">
                 <span>{e.rarity.toUpperCase()}</span>
-                <span>{e.trade_date}</span>
+                <span className="cstage">{region} · <b className={`mode-${e.best_mode}`}>{e.best_mode === 'easy' ? '이지' : '하드'}</b></span>
               </div>
               <div className="cchart">
-                <div className="cbars">
-                  {miniBars(e.ticker + e.trade_date, e.day_change_pct).map((b, i) => (
-                    <i key={i} className={b.up ? 'u' : 'd'} style={{ height: `${b.h}%` }} />
-                  ))}
-                </div>
+                {paths ? (
+                  <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} preserveAspectRatio="none" className={pos ? 'up' : 'down'}>
+                    <path className="area" d={paths.area} />
+                    <path className="line" d={paths.line} />
+                  </svg>
+                ) : (
+                  <div className="small dim nochart">차트 없음</div>
+                )}
                 <span className={`cpct ${pos ? '' : 'neg'}`}>
                   {pos ? '▲ +' : '▼ '}{e.day_change_pct.toFixed(1)}%
                 </span>
               </div>
+              <div className="cperiod">{period} · {e.spark?.length ? '실제 플레이 구간' : ''}</div>
               <div className="cbody">
                 <b>{e.company_name}</b>
                 <span className="small dim">{e.ticker} · {e.sector}</span>

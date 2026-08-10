@@ -428,6 +428,17 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .ub-wrap .qmark:hover { color: var(--cream); border-color: var(--mut); }
 .slot-menu .ub-wrap { display: flex; }
 .slot-menu .ub-wrap > button:first-child { flex: 1; text-align: left; }
+/* FR-2.6 난이도 선택 */
+.mode-pick { max-width: 520px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
+.mode-pick h3 { color: var(--cream); }
+.mode-row { display: flex; gap: 12px; }
+.mode-row .mode { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 14px 12px; align-items: center; }
+.mode-row .mode b { font-size: 17px; }
+.mode-row .easy { border-color: var(--green); }
+.mode-row .easy b { color: var(--green2); }
+.mode-row .hard { border-color: var(--red); }
+.mode-row .hard b { color: var(--red2); }
+
 .info-card { max-width: 440px; display: flex; flex-direction: column; gap: 10px; }
 .info-card h3 { color: var(--cream); }
 .info-card p { line-height: 1.7; }
@@ -512,7 +523,7 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
   background: var(--panel2); color: var(--text); border: 2px solid var(--line);
   border-radius: 0; padding: 8px; font-family: var(--fp); font-size: 13px;
 }
-.codex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.codex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
 /* 도감 등급 배지 — S는 금색 발광으로 한눈에 구분 */
 .rank { font-family: var(--fm); font-weight: 700; letter-spacing: 0.5px; }
 .rank-S {
@@ -525,26 +536,37 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .rank-C { color: #7C89A3; }
 @keyframes rank-s-pulse { 50% { text-shadow: 0 0 10px rgba(255, 197, 61, 1), 0 0 3px rgba(255, 197, 61, 1); } }
 
-.codex-card { display: flex; flex-direction: column; background: var(--panel); border: 3px solid var(--line2); font-size: 13px; }
+.codex-card { display: flex; flex-direction: column; background: var(--panel); border: 3px solid var(--line2); font-size: 14px; }
 .codex-card .chead {
   height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
   font-family: var(--fm); font-size: 10px; background: var(--head); color: var(--mut);
 }
 .codex-card .cchart {
-  position: relative; height: 96px; background: var(--bg2); border-bottom: 3px solid var(--line2); overflow: hidden;
+  position: relative; height: 148px; background: var(--bg2); border-bottom: 3px solid var(--line2); overflow: hidden;
   background-image: repeating-linear-gradient(to bottom, transparent 0 23px, #141C2E 23px 24px);
 }
-.codex-card .cbars { position: absolute; left: 10px; right: 10px; top: 10px; bottom: 8px; display: flex; align-items: flex-end; gap: 4px; }
-.codex-card .cbars i { flex: 1; }
-.codex-card .cbars i.u { background: var(--green); }
-.codex-card .cbars i.d { border: 2px solid var(--red); }
+/* 실제 플레이 구간 종가 라인 */
+.codex-card .cchart svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.codex-card .cchart svg .line { fill: none; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.codex-card .cchart svg.up .line { stroke: var(--green2); }
+.codex-card .cchart svg.down .line { stroke: var(--red2); }
+.codex-card .cchart svg.up .area { fill: rgba(78, 214, 138, 0.16); }
+.codex-card .cchart svg.down .area { fill: rgba(232, 92, 76, 0.16); }
+.codex-card .nochart { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.codex-card .cstage { color: var(--cream); }
+.codex-card .cstage .mode-easy { color: var(--green2); }
+.codex-card .cstage .mode-hard { color: var(--red2); }
+.codex-card .cperiod {
+  padding: 7px 12px; font-family: var(--fm); font-size: 11px; color: var(--mut);
+  background: #0B111C; border-bottom: 2px solid var(--line);
+}
 .codex-card .cpct {
   position: absolute; right: 8px; top: 8px; padding: 3px 8px; font-family: var(--fm); font-size: 12px;
   background: var(--green-dk); border: 2px solid var(--green); color: var(--green2);
 }
 .codex-card .cpct.neg { background: #3A1512; border-color: var(--red); color: var(--red2); }
 .codex-card .cbody { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
-.codex-card .cbody b { font-size: 15px; }
+.codex-card .cbody b { font-size: 17px; }
 .codex-card .cfoot { display: flex; justify-content: space-between; font-family: var(--fm); font-size: 11px; color: var(--mut); margin-top: 4px; }
 .codex-card.rarity-rare { border-color: var(--blue); }
 .codex-card.rarity-rare .chead { background: #15304C; color: #9CC4E8; }

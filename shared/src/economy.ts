@@ -1,6 +1,6 @@
 // 경제·판정·정산 수식 — 서버와 봇 시뮬레이터가 공유하는 순수 함수.
 import { BALANCE } from './balance.js';
-import type { Grade, Outcome, RewardLine } from './types.js';
+import type { Grade, Outcome, RewardLine, StageMode } from './types.js';
 
 // FR-6.8 기본 수입: 총액을 먼저 확정하고 분배한다 (웨이브당 내림 + 마지막 웨이브 나머지 보정)
 export function baseIncome(capturedCount: number, waveCount: number = BALANCE.WAVE_COUNT, financeRewards = 0) {
@@ -68,6 +68,7 @@ export interface SettlementInput {
   enemyBaseDestroyed: boolean;
   isRetry: boolean;
   irBonus: number; // IR팀 합연산 보너스 (0 / 0.05 / 0.10)
+  mode?: StageMode; // FR-2.6 이지모드는 자본금 보상 축소
 }
 
 export interface SettlementResult {
@@ -103,6 +104,7 @@ export function settle(inp: SettlementInput): SettlementResult {
   else if (accuracy >= 0.6) bonus += BALANCE.BONUS_ACC_60;
   let capital = base * bonus * BALANCE.GRADE_MULT[grade];
   if (inp.isRetry) capital *= BALANCE.RETRY_CAPITAL_MULT;
+  if (inp.mode === 'easy') capital *= BALANCE.EASY_CAPITAL_MULT; // FR-2.6
 
   // 점령 보상 자격 (FR-8.3)
   const eligibleLines: RewardLine[] = [];

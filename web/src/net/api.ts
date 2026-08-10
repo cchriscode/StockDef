@@ -1,4 +1,4 @@
-import type {
+import type { StageMode,
   DeptKey, FinishReq, FinishRes, MapRes, MeRes, RegionId, RevealRes, RewardLine, StageStartRes,
 } from '@tf/shared';
 
@@ -41,8 +41,8 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   me: () => req<MeRes>('/api/me'),
   map: () => req<MapRes>('/api/map'),
-  stageStart: (regionId: RegionId, speed: number) =>
-    req<StageStartRes>('/api/stage/start', { method: 'POST', body: JSON.stringify({ regionId, speed }) }),
+  stageStart: (regionId: RegionId, speed: number, mode: StageMode = 'hard') =>
+    req<StageStartRes>('/api/stage/start', { method: 'POST', body: JSON.stringify({ regionId, speed, mode }) }),
   stageFinish: (sessionId: string, body: FinishReq) =>
     req<FinishRes>('/api/stage/finish', { method: 'POST', body: JSON.stringify({ sessionId, ...body }) }),
   reveal: (sessionId: string) => req<RevealRes>(`/api/stage/${sessionId}/reveal`),
@@ -57,12 +57,17 @@ export interface CodexEntry {
   first_cleared_at: string;
   best_accuracy: number;
   best_grade: string;
+  best_mode: 'easy' | 'hard';
   ticker: string;
   company_name: string;
   trade_date: string;
+  date_start: string | null;
   sector: string;
   day_change_pct: number;
   rarity: string;
+  region_id: RegionId;
+  difficulty: number;
+  spark: number[]; // 종가 다운샘플 (카드 차트용)
 }
 
 // §12 텔레메트리 — fire & forget 배치

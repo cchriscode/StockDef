@@ -26,6 +26,7 @@ export interface BarsFile {
 }
 
 export type RegionId = 'R1' | 'R2' | 'R3' | 'TUT';
+export type StageMode = 'easy' | 'hard'; // FR-2.6 난이도 모드
 export type RewardLine = 'finance' | 'info' | 'defense' | 'offense';
 export type DeptKey = 'trading_desk' | 'rnd' | 'hr' | 'legal' | 'ir' | 'margin' | 'research';
 export type Grade = 'S' | 'A' | 'B' | 'C';
@@ -43,6 +44,10 @@ export interface StageParams {
   lossRate: number; // L: 하방 계수 (지역 노브)
   maxLossRate: number; // 포지션당 최대 손실률
   maxLeverage: number; // FR-5.6b: 마진 데스크 레벨로 해금된 최대 배율 (기본 1)
+  mode: StageMode; // FR-2.6 난이도 모드
+  enemyHpMult: number; // 모드 반영 최종 계수 (엔진이 이 값을 쓴다)
+  enemyDpsMult: number;
+  enemyCountMult: number;
   payoutBase: number;
   drawBand: number;
   towerSlots: number;

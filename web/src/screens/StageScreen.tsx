@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BALANCE, Battle, ENEMY_TYPES, TOWERS, UNITS, liquidationDeltaPct,
-  type BarsFile, type Direction, type FinishRes, type RegionId, type StageStartRes, type WsServerMsg,
+  type BarsFile, type Direction, type FinishRes, type RegionId, type StageMode, type StageStartRes, type WsServerMsg,
 } from '@tf/shared';
 import { api, getSettings, getToken, track } from '../net/api.js';
 import { StageWs } from '../net/stageWs.js';
@@ -15,6 +15,7 @@ import { PREVIEW_ROSTER, SHEET_UNIT, TURRET_BY_TYPE, clearPreviews, hasSkillShee
 
 interface Props {
   regionId: RegionId;
+  mode?: StageMode;
   onFinish: (sessionId: string, finish: FinishRes, regionId: RegionId) => void;
   onSkipTutorial: () => void;
 }
@@ -29,7 +30,7 @@ interface ResultPopup {
 
 type GuideStep = 0 | 1 | 2 | 3 | 4 | 5; // FR-12.2 강제 가이드
 
-export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
+export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial }: Props) {
   const isTut = regionId === 'TUT';
   const settings = getSettings();
 
@@ -119,7 +120,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
     let raf = 0;
     (async () => {
       try {
-        const start = await api.stageStart(regionId, isTut ? 1 : settings.speed);
+        const start = await api.stageStart(regionId, isTut ? 1 : settings.speed, isTut ? 'easy' : mode);
         const bars = (await fetch(start.barsUrl).then((r) => r.json())) as BarsFile;
         if (cancelled) return;
         const s = g.current;

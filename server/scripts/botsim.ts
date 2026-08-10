@@ -28,6 +28,8 @@ function loadBars(url: string): BarsFile {
   return b;
 }
 
+const MODE: 'easy' | 'hard' = process.argv.includes('--easy') ? 'easy' : 'hard';
+
 function makeParams(region: RegionId): StageParams {
   const captured = CAPTURED[region];
   const income = baseIncome(captured);
@@ -36,7 +38,12 @@ function makeParams(region: RegionId): StageParams {
     // §9.3 전제: R1 AUM 2000 / R2 2400 / R3 2800 (데스크 업그레이드 진행 가정)
     aum: BALANCE.AUM_BY_DESK_LV[captured],
     totalBaseIncome: income.total, incomePerWave: income.perWave, incomeLastWave: income.lastWave,
-    heat: heatOf(captured), lossRate: BALANCE.LOSS_RATE[region], maxLossRate: BALANCE.MAX_LOSS_RATE, maxLeverage: 1, payoutBase: BALANCE.PAYOUT_BASE,
+    heat: heatOf(captured), lossRate: BALANCE.LOSS_RATE[region], maxLossRate: BALANCE.MAX_LOSS_RATE, maxLeverage: 1,
+    mode: MODE,
+    enemyHpMult: BALANCE.ENEMY_HP_MULT * (MODE === 'easy' ? BALANCE.EASY_HP_MULT : 1),
+    enemyDpsMult: BALANCE.ENEMY_DPS_MULT * (MODE === 'easy' ? BALANCE.EASY_DPS_MULT : 1),
+    enemyCountMult: MODE === 'easy' ? BALANCE.EASY_COUNT_MULT : 1,
+    payoutBase: BALANCE.PAYOUT_BASE,
     drawBand: BALANCE.DRAW_BAND, towerSlots: 6, maxPositions: BALANCE.MAX_POSITIONS, waveCount: 13, // FR-5.13 거래 10회
     unitHpMult: 1, towerDmgMult: 1, unitCostMult: 1, hasInfoResearch: false,
     waveTable: WAVE_TABLES[region],

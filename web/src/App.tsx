@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { FinishRes, RegionId } from '@tf/shared';
+import type { FinishRes, RegionId, StageMode } from '@tf/shared';
 import { api, ensureAccount, track } from './net/api.js';
 import { TitleScreen } from './screens/TitleScreen.js';
 import { IntroScreen, TutorialSummary } from './screens/IntroScreen.js';
@@ -16,7 +16,7 @@ type Screen =
   | { name: 'intro' }
   | { name: 'tutorialSummary' }
   | { name: 'map' }
-  | { name: 'stage'; regionId: RegionId }
+  | { name: 'stage'; regionId: RegionId; mode: StageMode }
   | { name: 'reveal'; sessionId: string; finish: FinishRes; regionId: RegionId }
   | { name: 'company' }
   | { name: 'codex' };
@@ -46,15 +46,15 @@ export function App() {
     case 'title':
       return <TitleScreen onStart={sortie} onCodex={() => setScreen({ name: 'codex' })} onCompany={() => setScreen({ name: 'company' })} />;
     case 'intro':
-      return <IntroScreen onStart={() => { track('tutorial_step', { step: 'intro_done' }); setScreen({ name: 'stage', regionId: 'TUT' }); }} />;
+      return <IntroScreen onStart={() => { track('tutorial_step', { step: 'intro_done' }); setScreen({ name: 'stage', regionId: 'TUT', mode: 'easy' }); }} />;
     case 'tutorialSummary':
       return <TutorialSummary onDone={() => { localStorage.setItem('tf.tutSkipped', '1'); setTutorialDone(true); setScreen({ name: 'map' }); }} />;
     case 'map':
       return (
         <MapScreen
-          onEnterStage={(regionId) => setScreen({ name: 'stage', regionId })}
+          onEnterStage={(regionId, mode) => setScreen({ name: 'stage', regionId, mode })}
           onCodex={() => setScreen({ name: 'codex' })}
-          onTutorial={() => setScreen({ name: 'stage', regionId: 'TUT' })}
+          onTutorial={() => setScreen({ name: 'stage', regionId: 'TUT', mode: 'easy' })}
           onTitle={() => setScreen({ name: 'title' })}
         />
       );
@@ -62,6 +62,7 @@ export function App() {
       return (
         <StageScreen
           regionId={screen.regionId}
+          mode={screen.mode}
           onFinish={(sessionId, finish, regionId) => { if (regionId === 'TUT') setTutorialDone(true); setScreen({ name: 'reveal', sessionId, finish, regionId }); }}
           onSkipTutorial={() => setScreen({ name: 'tutorialSummary' })}
         />

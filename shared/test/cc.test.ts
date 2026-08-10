@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Battle } from '../src/battle.js';
 import { WAVE_TABLES } from '../src/balance.js';
 import type { StageParams } from '../src/types.js';
-const P = (): StageParams => ({ regionId:'R1', aum:2000, totalBaseIncome:325, incomePerWave:25, incomeLastWave:25, heat:1, lossRate:0.7, maxLossRate:0.95, maxLeverage:1, payoutBase:0.9, drawBand:0.25, towerSlots:3, maxPositions:24, waveCount:13, unitHpMult:1, towerDmgMult:1, unitCostMult:1, hasInfoResearch:false, waveTable:WAVE_TABLES.R1 });
+const P = (): StageParams => ({ regionId:'R1', aum:2000, totalBaseIncome:325, incomePerWave:25, incomeLastWave:25, heat:1, lossRate:0.7, maxLossRate:0.95, maxLeverage:1, mode:'hard', enemyHpMult:1.3, enemyDpsMult:1.3, enemyCountMult:1, payoutBase:0.9, drawBand:0.25, towerSlots:3, maxPositions:24, waveCount:13, unitHpMult:1, towerDmgMult:1, unitCostMult:1, hasInfoResearch:false, waveTable:WAVE_TABLES.R1 });
 const E = (id:number,x:number) => ({ id, type:'grunt', x, hp:5000, maxHp:5000, baseSpeed:20, dps:5, armor:0, mr:0, air:false, size:8, wave:1, baseDmg:10, healPerSec:0, slowUntil:0, slowPct:0, stunUntil:0, leaked:false, nextSkillAt:9999, lastSkillAt:-9, shieldUntil:0, hasteUntil:0, armorCutUntil:0, armorCutPct:0, dotUntil:0, dotDps:0, healBlockUntil:0, knockUntil:0, knockFrom:0, knockTo:0, stunImmuneUntil:0, dpsBuffUntil:0, dpsBuffPct:0, vulnUntil:0, vulnPct:0, airborneUntil:0, airborneFrom:0 });
 function peak(key:'club'|'roundshield'|'foreman') {
   const b=new Battle(P(),[]); b.addGold(500); b.spawnUnit(key);

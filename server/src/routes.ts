@@ -1,12 +1,15 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Router } from 'express';
 import {
   BALANCE, DEPTS, DEPT_EFFECTS, REGION_META, settle,
+  type StageMode,
   type FinishReq, type FinishRes, type Grade, type MapRegion, type MapRes,
   type RegionId, type RewardLine, type StageStartRes,
 } from '@tf/shared';
 import { authMiddleware, issueToken, type AuthedRequest } from './auth.js';
-import { db, type ChartSetRow, type SessionRow, type TerritoryRow } from './db.js';
+import { db, SERVER_ROOT, type ChartSetRow, type SessionRow, type TerritoryRow } from './db.js';
 import { dropLive, getLive, loadLive } from './live.js';
 import { buildStageParams, countRewards, getDeptLevels, getTerritories } from './params.js';
 
@@ -89,8 +92,9 @@ router.get('/map', (req, res) => {
 // ─── FR-3.6 조합 배정 (쿨다운) + 세션 생성 ───
 router.post('/stage/start', (req, res) => {
   const accountId = (req as unknown as AuthedRequest).accountId;
-  const { regionId, speed } = req.body as { regionId: RegionId; speed?: number };
+  const { regionId, speed, mode } = req.body as { regionId: RegionId; speed?: number; mode?: StageMode };
   const spd = speed ?? 1;
+  const stageMode: StageMode = mode === 'easy' ? 'easy' : 'hard'; // FR-2.6 (기본 하드)
   if (![0.5, 1, 2].includes(spd)) return res.status(400).json({ error: 'BAD_SPEED' });
   if (!['R1', 'R2', 'R3', 'TUT'].includes(regionId)) return res.status(400).json({ error: 'BAD_REGION' });
 
@@ -132,7 +136,7 @@ router.post('/stage/start', (req, res) => {
     if (roll <= 0) { chart = c; break; }
   }
 
-  const params = buildStageParams(accountId, regionId);
+  const params = buildStageParams(accountId, regionId, stageMode);
   const sessionId = crypto.randomUUID();
   const isRetry = !!territory?.captured_at;
   db.prepare(
@@ -199,6 +203,7 @@ router.post('/stage/finish', (req, res) => {
     enemyBaseDestroyed,
     isRetry: !!row.is_retry,
     irBonus: DEPT_EFFECTS.irBonus(depts.ir),
+    mode: params.mode, // FR-2.6
   });
 
   const isTut = row.region_id === 'TUT';
@@ -230,11 +235,12 @@ router.post('/stage/finish', (req, res) => {
   // FR-10.1 도감 등록 (클리어만, 튜토리얼 제외)
   if (cleared && !isTut) {
     db.prepare(
-      `INSERT INTO codex_entries (account_id, chart_set_id, best_accuracy, best_grade) VALUES (?, ?, ?, ?)
+      `INSERT INTO codex_entries (account_id, chart_set_id, best_accuracy, best_grade, best_mode) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT (account_id, chart_set_id) DO UPDATE SET
          best_accuracy = MAX(best_accuracy, excluded.best_accuracy),
-         best_grade = CASE WHEN excluded.best_grade < best_grade THEN excluded.best_grade ELSE best_grade END`,
-    ).run(accountId, row.chart_set_id, s.accuracy, s.grade);
+         best_grade = CASE WHEN excluded.best_grade < best_grade THEN excluded.best_grade ELSE best_grade END,
+         best_mode = CASE WHEN excluded.best_mode = 'hard' THEN 'hard' ELSE best_mode END`,
+    ).run(accountId, row.chart_set_id, s.accuracy, s.grade, params.mode ?? 'hard');
   }
 
   dropLive(sessionId);
@@ -309,12 +315,33 @@ router.post('/dept/upgrade', (req, res) => {
 });
 
 // ─── FR-10 도감 ───
+// 카드용 종가 스파크라인. 봉 파일은 스테이지당 하나뿐이라 프로세스 수명 동안 캐시해 둔다.
+const SPARK_POINTS = 64;
+const sparkCache = new Map<string, number[]>();
+function sparkOf(chartSetId: string, barsUrl: string): number[] {
+  const hit = sparkCache.get(chartSetId);
+  if (hit) return hit;
+  let out: number[] = [];
+  try {
+    const raw = fs.readFileSync(path.join(SERVER_ROOT, barsUrl.replace('/static/', 'static/')), 'utf-8');
+    const bars = (JSON.parse(raw) as { bars: { c: number }[] }).bars;
+    const step = bars.length / SPARK_POINTS;
+    out = Array.from({ length: SPARK_POINTS }, (_, i) => bars[Math.min(bars.length - 1, Math.floor(i * step))].c);
+    out.push(bars[bars.length - 1].c);
+  } catch {
+    out = [];
+  }
+  sparkCache.set(chartSetId, out);
+  return out;
+}
+
 router.get('/codex', (req, res) => {
   const accountId = (req as unknown as AuthedRequest).accountId;
   const { sector, rarity, sort } = req.query as { sector?: string; rarity?: string; sort?: string };
   let rows = db.prepare(
-    `SELECT ce.first_cleared_at, ce.best_accuracy, ce.best_grade,
-            cs.ticker, cs.company_name, cs.trade_date, cs.sector, cs.day_change_pct, cs.rarity
+    `SELECT ce.first_cleared_at, ce.best_accuracy, ce.best_grade, ce.best_mode,
+            cs.id AS chart_set_id, cs.ticker, cs.company_name, cs.trade_date, cs.sector,
+            cs.day_change_pct, cs.rarity, cs.region_id, cs.difficulty, cs.ohlcv_day, cs.bars_url
      FROM codex_entries ce JOIN chart_sets cs ON cs.id = ce.chart_set_id
      WHERE ce.account_id = ?`,
   ).all(accountId) as Record<string, unknown>[];
@@ -323,7 +350,13 @@ router.get('/codex', (req, res) => {
   const rarityRank = { legendary: 4, epic: 3, rare: 2, common: 1 } as Record<string, number>;
   if (sort === 'rarity') rows.sort((a, b) => (rarityRank[b.rarity as string] ?? 0) - (rarityRank[a.rarity as string] ?? 0));
   else rows.sort((a, b) => String(b.trade_date).localeCompare(String(a.trade_date)));
-  res.json({ entries: rows });
+  // 카드에 실제 차트를 그리려면 종가 시계열이 필요하다. 390봉 전부는 과하니 카드 폭에 맞춰 다운샘플.
+  const entries = rows.map((r) => {
+    const day = JSON.parse(String(r.ohlcv_day)) as { dateStart?: string };
+    const { ohlcv_day: _o, bars_url: _b, ...rest } = r;
+    return { ...rest, date_start: day.dateStart ?? null, spark: sparkOf(String(r.chart_set_id), String(r.bars_url)) };
+  });
+  res.json({ entries });
 });
 
 // ─── §12 텔레메트리 (최소) ───

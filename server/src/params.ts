@@ -1,7 +1,7 @@
 // 스테이지 진입 시점 파라미터 스냅샷 (PRD stage_sessions.params — 중간 업글 영향 차단)
 import {
   BALANCE, DEPT_EFFECTS, WAVE_TABLES, baseIncome, heatOf,
-  type DeptKey, type RegionId, type StageParams,
+  type DeptKey, type RegionId, type StageMode, type StageParams,
 } from '@tf/shared';
 import { db, type TerritoryRow } from './db.js';
 
@@ -20,7 +20,7 @@ export function countRewards(territories: TerritoryRow[], line: string): number 
   return territories.filter((t) => (JSON.parse(t.rewards_taken) as string[]).includes(line)).length;
 }
 
-export function buildStageParams(accountId: string, regionId: RegionId): StageParams {
+export function buildStageParams(accountId: string, regionId: RegionId, mode: StageMode = 'hard'): StageParams {
   const depts = getDeptLevels(accountId);
   const territories = getTerritories(accountId);
   const captured = territories.filter((t) => t.captured_at && t.region_id !== 'TUT').length;
@@ -44,6 +44,11 @@ export function buildStageParams(accountId: string, regionId: RegionId): StagePa
     lossRate: Math.round(lossRate * 100) / 100,
     maxLossRate: BALANCE.MAX_LOSS_RATE,
     maxLeverage: regionId === 'TUT' ? 1 : DEPT_EFFECTS.maxLeverage(depts.margin),
+    mode,
+    // FR-2.6 이지모드는 하드 기준값에 완화 계수를 곱한다
+    enemyHpMult: BALANCE.ENEMY_HP_MULT * (mode === 'easy' ? BALANCE.EASY_HP_MULT : 1),
+    enemyDpsMult: BALANCE.ENEMY_DPS_MULT * (mode === 'easy' ? BALANCE.EASY_DPS_MULT : 1),
+    enemyCountMult: mode === 'easy' ? BALANCE.EASY_COUNT_MULT : 1,
     payoutBase: BALANCE.PAYOUT_BASE,
     drawBand: BALANCE.DRAW_BAND,
     towerSlots: Math.min(BALANCE.TOWER_SLOTS_BASE + defenseRewards, BALANCE.TOWER_SLOTS_MAX),

@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import type { MapRes, RegionId } from '@tf/shared';
+import type { MapRes, RegionId, StageMode } from '@tf/shared';
 import { api } from '../net/api.js';
 import { COUNTRIES, KR_COLS, KR_ROWS, WORLD_COLS, WORLD_ROWS, krSegs, worldSegs } from '../game/pixelMaps.js';
 
 // FR-2 세계지도 — 목업 03번: 전략 상황실 홀로그램 톤. 세계지도 → 한국 → 전선 목록 → 작전 개시
 interface Props {
-  onEnterStage: (regionId: RegionId) => void;
+  onEnterStage: (regionId: RegionId, mode: StageMode) => void;
   onCodex: () => void;
   onTutorial: () => void;
   onTitle: () => void;
@@ -42,6 +42,7 @@ function useFitScale(naturalW: number, naturalH: number, cap: number) {
 }
 
 export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props) {
+  const [pickMode, setPickMode] = useState<RegionId | null>(null); // FR-2.6
   const [map, setMap] = useState<MapRes | null>(null);
   const [view, setView] = useState<'world' | 'kr'>('world');
   const [selCountry, setSelCountry] = useState('k');
@@ -91,7 +92,7 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
       flash('인접 지역을 먼저 점령하세요');
       return;
     }
-    onEnterStage(regionId);
+    setPickMode(regionId); // FR-2.6 난이도 선택 후 진입
   };
 
   return (
@@ -302,6 +303,29 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
         <button className="ghost" onClick={onTitle}>◀ 타이틀</button>
         <button onClick={onCodex}>도감</button>
       </div>
+
+      {/* FR-2.6 난이도 선택 — 스테이지 진입 직전 */}
+      {pickMode && (
+        <div className="overlay center" onClick={() => setPickMode(null)}>
+          <div className="card mode-pick" onClick={(e) => e.stopPropagation()}>
+            <h3>작전 난이도</h3>
+            <p className="small dim">차트와 트레이딩 규칙은 동일하고, 방어전의 압박만 달라집니다.</p>
+            <div className="mode-row">
+              <button className="mode easy" onClick={() => onEnterStage(pickMode, 'easy')}>
+                <b>이지</b>
+                <span className="small">적 체력 −30% · 공격력 −25% · 수 −20%</span>
+                <span className="small dim">자본금 보상 70%</span>
+              </button>
+              <button className="mode hard" onClick={() => onEnterStage(pickMode, 'hard')}>
+                <b>하드</b>
+                <span className="small">기본 밸런스 — 설계된 난이도</span>
+                <span className="small dim">자본금 보상 100%</span>
+              </button>
+            </div>
+            <button className="ghost small" onClick={() => setPickMode(null)}>취소</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
