@@ -6,7 +6,7 @@
 //  - Bloons TD: 타워 타겟팅 모드 first/last/strong/close
 //  - Age of War: 블로커+원거리 역할 조합, 본진 자동 포탑, 화면 클리어 스킬
 import {
-  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, ATTACK_CUE_S, MUZZLE, SKILL_CUE_S, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
+  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, ATTACK_CUE_S, MUZZLE, SKILL_CUE_S, SPAWN_GLOBAL_CD, UNIT_SPAWN_CD, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
   type DmgType, type EnemyTypeSpec, type TargetingMode, type TowerSpec, type UnitSpec,
 } from './balance.js';
 import type { MarketEvent, RegionId, StageParams } from './types.js';
@@ -164,6 +164,9 @@ export class Battle {
   baseTurretCd = 0;
   rageStage = 0; // FR-6.10b 적 본진 위기 반격 (0 → 40% 돌파 시 1 → 20% 돌파 시 2)
   rageAt = -9; // 최근 반격 발동 시각 (충격파 연출 기준)
+  /** FR-6.5e 유닛별 재소환 가능 시각 + 전역 간격 */
+  spawnReadyAt: Record<string, number> = {};
+  globalSpawnAt = 0;
   victory = false;
   t = 0;
   activeEvent: MarketEvent | null = null;
@@ -255,9 +258,17 @@ export class Battle {
     return Math.floor(spec.cost * this.params.unitCostMult);
   }
 
+  /** 남은 재소환 대기 시간(초) — 0이면 즉시 소환 가능 (UI 표시용) */
+  spawnCdLeft(key: UnitSpec['key']): number {
+    return Math.max(0, (this.spawnReadyAt[key] ?? 0) - this.t, this.globalSpawnAt - this.t);
+  }
+
   spawnUnit(key: UnitSpec['key']): boolean {
     const spec = UNITS.find((s) => s.key === key)!;
+    if (this.spawnCdLeft(key) > 0) return false; // FR-6.5e 재소환 대기 중
     if (!this.spend(this.unitCost(key))) return false;
+    this.spawnReadyAt[key] = this.t + (UNIT_SPAWN_CD[key] ?? 1);
+    this.globalSpawnAt = this.t + SPAWN_GLOBAL_CD;
     const hp = Math.round(spec.hp * this.params.unitHpMult);
     this.units.push({
       id: this.nextId++, key, x: UNIT_SPAWN_X, hp, maxHp: hp, spec, shotCd: 0,

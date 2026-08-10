@@ -66,7 +66,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
   });
 
   const [phase, setPhase] = useState<'loading' | 'playing' | 'settling' | 'error'>('loading');
-  const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, ebhp: 300, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0, upnl: null as number | null, udelta: null as number | null });
+  const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, ebhp: 300, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0, upnl: null as number | null, udelta: null as number | null, unitCd: {} as Record<string, number> });
   const [popup, setPopup] = useState<ResultPopup | null>(null);
   const [banner, setBanner] = useState<{ text: string; kind: 'panic' | 'fomo' | 'danger' } | null>(null);
   const [stakePct, setStakePct] = useState(0.25);
@@ -270,6 +270,7 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
           wave: b.waveIdx, waveCount: s.start!.params.waveCount,
           prep: b.phase === 'prep', barF, barCount: s.bars.barCount,
           posCount: s.seq, skillCd: Math.max(0, Math.ceil(b.skillReadyAt - b.t)), upnl, udelta,
+          unitCd: Object.fromEntries(UNITS.map((u) => [u.key, b.spawnCdLeft(u.key)])), // FR-6.5e 재소환 대기
         });
       }
 
@@ -567,8 +568,13 @@ export function StageScreen({ regionId, onFinish, onSkipTutorial }: Props) {
             const cost = battle.unitCost(u.key);
             return (
               <span key={u.key} className="ub-wrap">
-                <button className={isTut && guide === 4 ? 'pulse' : ''} disabled={hud.gold < cost || phase !== 'playing'} onClick={() => spawnUnit(u.key)}>
-                  {u.name}<span className="cost">{cost} G</span>
+                <button className={isTut && guide === 4 ? 'pulse' : ''}
+                  disabled={hud.gold < cost || phase !== 'playing' || (hud.unitCd[u.key] ?? 0) > 0}
+                  onClick={() => spawnUnit(u.key)}>
+                  {u.name}
+                  <span className="cost">
+                    {(hud.unitCd[u.key] ?? 0) > 0 ? `${Math.ceil(hud.unitCd[u.key])}s` : `${cost} G`}
+                  </span>
                 </button>
                 <button className="qmark" title="유닛 설명" onClick={() => setInfoKey({ kind: 'unit', key: u.key })}>?</button>
               </span>

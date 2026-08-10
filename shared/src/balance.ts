@@ -243,6 +243,23 @@ export const ENEMY_SKILL = {
   boss: { mult: 0.8, targets: 2, stun: 0.5, markPct: 0.12, markDur: 3 }, // 번개 왕 낙뢰 심판
 } as const;
 
+/**
+ * FR-6.5e 유닛 재소환 쿨다운(초) — 골드가 쌓여도 한 번에 쏟아붓지 못하게 한다.
+ * 값이 셀수록 길다. 전역 간격(SPAWN_GLOBAL_CD)도 함께 걸려 동시 투입을 막는다.
+ */
+export const UNIT_SPAWN_CD: Record<string, number> = {
+  apprentice: 1.0, // 견습공 — 소모품, 가장 빠른 회전
+  scissor: 2.0,
+  club: 2.5,
+  roundshield: 3.0,
+  bricker: 3.0,
+  shutter: 3.5,
+  gasmask: 3.5,
+  foreman: 4.5,
+  sniper: 5.0, // 저격수 — 최고 화력, 가장 김
+};
+export const SPAWN_GLOBAL_CD = 0.7; // 종류가 달라도 이 간격 안에는 연속 소환 불가
+
 export const STUN_IMMUNE_S = 3; // 기절 종료 후 재기절 면역 (스턴락 방지)
 
 /**
