@@ -736,11 +736,18 @@ export function drawBattle(
   }
   st.lastFxT = b.t;
 
-  // 번개왕 낙뢰 기둥 재생 (60+70+140 = 270ms)
+  // 보스 스킬 착탄 연출 (270ms). 낙뢰 기둥 아트는 번개 왕(enemy_d_1)에만 있으므로,
+  // 드릴 워커(R3)는 낙뢰 대신 지면 충격파로 표현한다 — 드릴이 번개를 떨구면 어색하다.
   st.strikes = st.strikes.filter((k) => {
     const el = b.t - k.t0;
     if (el > 0.27) return false;
-    if (el >= 0) drawStrikeFx(ctx, el, sx(k.x), GROUND_Y);
+    if (el >= 0) {
+      if (b.params.regionId === 'R3') {
+        if (el < 0.02) pushVfx(st, 'ally_pierce-shockwave', k.x, GROUND_Y - 12, b.t, 0.3, 14, 40);
+      } else {
+        drawStrikeFx(ctx, el, sx(k.x), GROUND_Y);
+      }
+    }
     return true;
   });
 
