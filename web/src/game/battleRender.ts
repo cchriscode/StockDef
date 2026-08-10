@@ -10,9 +10,10 @@ import { // [임시] 신규 아트 로스터 (아군·적군 전면 교체)
 } from './previewSprites.js';
 
 const AIR_Y = 96;
-// 2026-08-10: 사옥·적 본진을 2배로. 사옥 슬롯 높이·클릭 판정이 전부 이 값에서 파생된다
-const HQ_H = 232;
-const FOE_H = 176;
+// 2026-08-10: 사옥·적 본진 확대(2배 → 70%로 축소 조정). 사옥 슬롯 높이·클릭 판정이 이 값에서 파생된다.
+// 이 높이에서 사옥은 world 2~65, 적 본진은 905~999를 차지한다 (전장 앵커가 여기에 맞춰져 있다).
+const HQ_H = 162;
+const FOE_H = 123;
 const GROUND_Y = 258; // 캔버스 1400×300 기준 — 스프라이트는 고정 px, 레인만 길어진다
 
 const ENEMY_COLORS: Record<Enemy['type'], string> = {
@@ -305,7 +306,8 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
   if (hq) {
     const wwq = (HQ_H * 112) / 160;
     ctx.drawImage(hq, 4, groundTop - HQ_H, wwq, HQ_H);
-    hpBar(ctx, 8, groundTop - HQ_H - 8, wwq - 8, b.baseHP / 100, '#46A574');
+    // 옥상 포탑이 있으면 체력바를 그 위로 올린다 (겹침 방지)
+    hpBar(ctx, 8, groundTop - HQ_H - 8 - (b.towers[0] ? 46 : 0), wwq - 8, b.baseHP / 100, '#46A574');
   } else {
     drawBase(ctx, 8, groundTop - HQ_H, 80, HQ_H, '#46A574', '#0C1A12', b.baseHP / 100, '사옥');
   }
