@@ -785,7 +785,8 @@ u { text-decoration: none; } /* 상태 마커(●○) 전용 색 래퍼 */
 .wr-chips span.warn { border-color: var(--red); color: var(--red2); animation: wr-blink 2s steps(1) infinite; }
 
 /* 부서 행 */
-.dk-list { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; gap: 9px; overflow: hidden; }
+/* 목업 비율: 부서 목록 1176 : 우측 레일 632 ≈ 65:35 */
+.dk-list { flex: 1 1 65%; min-width: 0; position: relative; display: flex; flex-direction: column; gap: 9px; overflow: hidden; }
 .dk-row {
   position: relative; display: flex; align-items: center; gap: 15px; padding: 12px 16px;
   background: #0C1220; border: 2px solid #1B2A42; border-left-width: 6px; overflow: hidden;
@@ -829,7 +830,7 @@ u { text-decoration: none; } /* 상태 마커(●○) 전용 색 래퍼 */
 }
 
 /* 우측 레일 */
-.dk-rail { width: 420px; flex: none; display: flex; flex-direction: column; gap: 13px; min-height: 0; overflow-y: auto; }
+.dk-rail { flex: 0 0 35%; min-width: 320px; max-width: 640px; display: flex; flex-direction: column; gap: 13px; min-height: 0; overflow-y: auto; }
 .dk-panel { position: relative; padding: 16px 21px; background: #0C1220; border: 2px solid #1B2A42; }
 .dk-panel.gold { border-color: var(--gold); }
 .dk-panel .br { position: absolute; width: 18px; height: 18px; pointer-events: none; border-color: #2A3A54; }
