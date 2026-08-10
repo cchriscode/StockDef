@@ -20,7 +20,21 @@ const KR_MARKS: Record<string, { x: number; y: number }> = {
   R2: { x: 124, y: 338 }, // 판교 — 서울 남동
   R3: { x: 218, y: 448 }, // 울산 — 남동 해안
 };
-const KR_ON_WORLD = { x: 984, y: 152 }; // 세계지도 위 한국 좌표 (핑·조준 브래킷)
+const KR_ON_WORLD = { x: 984, y: 160 }; // 세계지도 위 한국 좌표 (핑·조준·레이더 중심)
+const JP_ON_WORLD = { x: 1020, y: 140 };
+
+// 목업 War Room Map의 지도 위 콜아웃 — 앵커에서 리더선이 꺾여 라벨로 이어진다 (원본 px 좌표)
+interface Callout {
+  k: string; x: number; y: number; tick: number; drop: number;
+  lx: number; ly: number; side: 'left' | 'right'; note: string;
+}
+const CALLOUTS: Callout[] = [
+  { k: 'k', x: 984, y: 154, tick: 74, drop: 82, lx: -190, ly: 80, side: 'left', note: '● 교전 중' },
+  { k: 'j', x: 1030, y: 150, tick: 40, drop: 132, lx: -72, ly: 132, side: 'left', note: '● 해금 예정' },
+  { k: 'c', x: 872, y: 150, tick: 92, drop: 40, lx: -208, ly: 38, side: 'left', note: '○ 잠김' },
+  { k: 'e', x: 600, y: 180, tick: 70, drop: 64, lx: -186, ly: 62, side: 'left', note: '○ 잠김' },
+  { k: 'n', x: 220, y: 140, tick: 66, drop: 52, lx: 72, ly: 50, side: 'right', note: '○ 잠김' },
+];
 
 const STATUS_LABEL = { open: '진행 중', next: '해금 예정', locked: '잠김' } as const;
 const STATUS_COLOR = { open: '#7BD8A0', next: '#FF9E86', locked: '#4E5B72' } as const;
@@ -74,6 +88,19 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
   }, []);
 
   const wSegs = useMemo(() => worldSegs(wCell), [wCell]);
+  /** 국가별 레이더 중심 — 지도 셀 바운딩 박스의 중앙 (선택한 나라로 레이더가 옮겨간다) */
+  const centers = useMemo(() => {
+    const bb = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
+    for (const g of wSegs) {
+      const o = bb.get(g.k) ?? { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+      o.x0 = Math.min(o.x0, g.x); o.y0 = Math.min(o.y0, g.y);
+      o.x1 = Math.max(o.x1, g.x + g.w); o.y1 = Math.max(o.y1, g.y + g.h);
+      bb.set(g.k, o);
+    }
+    const out = new Map<string, { x: number; y: number }>();
+    for (const [k, o] of bb) out.set(k, { x: (o.x0 + o.x1) / 2, y: (o.y0 + o.y1) / 2 });
+    return out;
+  }, [wSegs]);
   const kSegs = useMemo(() => krSegs(kCell), [kCell]);
   const kq = kCell / KR_CELL; // 목업 8px 기준 좌표 → 현재 셀 크기
   const wq = wCell / WORLD_CELL;
@@ -112,6 +139,9 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
     `자본금 ${map.capital.toLocaleString()}`,
   ].join('   ·   ');
 
+  // 선택 국가의 지도상 중심 — 레이더 링·스윕·조준 브래킷이 여기로 옮겨간다
+  const focus = centers.get(selCountry) ?? { x: KR_ON_WORLD.x * wq, y: KR_ON_WORLD.y * wq };
+
   const openCount = regions.filter((r) => r.state !== 'locked').length;
   const contested = Math.round((openCount / Math.max(regions.length, 1)) * 100);
 
@@ -132,12 +162,6 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
 
       <div className="wr-body">
         <div className="wr-radar" ref={isKr ? krRef : midRef}>
-          <div className="rings">
-            {[0.34, 0.58, 0.86, 1.2].map((r) => (
-              <i key={r} style={{ width: `${r * 100}%`, aspectRatio: '1' }} />
-            ))}
-          </div>
-          <div className="sweep" />
 
           {isKr ? (
             <div>
@@ -188,19 +212,50 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
                   );
                 })}
                 <div className="grid-overlay" style={{ backgroundSize: `${wCell}px ${wCell}px` }} />
-                <div className="lat eq" style={{ top: 33.5 * wCell }} />
-                <div className="lat" style={{ top: 23.5 * wCell }} />
-                <div className="lat" style={{ top: 43.5 * wCell }} />
-                <div className="meridian" style={{ left: 72 * wCell }} />
 
-                {/* 플레이 가능한 전역은 한국뿐 — 핑도 하나만 (없는 지역을 있는 것처럼 보이지 않게) */}
+                {/* 레이더는 패널 중앙이 아니라 선택한 나라를 중심으로 돈다 */}
+                {[240, 480, 720, 940].map((d) => (
+                  <i
+                    key={d}
+                    className="wr-ring"
+                    style={{ left: focus.x - (d / 2) * wq, top: focus.y - (d / 2) * wq, width: d * wq, height: d * wq }}
+                  />
+                ))}
+                <div
+                  className="wr-sweep"
+                  style={{ left: focus.x - 470 * wq, top: focus.y - 470 * wq, width: 940 * wq, height: 940 * wq }}
+                />
+                <div className="wr-cross h" style={{ top: focus.y }} />
+                <div className="wr-cross v" style={{ left: focus.x }} />
+
                 <div className="wr-ping" style={{ left: KR_ON_WORLD.x * wq, top: KR_ON_WORLD.y * wq, color: '#7BD8A0' }}><i /><i className="d" /><b /></div>
-                <div className="wr-lock" style={{ left: KR_ON_WORLD.x * wq, top: KR_ON_WORLD.y * wq }}>
-                  <i style={{ left: 0, top: 0, width: 8, height: 2 }} /><i style={{ left: 0, top: 0, width: 2, height: 8 }} />
-                  <i style={{ right: 0, top: 0, width: 8, height: 2 }} /><i style={{ right: 0, top: 0, width: 2, height: 8 }} />
-                  <i style={{ left: 0, bottom: 0, width: 8, height: 2 }} /><i style={{ left: 0, bottom: 0, width: 2, height: 8 }} />
-                  <i style={{ right: 0, bottom: 0, width: 8, height: 2 }} /><i style={{ right: 0, bottom: 0, width: 2, height: 8 }} />
+                <div className="wr-ping" style={{ left: JP_ON_WORLD.x * wq, top: JP_ON_WORLD.y * wq, color: '#FF9E86' }}><i /><i className="d" /><b /></div>
+                <div className="wr-lock" style={{ left: focus.x, top: focus.y, color: country.color }}>
+                  <i style={{ left: 0, top: 0, width: 9, height: 2 }} /><i style={{ left: 0, top: 0, width: 2, height: 9 }} />
+                  <i style={{ right: 0, top: 0, width: 9, height: 2 }} /><i style={{ right: 0, top: 0, width: 2, height: 9 }} />
+                  <i style={{ left: 0, bottom: 0, width: 9, height: 2 }} /><i style={{ left: 0, bottom: 0, width: 2, height: 9 }} />
+                  <i style={{ right: 0, bottom: 0, width: 9, height: 2 }} /><i style={{ right: 0, bottom: 0, width: 2, height: 9 }} />
                 </div>
+
+                {/* 지도 위 국가 콜아웃 — 리더선 + 라벨 (목업 핵심 인상) */}
+                {CALLOUTS.map((co) => {
+                  const c = COUNTRIES.find((cc) => cc.key === co.k)!;
+                  const right = co.side === 'right';
+                  return (
+                    <div key={co.k} className="wr-callout" style={{ left: co.x * wq, top: co.y * wq }}>
+                      <i style={{ width: co.tick * wq, height: 2, background: c.color, transform: right ? undefined : `translateX(${-co.tick * wq}px)` }} />
+                      <i style={{ left: (right ? co.tick : -co.tick) * wq, top: 0, width: 2, height: co.drop * wq, background: c.color }} />
+                      <span
+                        className="lb"
+                        style={{ left: co.lx * wq, top: co.ly * wq, width: 150 * wq, alignItems: right ? 'flex-start' : 'flex-end' }}
+                      >
+                        <b>{c.name}</b>
+                        <em style={{ color: c.color }}>{c.en}{co.k === 'k' ? ` · R1-R${regions.length}` : ''}</em>
+                        <em style={{ color: c.status === 'open' ? '#7BD8A0' : c.status === 'next' ? '#FF9E86' : '#4E5B72' }}>{co.note}</em>
+                      </span>
+                    </div>
+                  );
+                })}
                 {/* 한국 클릭 히트박스 (셀이 작아 영역 전체를 클릭 가능하게) */}
                 <div
                   style={{ position: 'absolute', left: 119.5 * wCell, top: 15.5 * wCell, width: 7 * wCell, height: 7 * wCell, cursor: 'pointer', background: 'rgba(255,255,255,0.02)' }}
@@ -210,6 +265,9 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
             </div>
           )}
 
+          <div className="wr-scanband" />
+          <div className="wr-corner tl" /><div className="wr-corner tr" />
+          <div className="wr-corner bl" /><div className="wr-corner br" />
           {isKr && <button className="ghost small wr-back" onClick={() => setView('world')}>← 세계지도</button>}
           <div className="scanline" />
           <div className="caption">
@@ -218,34 +276,38 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
         </div>
 
         <aside className="wr-side">
-          <div className="wr-panel">
-            <div className="ph">
-              <span>SELECTED THEATER</span>
-              <span style={{ color: isKr ? '#7BD8A0' : country.color }}>{isKr ? sel?.regionId : country.en}</span>
-            </div>
+          {/* SELECTED THEATER — 선택 색으로 테두리를 두르고 상태 칩을 우상단에 (목업) */}
+          <div className="wr-panel theater" style={{ borderColor: country.status === 'locked' ? undefined : country.color }}>
             <div className="wr-theater">
-              <span className="nm">{isKr ? sel?.name : country.name}</span>
-              <span className="en">{isKr ? `${sel?.sector} · 난이도 ${'★'.repeat(sel?.difficulty ?? 1)}${'☆'.repeat(3 - (sel?.difficulty ?? 1))}` : country.en}</span>
-              <span className="desc">
-                {isKr
-                  ? '정체를 가린 실제 과거 차트를 읽어 자금을 만들고, 13웨이브의 베어 공세에서 사옥을 지켜낸다.'
-                  : country.desc}
-              </span>
+              <div className="trow">
+                <div className="tcol">
+                  <span className="lbl">SELECTED THEATER</span>
+                  <span className="nm">{country.name}</span>
+                  <span className="en" style={{ color: country.color }}>{country.en}</span>
+                </div>
+                <div className="tcol right">
+                  <span className="chip" style={{ color: STATUS_COLOR[country.status], borderColor: STATUS_COLOR[country.status] }}>
+                    {STATUS_LABEL[country.status]}
+                  </span>
+                  <span className="lbl">{country.key === 'k' ? `${regions.length} STAGES` : `${country.stages} STAGES`}</span>
+                </div>
+              </div>
+              <span className="desc">{country.desc}</span>
             </div>
           </div>
 
-          <div className="wr-panel" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div className="wr-panel queue">
             <div className="ph">
-              <span>{isKr ? 'STAGE QUEUE' : 'THEATER LIST'}</span>
-              <span>{isKr ? `▸ ${regions.length} 스테이지` : `▸ ${COUNTRIES.length} 전역`}</span>
+              <span>STAGE QUEUE</span>
+              <span>{country.key === 'k' ? `▸ 대기 중 ${regions.filter((r) => r.state === 'locked').length}` : '▸ 미해금'}</span>
             </div>
             <div className="wr-queue">
-              {isKr ? (
+              {country.key === 'k' ? (
                 <>
                   <button className={`wr-qrow ${map.tutorialDone ? 'captured' : 'open'}`} onClick={onTutorial}>
                     <span className="id">R0</span>
                     <span className="nm">사옥 · 튜토리얼</span>
-                    <span className="st">{map.tutorialDone ? '수료' : '진행'}</span>
+                    <span className="st">{map.tutorialDone ? 'CLEAR' : '진행'}</span>
                   </button>
                   {regions.map((r, i) => (
                     <button
@@ -262,29 +324,25 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
                   ))}
                 </>
               ) : (
-                COUNTRIES.map((c) => (
-                  <button
-                    key={c.key}
-                    className={`wr-qrow ${c.status === 'open' ? 'open' : ''} ${selCountry === c.key ? 'sel' : ''}`}
-                    onClick={() => pickCountry(c.key)}
-                  >
-                    <span className="id" style={{ background: c.color, width: 12, height: 12 }} />
-                    <span className="nm">{c.name}</span>
-                    <span className="st" style={{ color: STATUS_COLOR[c.status] }}>{STATUS_LABEL[c.status]}</span>
-                  </button>
-                ))
+                <div className="wr-locked">한국을 점령해야 열리는 전역입니다.</div>
               )}
             </div>
-            <button
-              className="cta wr-cta"
-              disabled={isKr ? sel?.state === 'locked' : country.status !== 'open'}
-              onClick={() => (isKr ? sel && enterRegion(sel.regionId, sel.state) : country.status === 'open' && setView('kr'))}
-            >
-              {isKr
-                ? (sel?.state === 'locked' ? '잠김 — 인접 점령 필요' : '작 전 개 시')
-                : (country.status === 'open' ? '진 입' : country.status === 'next' ? '한국 점령 후 해금' : '해금 조건 미충족')}
-            </button>
           </div>
+
+          <button
+            className="cta wr-cta"
+            disabled={country.key !== 'k' || sel?.state === 'locked'}
+            onClick={() => {
+              if (country.key !== 'k' || !sel) return;
+              if (!isKr) { setView('kr'); return; } // 세계지도에서는 먼저 국내 전선으로
+              enterRegion(sel.regionId, sel.state);
+            }}
+          >
+            {country.key !== 'k'
+              ? '해금 조건 미충족'
+              : !isKr ? '전 선 진 입'
+                : sel?.state === 'locked' ? '잠김 — 인접 점령 필요' : '작 전 개 시'}
+          </button>
         </aside>
       </div>
 

@@ -639,20 +639,44 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
   border: 2px solid #1B2A42; background: #080C16;
   display: flex; align-items: center; justify-content: center;
 }
-/* 스윕·링은 지도 위에 겹치되 클릭을 막지 않는다 */
-.wr-radar .rings, .wr-radar .sweep, .wr-radar .scanline { position: absolute; pointer-events: none; }
-.wr-radar .rings { inset: 0; }
-.wr-radar .rings i {
-  position: absolute; left: 50%; top: 50%; border: 1px solid rgba(70, 165, 116, 0.16);
-  border-radius: 50%; transform: translate(-50%, -50%);
+/* 스윕·링은 지도 위에 겹치되 클릭을 막지 않는다. 중심은 한국 — 목업 원본 */
+.wr-radar .scanline { position: absolute; pointer-events: none; }
+.wr-ring {
+  position: absolute; border: 1px solid rgba(70, 165, 116, 0.16);
+  border-radius: 50%; pointer-events: none;
 }
-.wr-radar .sweep {
-  left: 50%; top: 50%; width: 150%; aspect-ratio: 1; transform: translate(-50%, -50%);
+.wr-ring:nth-of-type(1) { border-color: rgba(70, 165, 116, 0.20); }
+.wr-sweep {
+  position: absolute; pointer-events: none; border-radius: 50%;
   animation: wr-sweep 5.5s linear infinite;
-  background: conic-gradient(from 0deg, rgba(123,216,160,.22), rgba(123,216,160,.07) 22deg, transparent 46deg, transparent 360deg);
+  background: conic-gradient(from 0deg, rgba(123,216,160,.30), rgba(123,216,160,.10) 22deg, transparent 46deg, transparent 360deg);
   mask-image: radial-gradient(circle, #000 0 66%, transparent 68%);
   -webkit-mask-image: radial-gradient(circle, #000 0 66%, transparent 68%);
 }
+/* 한국을 지나는 위·경선 */
+.wr-cross { position: absolute; pointer-events: none; background: rgba(70,165,116,.13); }
+.wr-cross.h { left: 0; width: 100%; height: 1px; }
+.wr-cross.v { top: 0; width: 1px; height: 100%; }
+
+/* 지도 위 국가 콜아웃 — 리더선이 꺾여 라벨로 이어진다 */
+.wr-callout { position: absolute; pointer-events: none; }
+.wr-callout i { position: absolute; left: 0; top: 0; opacity: .62; }
+.wr-callout .lb { position: absolute; display: flex; flex-direction: column; gap: 3px; }
+.wr-callout .lb b { font-size: 14px; font-weight: 400; color: var(--text); text-shadow: 0 0 8px #070A12; white-space: nowrap; }
+.wr-callout .lb em { font-family: var(--fm); font-size: 9px; font-style: normal; letter-spacing: 1px; white-space: nowrap; }
+
+/* 패널 장식: 코너 브래킷 + 위에서 아래로 훑는 스캔 밴드 */
+.wr-corner { position: absolute; width: 26px; height: 26px; pointer-events: none; }
+.wr-corner.tl { left: 14px; top: 14px; border-left: 2px solid var(--green); border-top: 2px solid var(--green); }
+.wr-corner.tr { right: 14px; top: 14px; border-right: 2px solid var(--green); border-top: 2px solid var(--green); }
+.wr-corner.bl { left: 14px; bottom: 14px; border-left: 2px solid var(--green); border-bottom: 2px solid var(--green); }
+.wr-corner.br { right: 14px; bottom: 14px; border-right: 2px solid var(--green); border-bottom: 2px solid var(--green); }
+.wr-scanband {
+  position: absolute; left: 0; top: 0; width: 100%; height: 56px; pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(123,216,160,.07) 70%, rgba(123,216,160,.16));
+  animation: wr-scan 6.5s linear infinite;
+}
+@keyframes wr-scan { 0% { transform: translateY(-60px); } 100% { transform: translateY(var(--wr-scan-to, 560px)); } }
 .wr-radar .scanline { inset: 0; background: repeating-linear-gradient(to bottom, rgba(0,0,0,.12) 0 2px, transparent 2px 4px); }
 .wr-radar .caption { position: absolute; left: 10px; bottom: 8px; font-family: var(--fm); font-size: 10px; color: var(--dim); }
 /* 세계지도 복귀 — 지도 위 우측 상단 (하단 액션 바까지 내려가지 않게) */
@@ -663,8 +687,8 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .wr-ping i { position: absolute; inset: 0; border: 2px solid currentColor; border-radius: 50%; animation: wr-ping 2.6s ease-out infinite; }
 .wr-ping i.d { inset: 11px; animation-delay: .5s; }
 .wr-ping b { position: absolute; left: 19px; top: 19px; width: 8px; height: 8px; background: currentColor; animation: wr-blink 1.1s steps(1) infinite; }
-.wr-lock { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; pointer-events: none; animation: wr-lock .8s ease-out infinite alternate; }
-.wr-lock i { position: absolute; background: var(--green2); }
+.wr-lock { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; pointer-events: none; color: var(--green2); animation: wr-lock .8s ease-out infinite alternate; }
+.wr-lock i { position: absolute; background: currentColor; }
 
 /* 우측 브리핑 패널 */
 .wr-side { width: 320px; flex: none; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
@@ -673,10 +697,23 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 7px 11px; background: var(--head); font-family: var(--fm); font-size: 10px; color: var(--mut); letter-spacing: 1px;
 }
-.wr-theater { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
-.wr-theater .nm { font-family: var(--ft); font-size: 20px; }
-.wr-theater .en { font-family: var(--fm); font-size: 10px; color: var(--dim); letter-spacing: 1px; }
+.wr-panel.theater { border-width: 2px; }
+.wr-theater { padding: 13px 15px; display: flex; flex-direction: column; gap: 10px; }
+.wr-theater .trow { display: flex; justify-content: space-between; gap: 10px; }
+.wr-theater .tcol { display: flex; flex-direction: column; gap: 3px; }
+.wr-theater .tcol.right { align-items: flex-end; }
+.wr-theater .lbl { font-family: var(--fm); font-size: 9px; color: var(--dim); letter-spacing: 1px; }
+.wr-theater .nm { font-family: var(--ft); font-size: 24px; line-height: 1.1; }
+.wr-theater .en { font-family: var(--fm); font-size: 10px; letter-spacing: 1px; }
+.wr-theater .chip { font-family: var(--fm); font-size: 10px; padding: 3px 8px; border: 1px solid; }
 .wr-theater .desc { font-size: 12px; color: var(--mut); line-height: 1.6; }
+.wr-locked { padding: 18px 15px; font-size: 12px; color: var(--dim); text-align: center; }
+.wr-panel.queue { display: flex; flex-direction: column; min-height: 0; }
+/* 선택 행은 초록 테두리 박스 (목업) */
+.wr-qrow.sel { background: var(--sel); box-shadow: inset 0 0 0 2px var(--green2); }
+.wr-qrow.sel .id { background: var(--green); color: #06210F; }
+.wr-qrow .id { padding: 2px 5px; text-align: center; }
+.wr-cta { margin: 0; width: 100%; min-height: 52px; font-size: 17px; letter-spacing: 6px; }
 .wr-queue { display: flex; flex-direction: column; max-height: 46vh; overflow-y: auto; }
 .wr-qrow {
   display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
@@ -690,8 +727,6 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .wr-qrow.open .st, .wr-qrow.open .id { color: var(--green2); }
 .wr-qrow.captured .st { color: var(--gold); }
 .wr-qrow.captured .nm { color: var(--text); }
-.wr-qrow.sel { background: var(--sel); box-shadow: inset 3px 0 0 var(--green2); }
-.wr-cta { margin: 10px; }
 
 /* 스탯 스트립 */
 .wr-stats { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -707,7 +742,7 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 
 /* 하단 피드 티커 */
 .wr-feed { display: flex; align-items: center; gap: 10px; border-top: 2px solid #1B2A42; padding-top: 8px; }
-.wr-feed .tag { font-family: var(--fm); font-size: 10px; color: var(--dim); letter-spacing: 1px; }
+.wr-feed .tag { font-family: var(--fm); font-size: 10px; color: var(--green2); letter-spacing: 1px; border: 1px solid var(--green); padding: 4px 9px; }
 .wr-feed .track { flex: 1; overflow: hidden; }
 .wr-feed .track > div { display: inline-block; white-space: nowrap; font-family: var(--fm); font-size: 11px; color: var(--mut); animation: wr-crawl 34s linear infinite; }
 
