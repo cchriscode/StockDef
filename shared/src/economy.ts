@@ -68,6 +68,28 @@ export function sltpHit(
   return null;
 }
 
+/**
+ * FR-5.15b 봉의 꼬리(고가·저가)로도 체결 판정.
+ * 체결가는 보간 종가가 아니라 지정 레벨 — 봉 안에서 어느 순서로 닿았는지는 알 수 없으므로,
+ * 손절·익절이 한 봉에 다 걸리면 **손절을 먼저** 인정한다 (거래소 관행과 같은 보수적 처리).
+ */
+export function sltpWickHit(
+  direction: 'long' | 'short',
+  low: number,
+  high: number,
+  sl: number | null,
+  tp: number | null,
+): { kind: 'sl' | 'tp'; price: number } | null {
+  if (direction === 'long') {
+    if (sl != null && low <= sl) return { kind: 'sl', price: sl };
+    if (tp != null && high >= tp) return { kind: 'tp', price: tp };
+  } else {
+    if (sl != null && high >= sl) return { kind: 'sl', price: sl };
+    if (tp != null && low <= tp) return { kind: 'tp', price: tp };
+  }
+  return null;
+}
+
 /** 손절/익절 레벨이 방향상 올바른 쪽에 있는지 (롱: 손절 < 진입 < 익절) */
 export function sltpValid(direction: 'long' | 'short', basePrice: number, sl: number | null, tp: number | null): boolean {
   if (sl != null && (!Number.isFinite(sl) || sl <= 0)) return false;

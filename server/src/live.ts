@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  BALANCE, judge, splitPayout, sltpHit, sltpValid, tradeFee,
+  BALANCE, judge, splitPayout, sltpHit, sltpValid, sltpWickHit, tradeFee,
   type BarsFile, type Direction, type StageParams, type WsErrorCode, type WsServerMsg,
 } from '@tf/shared';
 import type { WebSocket } from 'ws';
@@ -29,6 +29,7 @@ export class LiveSession {
   ws: WebSocket | null = null;
   private timers: NodeJS.Timeout[] = [];
   private endTimerSet = false;
+  private wickCheckedBar = -1; // 꼬리 판정을 끝낸 마지막 봉
 
   constructor(row: SessionRow, chartSet: ChartSetRow) {
     this.id = row.id;
@@ -110,6 +111,7 @@ export class LiveSession {
     if (i < 0 || i >= this.bars.barCount - 2) return err('SESSION_ENDED'); // 종료 직전 진입 불가
     const { price: basePrice, barIdx: openBarIdx } = this.interpPrice(now);
     const fee = tradeFee(stake, leverage); // FR-5.14 진입 수수료
+    this.wickCheckedBar = openBarIdx; // 진입한 봉의 꼬리는 이미 지나갔을 수 있어 다음 봉부터 본다
     this.open = { seq, direction, stake, openBarIdx, basePrice, leverage, sl: null, tp: null };
     this.positionCount += 1;
     this.aum -= stake + fee;
@@ -151,6 +153,22 @@ export class LiveSession {
     if (!this.open || this.t0 == null) return;
     const { price, barIdx } = this.interpPrice();
     // FR-5.15: 지정 레벨 도달은 마진콜보다 먼저 본다 (손절이 마진콜 앞에서 손실을 끊는 게 지정 목적)
+    // FR-5.15b: 완성된 봉의 꼬리(고가·저가)가 레벨을 스쳐도 체결이다 — 보간 종가만 보면
+    // 화면의 심지가 선을 뚫고 지나가는데도 체결이 안 되는 일이 생긴다.
+    if (this.open.sl != null || this.open.tp != null) {
+      for (let i = Math.max(this.wickCheckedBar + 1, this.open.openBarIdx + 1); i < barIdx; i++) {
+        const bar = this.bars.bars[i];
+        if (!bar) continue;
+        const wick = sltpWickHit(this.open.direction, bar.l, bar.h, this.open.sl, this.open.tp);
+        if (wick) {
+          this.wickCheckedBar = i;
+          this.settleClose(Math.max(i, this.open.openBarIdx), wick.price, true, false, wick.kind);
+          return;
+        }
+      }
+    }
+    this.wickCheckedBar = Math.max(this.wickCheckedBar, barIdx - 1);
+
     const hit = sltpHit(this.open.direction, price, this.open.sl, this.open.tp);
     if (hit) {
       this.settleClose(Math.max(barIdx, this.open.openBarIdx), hit.price, true, false, hit.kind);

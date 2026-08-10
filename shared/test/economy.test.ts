@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseIncome, heatOf, judge, settle, sltpHit, sltpValid, splitPayout, tradeFee } from '../src/economy.js';
+import { baseIncome, heatOf, judge, settle, sltpHit, sltpValid, sltpWickHit, splitPayout, tradeFee } from '../src/economy.js';
 import { BALANCE, DEPT_EFFECTS } from '../src/balance.js';
 
 describe('FR-6.8 기본 수입 — 총액 우선 분배', () => {
@@ -146,5 +146,24 @@ describe('FR-5.15 손절·익절', () => {
     expect(sltpHit('short', 104, 105, 90)).toBeNull();
     expect(sltpHit('short', 106, 105, 90)).toEqual({ kind: 'sl', price: 105 });
     expect(sltpHit('short', 88, 105, 90)).toEqual({ kind: 'tp', price: 90 });
+  });
+});
+
+describe('FR-5.15b 꼬리(고가·저가) 체결', () => {
+  it('롱: 저가가 손절을 스치면 체결 (종가가 위로 끝나도)', () => {
+    expect(sltpWickHit('long', 94, 108, 95, 110)).toEqual({ kind: 'sl', price: 95 });
+  });
+  it('롱: 고가가 익절을 스치면 체결', () => {
+    expect(sltpWickHit('long', 99, 111, 95, 110)).toEqual({ kind: 'tp', price: 110 });
+  });
+  it('숏: 방향이 반대', () => {
+    expect(sltpWickHit('short', 88, 100, 105, 90)).toEqual({ kind: 'tp', price: 90 });
+    expect(sltpWickHit('short', 100, 106, 105, 90)).toEqual({ kind: 'sl', price: 105 });
+  });
+  it('한 봉에 둘 다 걸리면 손절 우선 (순서를 알 수 없으므로 보수적으로)', () => {
+    expect(sltpWickHit('long', 94, 111, 95, 110)).toEqual({ kind: 'sl', price: 95 });
+  });
+  it('봉이 레벨에 못 미치면 미체결', () => {
+    expect(sltpWickHit('long', 96, 109, 95, 110)).toBeNull();
   });
 });
