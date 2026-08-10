@@ -185,13 +185,13 @@ describe('Battle 엔진', () => {
   });
   it('적 본진 위기 반격: HP 40%/20% 돌파 시 정예 분대 투입 (FR-6.10b)', () => {
     const b = new Battle(params(), []);
-    b.enemyBaseHP = 110; // < 40% of 300
+    b.enemyBaseHP = BALANCE.ENEMY_BASE_HP * 0.35; // < 40%
     advanceAlive(b, 1);
     expect(b.rageStage).toBe(1);
     const anyB = b as unknown as { pending: { wave: number }[] };
     const squad1 = b.enemies.length + anyB.pending.length;
     expect(squad1).toBeGreaterThanOrEqual(4); // 1단계 분대 4기
-    b.enemyBaseHP = 50; // < 20%
+    b.enemyBaseHP = BALANCE.ENEMY_BASE_HP * 0.15; // < 20%
     advanceAlive(b, 2);
     expect(b.rageStage).toBe(2);
   });

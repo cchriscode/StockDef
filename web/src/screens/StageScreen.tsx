@@ -78,7 +78,7 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
   });
 
   const [phase, setPhase] = useState<'loading' | 'playing' | 'settling' | 'error'>('loading');
-  const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, ebhp: 300, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0, upnl: null as number | null, udelta: null as number | null, unitCd: {} as Record<string, number> });
+  const [hud, setHud] = useState({ gold: 0, aum: 0, hp: 100, ebhp: BALANCE.ENEMY_BASE_HP as number, wave: 0, waveCount: 13, prep: true, barF: 0, barCount: 390, posCount: 0, skillCd: 0, upnl: null as number | null, udelta: null as number | null, unitCd: {} as Record<string, number> });
   const [popup, setPopup] = useState<ResultPopup | null>(null);
   const [banner, setBanner] = useState<{ text: string; kind: 'panic' | 'fomo' | 'danger' } | null>(null);
   const [stakePct, setStakePct] = useState(0.25);
@@ -750,8 +750,8 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
         </div>
         <div className="hp-overlay right">
           <div className="who">베어 요새<i /></div>
-          <div className="track"><div className="fillbar" style={{ width: `${(hud.ebhp / 300) * 100}%` }} /></div>
-          <div className="num">{hud.ebhp} / 300</div>
+          <div className="track"><div className="fillbar" style={{ width: `${(hud.ebhp / BALANCE.ENEMY_BASE_HP) * 100}%` }} /></div>
+          <div className="num">{hud.ebhp} / {BALANCE.ENEMY_BASE_HP}</div>
         </div>
         <div className="wave-pill">
           <div className="w">WAVE {Math.min(Math.max(hud.wave, 1), hud.waveCount)} / {hud.waveCount}</div>

@@ -1,6 +1,6 @@
 // FR-6.1 일자형 전투 렌더러 — Battle 엔진 상태를 그리기만 한다 (로직·렌더 분리, §11)
 // 스프라이트: handoff 리그 팩 — 로드 시 rigFrames가 고프레임으로 구워둔 시퀀스를 blit
-import { ENEMY_TYPES, MUZZLE, TOWERS, TOWER_FIRE_ANIM_S, UNIT_ATK_PERIOD, UNIT_ATK_PERIOD_DEFAULT, type Battle, type Enemy } from '@tf/shared';
+import { BALANCE, ENEMY_TYPES, MUZZLE, TOWERS, TOWER_FIRE_ANIM_S, UNIT_ATK_PERIOD, UNIT_ATK_PERIOD_DEFAULT, type Battle, type Enemy } from '@tf/shared';
 import { BACKDROPS, BACKDROP_GROUND, BACKDROP_H, BACKDROP_W, type Backdrop } from './battleBackdrops.js';
 import { RIG_ENEMY, RIG_TOWER, RIG_UNIT, rigFrame } from './rigFrames.js';
 import { VFX } from './rig/rig-player.js';
@@ -333,13 +333,13 @@ export function drawBattle(
     ctx.fillStyle = grad;
     ctx.fillRect(W - 310, groundTop - FOE_H - 40, 310, FOE_H + 48);
   }
-  const foe = spr(`foe_${hpState(b.enemyBaseHP / 300)}`);
+  const foe = spr(`foe_${hpState(b.enemyBaseHP / BALANCE.ENEMY_BASE_HP)}`);
   if (foe) {
     const wwf = (FOE_H * 176) / 128;
     ctx.drawImage(foe, W - wwf - 2, groundTop - FOE_H, wwf, FOE_H);
-    hpBar(ctx, W - wwf + 2, groundTop - FOE_H - 8, wwf - 8, b.enemyBaseHP / 300, '#E8654F');
+    hpBar(ctx, W - wwf + 2, groundTop - FOE_H - 8, wwf - 8, b.enemyBaseHP / BALANCE.ENEMY_BASE_HP, '#E8654F');
   } else {
-    drawBase(ctx, W - 96, groundTop - FOE_H, 88, FOE_H, '#A83A2E', '#FFE9C4', b.enemyBaseHP / 300, '베어');
+    drawBase(ctx, W - 96, groundTop - FOE_H, 88, FOE_H, '#A83A2E', '#FFE9C4', b.enemyBaseHP / BALANCE.ENEMY_BASE_HP, '베어');
   }
   ctx.imageSmoothingEnabled = true; // 벡터 팩은 스무딩 렌더
 

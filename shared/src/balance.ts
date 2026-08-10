@@ -37,7 +37,7 @@ export const BALANCE = {
   // FR-6.11 (2026-08-10): 적은 사옥을 통과해 소멸하지 않고 그 자리에서 사옥을 친다.
   // 초당 피해 = 적 baseDmg × 이 계수 (봇 시뮬로 결정)
   BASE_ATTACK_DPS_MULT: 0.35,
-  ENEMY_BASE_HP: 300,
+  ENEMY_BASE_HP: 600, // 2026-08-10 2배 (300→600) — 러시 조기 승리가 너무 쉬웠다
   RETRY_CAPITAL_MULT: 0.5,
   // FR-6.3c (2026-08-10): 슬롯 3칸 — 사옥 위 2 + 지면 1. 사옥을 등분해 옥상·중층에 포탑을 얹는다
   TOWER_SLOTS_BASE: 3,
