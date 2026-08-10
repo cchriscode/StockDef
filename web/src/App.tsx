@@ -19,7 +19,7 @@ type Screen =
   | { name: 'stage'; regionId: RegionId; mode: StageMode }
   | { name: 'reveal'; sessionId: string; finish: FinishRes; regionId: RegionId }
   | { name: 'company' }
-  | { name: 'codex' };
+  | { name: 'codex'; from: 'title' | 'map' }; // 돌아갈 화면을 진입 경로에서 기억
 
 export function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'boot' });
@@ -44,7 +44,7 @@ export function App() {
     case 'boot':
       return <div className="screen center"><p className="dim">TICKER FRONT</p></div>;
     case 'title':
-      return <TitleScreen onStart={sortie} onCodex={() => setScreen({ name: 'codex' })} onCompany={() => setScreen({ name: 'company' })} />;
+      return <TitleScreen onStart={sortie} onCodex={() => setScreen({ name: 'codex', from: 'title' })} onCompany={() => setScreen({ name: 'company' })} />;
     case 'intro':
       return <IntroScreen onStart={() => { track('tutorial_step', { step: 'intro_done' }); setScreen({ name: 'stage', regionId: 'TUT', mode: 'easy' }); }} />;
     case 'tutorialSummary':
@@ -53,7 +53,7 @@ export function App() {
       return (
         <MapScreen
           onEnterStage={(regionId, mode) => setScreen({ name: 'stage', regionId, mode })}
-          onCodex={() => setScreen({ name: 'codex' })}
+          onCodex={() => setScreen({ name: 'codex', from: 'map' })}
           onTutorial={() => setScreen({ name: 'stage', regionId: 'TUT', mode: 'easy' })}
           onTitle={() => setScreen({ name: 'title' })}
         />
@@ -79,6 +79,11 @@ export function App() {
     case 'company':
       return <CompanyScreen onBack={() => setScreen({ name: 'title' })} />;
     case 'codex':
-      return <CodexScreen onBack={() => setScreen({ name: 'map' })} />;
+      return (
+        <CodexScreen
+          from={screen.from}
+          onBack={() => setScreen(screen.from === 'title' ? { name: 'title' } : { name: 'map' })}
+        />
+      );
   }
 }

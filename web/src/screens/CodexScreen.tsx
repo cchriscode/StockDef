@@ -28,7 +28,7 @@ function chartPaths(spark: number[]): { line: string; area: string } | null {
 /** 2024-03-05 → 24.03.05 */
 const shortDate = (d: string) => d.slice(2).replace(/-/g, '.');
 
-export function CodexScreen({ onBack }: { onBack: () => void }) {
+export function CodexScreen({ onBack, from = 'map' }: { onBack: () => void; from?: 'title' | 'map' }) {
   const [entries, setEntries] = useState<CodexEntry[]>([]);
   const [sector, setSector] = useState('');
   const [rarity, setRarity] = useState('');
@@ -62,7 +62,7 @@ export function CodexScreen({ onBack }: { onBack: () => void }) {
             <option value="date">날짜순</option>
             <option value="rarity">희귀도순</option>
           </select>
-          <button className="ghost" onClick={onBack}>← 지도</button>
+          <button className="ghost" onClick={onBack}>← {from === 'title' ? '타이틀' : '지도'}</button>
         </div>
       </header>
 
