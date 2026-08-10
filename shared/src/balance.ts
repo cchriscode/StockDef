@@ -175,6 +175,18 @@ export const UNIT_SKILL_PERIOD: Record<UnitSpec['key'], number> = {
   foreman: 11, roundshield: 12, shutter: 12, bricker: 11, // 탱커 — 강타 + 자기 방어
   pistol: 9999, gasmask: 12, sniper: 12, // 원거리 — 강화탄 (권총 장교는 스킬 시트 없음)
 };
+/**
+ * FR-6.7d 적 스킬 발동 — 아군과 동일하게 **교전 누적 후 시전**한다 (2026-08-10).
+ * 적은 평타가 아니라 지속 피해(dps×dt)로 싸우므로, "교전한 시간"을 평타 횟수로 환산한다.
+ * 아군 평타 주기가 0.8초이므로 교전 N초 = 평타 N/0.8회에 해당한다.
+ * 원거리·전역형(포병·정찰기·보스)은 교전하지 않으므로 사거리 판정만으로 시전한다.
+ */
+export const ENEMY_SKILL_HITS: Record<string, number> = {
+  grunt: 5, // 창 망령 — 교전 4.0초 (평타 5회분)
+  shield: 6, // 방패 파쇄병 — 4.8초
+  runner: 4, // 석궁 사수 — 3.2초 (사격형이라 빠름)
+};
+
 export const ENEMY_SKILL_PERIOD: Record<EnemyTypeSpec['key'], number> = {
   grunt: 9, // 3점사 — 블로킹 중 추가 일격 (dps×1.5)
   runner: 8, // 질주 — 2초간 이속 ×1.5

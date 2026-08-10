@@ -6,7 +6,7 @@
 //  - Bloons TD: 타워 타겟팅 모드 first/last/strong/close
 //  - Age of War: 블로커+원거리 역할 조합, 본진 자동 포탑, 화면 클리어 스킬
 import {
-  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, ATTACK_CUE_S, MUZZLE, SKILL_CUE_S, SPAWN_GLOBAL_CD, UNIT_SPAWN_CD, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
+  BALANCE, BASE_TURRET, BOSS_WAVES, ENEMY_SKILL_PERIOD, ENEMY_SKILL, ENEMY_SKILL_HITS, ATTACK_CUE_S, MUZZLE, SKILL_CUE_S, SPAWN_GLOBAL_CD, UNIT_SPAWN_CD, STUN_IMMUNE_S, UNIT_SKILL, UNIT_SKILL_HITS, ENEMY_TYPES, TOWERS, UNITS, UNIT_SKILL_PERIOD, WAVE_COMPS,
   type DmgType, type EnemyTypeSpec, type TargetingMode, type TowerSpec, type UnitSpec,
 } from './balance.js';
 import type { MarketEvent, RegionId, StageParams } from './types.js';
@@ -53,6 +53,7 @@ export interface Enemy {
   stunImmuneUntil: number; // 재기절 면역 (스턴락 방지)
   airborneUntil: number; // 공중 띄움 연출 (판정은 기절과 동일, 렌더가 포물선으로 띄운다)
   airborneFrom: number;
+  atkCount: number; // FR-6.7d 교전 누적 (평타 환산 — N회 채우면 스킬)
   dpsBuffUntil: number; // 확성기 선동 — 공격력 버프 만료
   dpsBuffPct: number;
   vulnUntil: number; // 자신이 받는 피해 증가 (방송 중 드론)
@@ -451,7 +452,7 @@ export class Battle {
       nextSkillAt: this.t + ENEMY_SKILL_PERIOD[p.type], lastSkillAt: -9, shieldUntil: 0, hasteUntil: 0,
       armorCutUntil: 0, armorCutPct: 0, dotUntil: 0, dotDps: 0, healBlockUntil: 0,
       knockUntil: 0, knockFrom: 0, knockTo: 0, stunImmuneUntil: 0,
-      dpsBuffUntil: 0, dpsBuffPct: 0, vulnUntil: 0, vulnPct: 0, airborneUntil: 0, airborneFrom: 0,
+      dpsBuffUntil: 0, dpsBuffPct: 0, vulnUntil: 0, vulnPct: 0, airborneUntil: 0, airborneFrom: 0, atkCount: 0,
     });
   }
 
@@ -709,11 +710,36 @@ export class Battle {
   private castEnemySkills() {
     const t = this.t;
     for (const e of this.enemies) {
-      if (e.hp <= 0 || t < e.stunUntil || t < (e.nextSkillAt ?? Infinity)) continue;
-      if (!this.units.length && e.type !== 'healer') continue; // 때릴 대상이 없으면 시전하지 않는다
+      if (e.hp <= 0 || t < e.stunUntil) continue;
+      const needHits = ENEMY_SKILL_HITS[e.type];
+      if (needHits != null) { // 근접·사격형: 실제로 교전한 만큼만 시전 (아군과 동일 규칙)
+        if (e.atkCount < needHits || !this.enemySkillHasTarget(e)) continue;
+        e.atkCount = 0;
+      } else { // 원거리·전역형(포병·정찰기·보스·확성기): 주기 + 사거리 판정
+        if (t < (e.nextSkillAt ?? Infinity)) continue;
+        if (!this.enemySkillHasTarget(e)) { e.nextSkillAt = t + 0.5; continue; }
+        e.nextSkillAt = t + ENEMY_SKILL_PERIOD[e.type];
+      }
       e.lastSkillAt = t;
-      e.nextSkillAt = t + ENEMY_SKILL_PERIOD[e.type];
       this.pendingSkills.push({ kind: 'enemy', id: e.id, at: t + (SKILL_CUE_S[e.type] ?? 0.27) });
+    }
+  }
+
+  /**
+   * 적 스킬 사거리 판정 — 근접형은 교전 거리에 아군이 있어야 시전한다.
+   * 포병·정찰기·보스는 설정상 원거리 지원형이라 전장에 아군만 있으면 시전 가능.
+   */
+  private enemySkillHasTarget(e: Enemy): boolean {
+    const near = (r: number) => this.units.some((u) => u.hp > 0 && e.x - u.x >= -10 && e.x - u.x <= r);
+    switch (e.type) {
+      case 'grunt': return near(46); // 창 망령 — 창이 닿아야 찌른다
+      case 'shield': return near(40); // 방패 파쇄병 — 붙어야 부순다
+      case 'runner': return near(120); // 석궁 사수 — 사격 사거리
+      case 'healer': { // 확성기 드론 — 방송으로 버프할 아군(적)이 주변에 있어야
+        const R = (ENEMY_SKILL.healer as Record<string, number>).radius / 1.8;
+        return this.enemies.some((o) => o !== e && o.hp > 0 && Math.abs(o.x - e.x) <= R);
+      }
+      default: return this.units.length > 0; // 포병·정찰기·보스 (원거리·전역)
     }
   }
 
@@ -972,6 +998,7 @@ export class Battle {
         const eDps = e.dps * (this.t < e.dpsBuffUntil ? 1 + e.dpsBuffPct : 1); // 선동 방송 버프
         const inc = this.t < blocker.markUntil ? 1 + blocker.markPct : 1; // 표식 — 받는 피해 증가
         blocker.hp -= eDps * guard * shield * inc * dt; // 블로킹된 적은 유닛과 교전
+        e.atkCount += dt / 0.8; // FR-6.7d 교전 시간을 평타 횟수로 환산 (아군 평타 주기 0.8초 기준)
       } else {
         // 손절 방벽: 지상 적의 경로를 물리적으로 막는다 — 파괴될 때까지 정지·공격
         const bar = this.towers.find((tw) => {
