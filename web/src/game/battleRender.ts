@@ -616,6 +616,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const tw = slot >= 0 ? b.towers[slot] : null;
     const turretId = tw ? TURRET_BY_TYPE[tw.key] : undefined;
     const laneY = (p.air ? AIR_Y : GROUND_Y) - 8;
+    const unitY = p.air ? AIR_Y : groundTop - (MUZZLE[p.srcKey ?? '']?.y ?? 34);
     let y = laneY;
     if (turretId) {
       // 포구에서 출발해 목표 레인까지 완만히 하강 — 사옥 탑재 포탑도 궤적이 이어져 보인다
@@ -629,10 +630,10 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       // 포탑 탄 — travel 프레임 루프
     } else if (!p.fromTower && drawShot(
       ctx, SHOT_SHEET[(p.srcKey ?? '').split(':')[0]] ?? 'A-02_3', 'ally', b.t + p.id, px,
-      p.air ? AIR_Y : groundTop - (MUZZLE[p.srcKey ?? '']?.y ?? 34), // 총구 높이로 비행
+      unitY, // 총구 높이로 비행
       null,
     )) {
-      // [임시] 아군 유닛 투사체 — 발사 주체별 시트, 무기 끝에서 출발
+      y = unitY; // 착탄 이펙트도 같은 높이에서 터지도록 (지면 기준으로 두면 탄과 어긋난다)
     } else {
       const by2 = (p.air ? AIR_Y : GROUND_Y) - (p.fromTower ? 14 : 4) + Math.sin(p.x * 0.15) * 2;
       y = by2;
@@ -661,7 +662,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
       st.shotImpacts.push({ id: info.turretId, x: sx(info.x), y: info.y, t0: b.t });
       if (st.shotImpacts.length > 24) st.shotImpacts.splice(0, st.shotImpacts.length - 24);
     } else {
-      pushVfx(st, 'ally_pierce-shockwave', info.x, (info.air ? AIR_Y : GROUND_Y) - 12, b.t, 0.28, 12, info.fromTower ? 34 : 26);
+      pushVfx(st, 'ally_pierce-shockwave', info.x, info.y, b.t, 0.28, 12, info.fromTower ? 34 : 26);
     }
   }
   st.shotImpacts = st.shotImpacts.filter((im) => {

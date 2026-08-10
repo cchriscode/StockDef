@@ -144,7 +144,7 @@ export interface UnitSpec {
   speed: number;
   range: number; // 교전 사거리 (근접 26)
   cleave: number; // 동시 타격 수
-  antiAirPct: number; // 공중 공격 배율 (0 = 불가)
+  antiAirPct: number; // 공중 공격 배율 — FR-6.5f(2026-08-10): 전 유닛 0. 공중 요격은 포탑 전담
   block: number; // 동시에 붙잡을 수 있는 적 수 (초과분은 통과)
   dmgType: DmgType; // 마법은 armor 관통 (Kingdom Rush 이분법)
   baseHealPerSec: number; // 리스크 매니저: 사옥 회복/초 (생존 중, BASE_HP 상한)
@@ -154,10 +154,10 @@ export interface UnitSpec {
 
 export const UNITS: UnitSpec[] = [
   { key: 'intern', name: '인턴', cost: 30, hp: 60, dps: 3, speed: 23, range: 26, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'analyst', name: '애널리스트', cost: 60, hp: 70, dps: 12, speed: 21, range: 110, cleave: 1, antiAirPct: 0.5, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'analyst', name: '애널리스트', cost: 60, hp: 70, dps: 12, speed: 21, range: 110, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'lancer', name: '창병', cost: 75, hp: 120, dps: 13, speed: 20, range: 34, cleave: 3, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'trader', name: '트레이더', cost: 90, hp: 170, dps: 18, speed: 20, range: 26, cleave: 2, antiAirPct: 0, block: 2, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'mage', name: '술사', cost: 110, hp: 55, dps: 14, speed: 20, range: 130, cleave: 1, antiAirPct: 0.6, block: 1, dmgType: 'magic', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'mage', name: '술사', cost: 110, hp: 55, dps: 14, speed: 20, range: 130, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'magic', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'riskmgr', name: '리스크 매니저', cost: 90, hp: 80, dps: 0, speed: 20, range: 0, cleave: 0, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0.5, guardPct: 0.2, guardRadius: 120 },
   // 임시 테스트 유닛 (PNG 스프라이트 프리뷰용, handoff-walk-cane) — 확정 시 정식 스탯·비용 책정
   // 지팡이는 내려치는 무기라 리치가 짧다 — 적이 바짝 붙어야 타격 (사거리 = 블로킹 간격)
@@ -169,10 +169,10 @@ export const UNITS: UnitSpec[] = [
   { key: 'roundshield', name: '원형 방패병', cost: 80, hp: 200, dps: 8, speed: 20, range: 20, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'bricker', name: '벽돌 짐꾼', cost: 85, hp: 210, dps: 10, speed: 20, range: 22, cleave: 1, antiAirPct: 0, block: 2, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'shutter', name: '셔터 장교', cost: 90, hp: 190, dps: 9, speed: 20, range: 20, cleave: 1, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'gasmask', name: '방독면 포수', cost: 95, hp: 85, dps: 16, speed: 20, range: 110, cleave: 1, antiAirPct: 0.4, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'gasmask', name: '방독면 포수', cost: 95, hp: 85, dps: 16, speed: 20, range: 110, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
   { key: 'foreman', name: '망치 작업반장', cost: 110, hp: 240, dps: 12, speed: 20, range: 24, cleave: 2, antiAirPct: 0, block: 3, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'sniper', name: '저격수', cost: 120, hp: 70, dps: 22, speed: 20, range: 170, cleave: 1, antiAirPct: 0.6, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
-  { key: 'pistol', name: '권총 장교', cost: 60, hp: 80, dps: 14, speed: 20, range: 120, cleave: 1, antiAirPct: 0.5, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'sniper', name: '저격수', cost: 120, hp: 70, dps: 22, speed: 20, range: 170, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
+  { key: 'pistol', name: '권총 장교', cost: 60, hp: 80, dps: 14, speed: 20, range: 120, cleave: 1, antiAirPct: 0, block: 1, dmgType: 'physical', baseHealPerSec: 0, guardPct: 0, guardRadius: 0 },
 ];
 
 // FR-6.5b/6.7b 자동 스킬 주기 (초) — 유닛·적이 일정 주기마다 고유 스킬을 자동 시전 (리그 skill 모션+VFX 재생)
