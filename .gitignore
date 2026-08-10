@@ -11,3 +11,6 @@ __pycache__/
 img/
 Dead Cat Bounce - *.html
 image.png
+
+# 제출용 문서 — 저장소에 공개하지 않는다 (로컬 보관)
+docs/
