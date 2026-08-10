@@ -12,6 +12,13 @@ import { // [임시] 신규 아트 로스터 (아군·적군 전면 교체)
 const AIR_Y = 96;
 // 2026-08-10: 사옥·적 본진 확대(2배 → 70%로 축소 조정). 사옥 슬롯 높이·클릭 판정이 이 값에서 파생된다.
 // 이 높이에서 사옥은 world 2~65, 적 본진은 905~999를 차지한다 (전장 앵커가 여기에 맞춰져 있다).
+// 포탑별 탄도 (h = 궤적 높이 배수, skew < 1 = 정점이 발사 쪽으로)
+const BALLISTICS: Record<string, { h: number; skew: number }> = {
+  cannon: { h: 1.25, skew: 1 },   // 박격 포대 — 높은 곡사
+  limit: { h: 0.3, skew: 1 },     // 대구경 곡사포 — 초속이 빨라 거의 직사
+  spire: { h: 1.55, skew: 0.6 },  // 수직 다연장 — 솟았다가 급강하
+};
+
 const HQ_H = 162;
 const FOE_H = 123;
 const GROUND_Y = 258; // 캔버스 1400×300 기준 — 스프라이트는 고정 px, 레인만 길어진다
@@ -642,18 +649,27 @@ export function drawBattle(
     const tw = slot >= 0 ? b.towers[slot] : null;
     const turretId = tw ? TURRET_BY_TYPE[tw.key] : undefined;
     const laneY = (p.air ? AIR_Y : GROUND_Y) - 8;
+    let shotAngle = 0;
     const unitY = p.air ? AIR_Y : groundTop - (MUZZLE[p.srcKey ?? '']?.y ?? 34);
     let y = laneY;
     if (turretId) {
-      // 포구에서 출발해 목표 레인까지 — 직선이 아니라 포물선으로 날린다 (발사체답게 위로 붕 떴다 떨어진다)
+      // 포탑 종류별 탄도 — 박격 포대는 높이 띄우고, 대구경 곡사포는 낮고 빠르게,
+      // 수직 다연장은 솟았다가 급강하한다 (skew < 1 이면 정점이 발사 쪽으로 당겨진다)
       const muzzleY = slotBaseY(slot) - 52;
       const tgt = enemyX.get(p.targetId);
       const span = tgt != null ? Math.abs(tgt - x0) : 220;
       const prog = Math.max(0, Math.min(1, Math.abs(p.x - x0) / Math.max(span, 1)));
-      const arc = Math.min(90, 26 + span * 0.16); // 사거리가 길수록 높게 뜬다
-      y = muzzleY + (laneY - muzzleY) * prog - arc * Math.sin(Math.PI * prog);
+      const ball = BALLISTICS[tw!.key] ?? { h: 1, skew: 1 };
+      const arc = Math.min(120, 26 + span * 0.16) * ball.h;
+      const yAt = (q: number) => muzzleY + (laneY - muzzleY) * q - arc * Math.sin(Math.PI * Math.pow(q, ball.skew));
+      y = yAt(prog);
+      // 접선 각도 (전진 방향 기준) — 포탄이 날아가는 쪽을 향해 기운다
+      const dq = 0.04;
+      const dy = yAt(Math.min(1, prog + dq)) - yAt(Math.max(0, prog - dq));
+      const dx = Math.max(1, span * dq * 2 * 1.8); // world → 캔버스 배율
+      shotAngle = Math.atan2(dy, dx) * (tgt != null && tgt < x0 ? -1 : 1);
     }
-    if (turretId && drawTurretShot(ctx, turretId, px, y, b.t + p.id, null)) {
+    if (turretId && drawTurretShot(ctx, turretId, px, y, b.t + p.id, null, shotAngle)) {
       // 포탑 탄 — travel 프레임 루프
     } else if (!p.fromTower && drawShot(
       ctx, SHOT_SHEET[(p.srcKey ?? '').split(':')[0]] ?? 'A-02_3', 'ally', b.t + p.id, px,

@@ -383,6 +383,7 @@ export const TURRET_SHOT_IMPACT_S = 0.19; // impact 80+110ms
 export function drawTurretShot(
   ctx: CanvasRenderingContext2D, id: string, cx: number, cy: number,
   t: number, impactPhase: number | null,
+  angle = 0, // 궤적 접선 각도 — 포탄이 날아가는 방향을 향하게 (착탄 프레임은 회전하지 않는다)
 ): boolean {
   const img = turretImg(id, 'shot');
   if (!img) return false;
@@ -391,6 +392,16 @@ export function drawTurretShot(
   const frame = impactPhase == null ? Math.floor(t * 16) % 2 : (impactPhase < 0.42 ? 2 : 3);
   const dw = cw * TURRET_SHOT_SCALE;
   const dh = ch * TURRET_SHOT_SCALE;
-  ctx.drawImage(img, frame * cw, 0, cw, ch, cx - dw * TURRET_SHOT_ORIGIN.ox, cy - dh * TURRET_SHOT_ORIGIN.oy, dw, dh);
+  const ox = dw * TURRET_SHOT_ORIGIN.ox;
+  const oy = dh * TURRET_SHOT_ORIGIN.oy;
+  if (impactPhase == null && angle !== 0) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.drawImage(img, frame * cw, 0, cw, ch, -ox, -oy, dw, dh);
+    ctx.restore();
+    return true;
+  }
+  ctx.drawImage(img, frame * cw, 0, cw, ch, cx - ox, cy - oy, dw, dh);
   return true;
 }
