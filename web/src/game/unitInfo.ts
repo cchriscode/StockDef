@@ -1,5 +1,5 @@
 // 유닛·타워 도움말 (? 버튼) — 역할/스킬 설명. 수치는 BALANCE에서 표시 시점에 읽는다 (이중 관리 방지)
-import { TOWERS, UNITS, type TowerSpec, type UnitSpec } from '@tf/shared';
+import { ENEMY_TYPES, TOWERS, UNITS, type TowerSpec, type UnitSpec } from '@tf/shared';
 
 export interface InfoCard {
   role: string; // 한 줄 역할 태그
@@ -101,5 +101,60 @@ export function towerStatsLine(key: TowerSpec['key']): string {
     if (t.splashRadius > 0) parts.push(`광역 ${t.splashRadius}`);
     if (t.slowPct > 0) parts.push(`슬로우 ${t.slowPct * 100}%`);
   }
+  return parts.join(' · ');
+}
+
+// FR-6.7 적군 도감 — 아군 유닛 카드와 같은 형식 (역할 · 설명 · 스킬 · 수치)
+export const ENEMY_INFO: Record<string, { role: string; desc: string; skill: string }> = {
+  grunt: {
+    role: '전열 창병',
+    desc: '가장 흔한 물량. 혼자서는 약하지만 줄지어 붙으면 블로커의 체력을 빠르게 갉습니다. 광역 포탑(공매도 캐논)의 밥입니다.',
+    skill: '관통 찌르기 (교전 5회) — 앞의 2기를 관통해 피해 ×1.1, 방어 30% 무시 + 자신 이속 상승.',
+  },
+  shield: {
+    role: '방패 파쇄병',
+    desc: '아군의 보호막·방벽을 깨는 역할. 셔터 장교의 보호막이나 원형 방패병의 감소 효과에 기대는 조합을 무너뜨립니다.',
+    skill: '방패 부수기 (교전 6회) — 보호막을 즉시 제거하고 5초간 받는 피해 +20% 표식.',
+  },
+  runner: {
+    role: '석궁 사수',
+    desc: '빠르게 접근해 원거리에서 쏩니다. 전열이 아니라 뒤의 원거리 딜러를 노리므로 사거리 밖에서 처리하는 편이 낫습니다.',
+    skill: '삼연사 (교전 4회) — 2회 타격 + 3초 둔화 30%.',
+  },
+  tank: {
+    role: '다연장 포병',
+    desc: '느리지만 단단하고, 밀집한 아군을 광역으로 두들깁니다. 뭉쳐 있으면 한 번에 무너지니 전열을 나눠 배치하세요.',
+    skill: '융단 포격 — 두 지점에 광역 포격 (피해 ×0.8).',
+  },
+  healer: {
+    role: '확성기 드론 · 공중',
+    desc: '공중에서 주변 적을 선동해 공격력을 올립니다. 지상 유닛은 손댈 수 없으니 지정가 포탑·옵션 스파이어로 먼저 떨어뜨려야 합니다.',
+    skill: '선동 방송 — 반경 340 내 적 공격력 +12% (5초). 방송 중에는 자신이 받는 피해가 20% 늘어납니다.',
+  },
+  air: {
+    role: '연 정찰기 · 공중',
+    desc: '전투력은 낮지만 아군을 표적으로 찍어 받는 피해를 늘립니다. 지상 유닛에게 막히지 않고 곧장 사옥으로 날아갑니다.',
+    skill: '표적 지정 — 체력이 가장 낮은 아군에 6초간 받는 피해 +12% 표식.',
+  },
+  boss: {
+    role: '베어 간부 · 보스',
+    desc: '웨이브 13(및 R2·R3는 7)에 등장. 체력·공격력이 압도적이고 전열을 통째로 기절시킵니다. 포탑 화력을 미리 모아 두세요.',
+    skill: '낙뢰 심판 — 앞선 아군 2기에 낙뢰. 피해 ×0.8 + 0.5초 기절 + 3초간 받는 피해 +12%.',
+  },
+};
+
+/** 적군 수치 한 줄 (아군 unitStatsLine과 같은 형식) */
+export function enemyStatsLine(key: string, hpMult: number, dpsMult: number): string {
+  const e = ENEMY_TYPES[key as keyof typeof ENEMY_TYPES];
+  const parts = [
+    `체력 ×${(e.hpMult * hpMult).toFixed(2)}`,
+    `공격 ×${(e.dpsMult * dpsMult).toFixed(2)}`,
+    `이속 ×${e.speedMult.toFixed(2)}`,
+  ];
+  if (e.armor > 0) parts.push(`방어 ${Math.round(e.armor * 100)}%`);
+  if (e.mr > 0) parts.push(`마저 ${Math.round(e.mr * 100)}%`);
+  if (e.isAir) parts.push('공중');
+  if (e.healPerSec > 0) parts.push(`회복 ${e.healPerSec}/s`);
+  parts.push(`처치 AUM ${e.aumBounty}`);
   return parts.join(' · ');
 }

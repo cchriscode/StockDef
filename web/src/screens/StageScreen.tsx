@@ -8,10 +8,10 @@ import { StageWs } from '../net/stageWs.js';
 import { chartScale, clockLabel, drawChart, interpPct, pctOf, sltpChipHit, type OpenMarker } from '../game/chart.js';
 import { drawBattle, slotScreenPos } from '../game/battleRender.js';
 import { sfx } from '../game/sfx.js';
-import { TOWER_INFO, UNIT_INFO, towerStatsLine, unitStatsLine } from '../game/unitInfo.js';
+import { ENEMY_INFO, TOWER_INFO, UNIT_INFO, enemyStatsLine, towerStatsLine, unitStatsLine } from '../game/unitInfo.js';
 import { RIG_UNIT } from '../game/rigFrames.js';
 import { RigPreview } from '../ui/RigPreview.js';
-import { PREVIEW_ROSTER, SHEET_UNIT, TURRET_BY_TYPE, clearPreviews, hasSkillSheet, spawnPreview } from '../game/previewSprites.js'; // [임시] 신규 아트 프리뷰
+import { SHEET_UNIT, TURRET_BY_TYPE, enemySheetId, hasSkillSheet } from '../game/previewSprites.js';
 
 // 튜토리얼 첫 거래 규칙은 서버와 공유한다 (진입 창을 서버가 실제 차트에서 계산해 내려준다)
 const TUT_CLOSE_HOLD_BARS = TUT_HOLD_BARS;
@@ -83,8 +83,8 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
   const [banner, setBanner] = useState<{ text: string; kind: 'panic' | 'fomo' | 'danger' } | null>(null);
   const [stakePct, setStakePct] = useState(0.25);
   const [leverage, setLeverage] = useState(1); // FR-5.6b 배율 (진입 시점 값이 포지션에 고정, 마진 데스크로 해금)
-  const [infoKey, setInfoKey] = useState<{ kind: 'unit' | 'tower'; key: string } | null>(null); // ? 도움말 카드
-  const [showPreviewBar, setShowPreviewBar] = useState(false); // [임시] 신규 아트 프리뷰 바
+  const [infoKey, setInfoKey] = useState<{ kind: 'unit' | 'tower' | 'enemy'; key: string } | null>(null); // ? 도움말 카드
+  const [showEnemyBook, setShowEnemyBook] = useState(false); // 적군 정보 패널
   const [placing, setPlacingState] = useState<(typeof TOWERS)[number]['key'] | null>(null); // 타워 배치 모드
   const placingRef = useRef<typeof placing>(null);
   const setPlacing = (v: typeof placing) => { placingRef.current = v; setPlacingState(v); };
@@ -844,26 +844,27 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
           )}
         </div>
         <div className="cmd-right">
-          <button className="ghost small" onClick={() => setShowPreviewBar((v) => !v)}>🎭 아트 프리뷰</button>
+          <button className="ghost small" onClick={() => setShowEnemyBook((v) => !v)}>👹 적군 정보</button>
           <span className="small dim mono">L={p.lossRate} · heat {p.heat.toFixed(2)}</span>
         </div>
       </div>
 
-      {/* [임시] 신규 스프라이트 프리뷰 — 아군·적군 모두 클릭 소환 (엔진 무관, 생김새 확인용) */}
-      {showPreviewBar && (
+      {/* 적군 정보 — 아군 유닛과 같은 카드 형식으로 역할·스킬·수치를 본다 */}
+      {showEnemyBook && (
         <div className="preview-bar">
           <div className="pb-head">
-            <b>적군 아트 프리뷰</b>
-            <span className="small dim">클릭하면 전장에 걸어 나옵니다 (2.2초마다 공격 모션 · 전투에는 관여하지 않음). 아군은 아래 커맨드 바에 1G로 들어가 있습니다.</span>
-            <button className="ghost small" onClick={() => clearPreviews()}>전부 지우기</button>
-            <button className="ghost small" onClick={() => setShowPreviewBar(false)}>✕</button>
+            <b>적군 정보</b>
+            <span className="small dim">이번 스테이지에 적용된 체력·공격 계수가 반영된 수치입니다. 이름을 누르면 상세가 열립니다.</span>
+            <button className="ghost small" onClick={() => setShowEnemyBook(false)}>✕</button>
           </div>
           <div className="pb-row">
-            <span className="lbl down">적군</span>
-            {PREVIEW_ROSTER.filter((s) => s.side === 'enemy').map((s) => (
-              <button key={s.id} onClick={() => spawnPreview(s.id, battle.t)}>
-                {s.name}{s.kind === 'air' ? ' ✈' : s.kind === 'boss' ? ' ★' : ''}
-              </button>
+            {Object.keys(ENEMY_INFO).map((k) => (
+              <span key={k} className="ub-wrap">
+                <button onClick={() => setInfoKey({ kind: 'enemy', key: k })}>
+                  {ENEMY_TYPES[k as keyof typeof ENEMY_TYPES].name}
+                  {ENEMY_TYPES[k as keyof typeof ENEMY_TYPES].isAir ? ' ✈' : k === 'boss' ? ' ★' : ''}
+                </button>
+              </span>
             ))}
           </div>
         </div>
@@ -872,16 +873,20 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
       {/* ? 도움말 카드 — 유닛/타워 역할·스킬·수치 */}
       {infoKey && (() => {
         const isUnit = infoKey.kind === 'unit';
-        const card = isUnit ? UNIT_INFO[infoKey.key as keyof typeof UNIT_INFO] : TOWER_INFO[infoKey.key as keyof typeof TOWER_INFO];
-        const name = isUnit
-          ? UNITS.find((u) => u.key === infoKey.key)!.name
-          : TOWERS.find((t) => t.key === infoKey.key)!.name;
-        const stats = isUnit
-          ? unitStatsLine(infoKey.key as keyof typeof UNIT_INFO)
-          : towerStatsLine(infoKey.key as keyof typeof TOWER_INFO);
+        const isEnemy = infoKey.kind === 'enemy';
+        const card = isEnemy ? ENEMY_INFO[infoKey.key]
+          : isUnit ? UNIT_INFO[infoKey.key as keyof typeof UNIT_INFO]
+            : TOWER_INFO[infoKey.key as keyof typeof TOWER_INFO];
+        const name = isEnemy ? ENEMY_TYPES[infoKey.key as keyof typeof ENEMY_TYPES].name
+          : isUnit ? UNITS.find((u) => u.key === infoKey.key)!.name
+            : TOWERS.find((t) => t.key === infoKey.key)!.name;
+        const stats = isEnemy ? enemyStatsLine(infoKey.key, p.enemyHpMult, p.enemyDpsMult)
+          : isUnit ? unitStatsLine(infoKey.key as keyof typeof UNIT_INFO)
+            : towerStatsLine(infoKey.key as keyof typeof TOWER_INFO);
         // 타워는 실제로 세워지는 신규 포탑 스프라이트를 보여준다 (구 리그 그림이 뜨던 문제)
-        const turretId = !isUnit ? TURRET_BY_TYPE[infoKey.key] : undefined;
+        const turretId = !isUnit && !isEnemy ? TURRET_BY_TYPE[infoKey.key] : undefined;
         const rigIdx = isUnit ? RIG_UNIT[infoKey.key] : undefined;
+        const sheetId = isEnemy ? enemySheetId(infoKey.key, regionId) : SHEET_UNIT[infoKey.key];
         return (
           <div className="overlay center" onClick={() => setInfoKey(null)}>
             <div className="card info-card" onClick={(e) => e.stopPropagation()}>
@@ -892,9 +897,9 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
                 <RigPreview unit={rigIdx} height={150} />
               ) : (
                 <img
-                  src={SHEET_UNIT[infoKey.key] ? `/assets/preview/${SHEET_UNIT[infoKey.key]}_walk.png` : '/assets/units/cane/wk-strip.png'}
+                  src={sheetId ? `/assets/preview/${sheetId}_walk.png` : '/assets/units/cane/wk-strip.png'}
                   alt=""
-                  style={{ width: SHEET_UNIT[infoKey.key] ? 150 : 100, height: 150, objectFit: 'cover', objectPosition: 'left', imageRendering: SHEET_UNIT[infoKey.key] ? 'auto' : 'pixelated', margin: '0 auto' }}
+                  style={{ width: sheetId ? 150 : 100, height: 150, objectFit: 'cover', objectPosition: 'left', imageRendering: sheetId ? 'auto' : 'pixelated', margin: '0 auto' }}
                 />
               )}
               <p>{card.desc}</p>
