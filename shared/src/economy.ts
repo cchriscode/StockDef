@@ -120,6 +120,37 @@ export function liquidationDeltaPct(sigma: number, lossRate: number, leverage: n
   return direction === 'long' ? -mag : mag;
 }
 
+/**
+ * FR-12.2b 튜토리얼 첫 거래 진입 창 — "롱으로 들어가 N봉 뒤 청산하면 반드시 이기는" 구간들.
+ * 가이드가 창을 하나만 갖고 있으면 놓치는 순간 되돌릴 수 없어(버튼이 영영 비활성) 막다른 길이 된다.
+ * 실제 차트에서 계산해 여러 창을 내려주면 놓쳐도 다음 창에서 다시 진입할 수 있다.
+ */
+export function tutorialEntryWindows(
+  closes: number[],
+  sigma: number,
+  lossRate: number,
+  holdBars: number,
+  minStart: number,
+): [number, number][] {
+  const wins: number[] = [];
+  for (let i = minStart; i + holdBars < closes.length; i++) {
+    const r = judge(closes[i], closes[i + holdBars], sigma, 'long', 1000, lossRate, 1);
+    if (r.outcome === 'win') wins.push(i);
+  }
+  const out: [number, number][] = [];
+  let start = -1;
+  let prev = -2;
+  for (const i of wins) {
+    if (i !== prev + 1) {
+      if (start >= 0) out.push([start, prev]);
+      start = i;
+    }
+    prev = i;
+  }
+  if (start >= 0) out.push([start, prev]);
+  return out.filter(([a2, b2]) => b2 - a2 >= 2); // 한두 봉짜리 창은 사실상 못 누른다
+}
+
 // FR-8.1 / FR-8.2 정산
 export interface SettlementInput {
   goldLeft: number;

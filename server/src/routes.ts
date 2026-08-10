@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Router } from 'express';
 import {
-  BALANCE, DEPTS, DEPT_EFFECTS, REGION_META, settle,
+  BALANCE, TUT_HOLD_BARS, TUT_MIN_ENTRY_BAR, tutorialEntryWindows, DEPTS, DEPT_EFFECTS, REGION_META, settle,
   type StageMode,
   type FinishReq, type FinishRes, type Grade, type MapRegion, type MapRes,
   type RegionId, type RewardLine, type StageStartRes,
@@ -137,6 +137,19 @@ router.post('/stage/start', (req, res) => {
   }
 
   const params = buildStageParams(accountId, regionId, stageMode);
+  // FR-12.2b: 튜토리얼 첫 거래는 "반드시 이기는" 구간에서만 열어 준다. 창을 실제 차트에서 계산해
+  // 여러 개 내려주면, 한 창을 놓쳐도 다음 창에서 다시 진입할 수 있다 (기존엔 놓치면 막다른 길).
+  if (regionId === 'TUT') {
+    try {
+      const raw = fs.readFileSync(path.join(SERVER_ROOT, chart.bars_url.replace('/static/', 'static/')), 'utf-8');
+      const bf = JSON.parse(raw) as { bars: { c: number }[]; sigma: Record<string, number> };
+      params.tutEntryWindows = tutorialEntryWindows(
+        bf.bars.map((b2) => b2.c), bf.sigma['30'], params.lossRate, TUT_HOLD_BARS, TUT_MIN_ENTRY_BAR,
+      );
+    } catch {
+      params.tutEntryWindows = undefined; // 계산 실패 시 클라가 기본 창으로 폴백
+    }
+  }
   const sessionId = crypto.randomUUID();
   const isRetry = !!territory?.captured_at;
   db.prepare(

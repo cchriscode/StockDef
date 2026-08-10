@@ -58,6 +58,7 @@ export interface StageParams {
   unitCostMult: number;
   hasInfoResearch: boolean;
   waveTable: WaveSpec[];
+  tutEntryWindows?: [number, number][]; // FR-12.2b 튜토리얼 첫 거래 진입 가능 구간 (봉 인덱스)
 }
 
 export interface WaveSpec {

@@ -444,3 +444,7 @@ export const DEPT_EFFECTS = {
   maxLeverage: (lv: number) => [1, 3, 5][lv - 1],
   maxPositions: (lv: number) => BALANCE.MAX_POSITIONS + (lv - 1) * BALANCE.POSITIONS_PER_DESK_LV,
 };
+
+// FR-12.2b 튜토리얼 첫 거래 규칙 — 서버(진입 창 계산)와 클라(가이드 잠금)가 공유한다
+export const TUT_HOLD_BARS = 26;    // 이 봉수를 채워야 청산 가능 (승리 보장 구간 길이)
+export const TUT_MIN_ENTRY_BAR = 22; // 가이드 설명이 끝나는 시점

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  BALANCE, Battle, ENEMY_TYPES, TOWERS, UNITS, judge, liquidationDeltaPct, tradeFee,
+  BALANCE, Battle, ENEMY_TYPES, TOWERS, TUT_HOLD_BARS, TUT_MIN_ENTRY_BAR, UNITS, judge, liquidationDeltaPct, tradeFee,
   type BarsFile, type Direction, type FinishRes, type RegionId, type StageMode, type StageStartRes, type WsServerMsg,
 } from '@tf/shared';
 import { api, getSettings, getToken, track } from '../net/api.js';
@@ -13,8 +13,8 @@ import { RIG_UNIT } from '../game/rigFrames.js';
 import { RigPreview } from '../ui/RigPreview.js';
 import { PREVIEW_ROSTER, SHEET_UNIT, TURRET_BY_TYPE, clearPreviews, hasSkillSheet, spawnPreview } from '../game/previewSprites.js'; // [임시] 신규 아트 프리뷰
 
-// 튜토리얼 첫 거래는 WIN이 보장되는 상승 구간을 지난 뒤에만 청산할 수 있다
-const TUT_CLOSE_HOLD_BARS = 26;
+// 튜토리얼 첫 거래 규칙은 서버와 공유한다 (진입 창을 서버가 실제 차트에서 계산해 내려준다)
+const TUT_CLOSE_HOLD_BARS = TUT_HOLD_BARS;
 
 interface Props {
   regionId: RegionId;
@@ -319,6 +319,34 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
   }, [regionId]);
 
   // ─── FR-5 포지션 진입·청산 ───
+  /** 튜토리얼 진입 창 — 서버가 실제 차트에서 계산한 "지금 사면 이기는" 구간들 */
+  const tutWindows = (): [number, number][] => {
+    const w = g.current.start?.params.tutEntryWindows;
+    return w && w.length ? w : [[TUT_MIN_ENTRY_BAR, TUT_MIN_ENTRY_BAR + 12]]; // 서버 계산 실패 시 폴백
+  };
+  const inTutWindow = (bar: number) => tutWindows().some(([a2, b2]) => bar >= a2 && bar <= b2);
+  /** 창을 놓쳤을 때 다음 창까지 남은 초 (없으면 null) */
+  const nextTutWindowIn = (bar: number): number | null => {
+    const nxt = tutWindows().find(([a2]) => a2 > bar);
+    return nxt ? Math.ceil(nxt[0] - bar) : null;
+  };
+
+  // FR-12.2c: 창이 끝나가면 대신 눌러 준다 — 놓쳐서 튜토리얼이 멈추는 상황을 없앤다
+  const autoEntered = useRef(false);
+  useEffect(() => {
+    if (!isTut || guide !== 1 || phase !== 'playing' || autoEntered.current) return;
+    const s2 = g.current;
+    if (s2.openMarker || s2.pendingOpen) return;
+    const win = tutWindows().find(([a2, b2]) => hud.barF >= a2 && hud.barF <= b2);
+    if (!win || hud.barF < win[1] - 2) return; // 창의 마지막 2초에만
+    autoEntered.current = true;
+    setBanner({ text: '⏱ 진입 시점이 지나갈 참이라 자동으로 LONG 진입했습니다', kind: 'fomo' });
+    setTimeout(() => setBanner(null), 2600);
+    openPosition('long');
+    // openPosition은 최신 렌더의 클로저를 쓰므로 의존성에 넣지 않는다 (매 렌더 새 함수)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTut, guide, phase, hud.barF]);
+
   const canOpen = (() => {
     const s = g.current;
     if (phase !== 'playing' || s.pendingOpen || s.openMarker || !s.start) return false;
@@ -326,7 +354,7 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
     if (s.aum < 1) return false;
     if (hud.barF + 3 >= hud.barCount) return false; // 종료 직전엔 체결 불가
     if (isTut && guide < 1) return false;
-    if (isTut && guide === 1 && (hud.barF < 22 || hud.barF > 34)) return false;
+    if (isTut && guide === 1 && !inTutWindow(hud.barF)) return false;
     if (isTut && guide === 2) return false;
     return true;
   })();
@@ -856,9 +884,24 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
               <button onClick={() => setGuide(1)}>다음</button>
             </>
           )}
-          {guide === 1 && <p>🎯 지금 상승 흐름입니다. <b>LONG ▲</b> 버튼을 눌러 포지션에 진입해 보세요! {hud.barF < 22 ? `(${Math.ceil(22 - hud.barF)}초 후 활성화)` : ''}</p>}
-          {guide === 2 && <p>⏳ 진입했습니다! 가격이 오르는 동안 미실현 손익이 실시간으로 움직입니다. 충분히 오르면 <b>청산 ✕</b> 버튼으로 이익을 확정하세요.</p>}
-          {guide === 3 && <p>💰 골드가 입금됐습니다! 이 돈으로 방어하세요. <b>전장의 빈 슬롯(점선)</b>을 눌러 타워를 지으세요.</p>}
+          {guide === 1 && (() => {
+            const waitS = nextTutWindowIn(hud.barF);
+            const open = inTutWindow(hud.barF);
+            return (
+              <p>
+                🎯 {open ? '지금 상승 흐름입니다.' : '지금은 진입 시점이 아닙니다.'} <b>LONG ▲</b> 버튼을 눌러 포지션에 진입해 보세요!
+                {!open && waitS != null && ` (${waitS}초 후 다음 기회)`}
+              </p>
+            );
+          })()}
+          {guide === 2 && (
+            <p>
+              ⏳ 진입했습니다! 가격이 오르는 동안 미실현 손익이 실시간으로 움직입니다. 충분히 오르면 <b>청산 ✕</b> 버튼으로 이익을 확정하세요.<br />
+              💡 <b>차트를 위아래로 끌면</b> 손절·익절 선을 걸 수 있습니다 — 진입가보다 위를 잡으면 익절, 아래를 잡으면 손절입니다.
+              선에 붙은 라벨에는 그 가격에 닿았을 때의 손익이 뜨고, <b>×</b>로 해제합니다. 자리를 비워도 자동으로 체결됩니다.
+            </p>
+          )}
+          {guide === 3 && <p>💰 골드가 입금됐습니다! 이 돈으로 방어하세요. 아래 커맨드 바의 <b>타워 버튼</b>을 누른 다음, 전장에서 <b>설치할 위치(점선 슬롯)</b>를 클릭하면 지어집니다.</p>}
           {guide === 4 && <p>⚔ 이제 <b>유닛</b>을 소환해 전선을 미세요. 아래 인턴/애널리스트 버튼!</p>}
         </div>
       )}
