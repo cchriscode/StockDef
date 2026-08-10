@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  BALANCE, Battle, ENEMY_TYPES, TOWERS, UNITS, liquidationDeltaPct, tradeFee,
+  BALANCE, Battle, ENEMY_TYPES, TOWERS, UNITS, judge, liquidationDeltaPct, tradeFee,
   type BarsFile, type Direction, type FinishRes, type RegionId, type StageMode, type StageStartRes, type WsServerMsg,
 } from '@tf/shared';
 import { api, getSettings, getToken, track } from '../net/api.js';
 import { StageWs } from '../net/stageWs.js';
-import { chartScale, clockLabel, drawChart, interpPct, pctOf, type OpenMarker } from '../game/chart.js';
+import { chartScale, clockLabel, drawChart, interpPct, pctOf, sltpChipHit, type OpenMarker } from '../game/chart.js';
 import { drawBattle, slotScreenPos } from '../game/battleRender.js';
 import { sfx } from '../game/sfx.js';
 import { TOWER_INFO, UNIT_INFO, towerStatsLine, unitStatsLine } from '../game/unitInfo.js';
@@ -247,7 +247,7 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
           marker: s.openMarker,
           showResearch: s.start!.params.hasInfoResearch,
           showMA,
-          sltp: s.openMarker ? sltpRef.current : null,
+          sltp: s.openMarker ? { ...sltpRef.current, ...sltpPnl(), dragging: dragRef.current } : null,
         });
       }
       if (battleRef.current) {
@@ -358,6 +358,21 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
     return Math.max(0, Math.ceil(s.openMarker.openBarIdx + TUT_CLOSE_HOLD_BARS - hud.barF));
   })();
 
+  /** 지정 레벨에 닿았을 때 실현될 손익 (왕복 수수료 차감) — 라벨 칩에 표시 */
+  const sltpPnl = (): { slPnl: number | null; tpPnl: number | null } => {
+    const s = g.current;
+    const mk = s.openMarker;
+    if (!mk || !s.bars || !s.start) return { slPnl: null, tpPnl: null };
+    const fee2 = tradeFee(mk.stake, mk.leverage) * 2;
+    const at = (pct: number | null) => {
+      if (pct == null) return null;
+      const price = s.bars!.openPrice * (1 + pct / 100);
+      const r = judge(mk.basePrice, price, s.bars!.sigma['30'], mk.direction, mk.stake, s.start!.params.lossRate, mk.leverage);
+      return r.pnl - fee2;
+    };
+    return { slPnl: at(sltpRef.current.slPct), tpPnl: at(sltpRef.current.tpPct) };
+  };
+
   // FR-5.15 손절·익절 드래그 — 차트 위에서 선을 잡아 끌어 레벨을 정한다 (실거래소 방식).
   // 진입가 위/아래 어느 쪽을 잡았는지로 익절/손절을 자동 판별한다.
   const sltpFromEvent = (e: React.PointerEvent<HTMLCanvasElement>): number | null => {
@@ -373,7 +388,29 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
 
   const onChartDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const s = g.current;
-    if (!s.openMarker) return;
+    if (!s.openMarker || !s.bars) return;
+    const cv = chartRef.current!;
+    const r = cv.getBoundingClientRect();
+    const px = ((e.clientX - r.left) / r.width) * cv.width;
+    const py = ((e.clientY - r.top) / r.height) * cv.height;
+    const sc = chartScale(s.bars, hud.barF, s.openMarker, cv.height);
+
+    // 라벨 칩 먼저 — × 는 해당 레벨만 취소, 본체는 잡아끌기 (바이낸스식)
+    for (const [kind, lvl] of [['sl', sltpRef.current.slPct], ['tp', sltpRef.current.tpPct]] as ['sl' | 'tp', number | null][]) {
+      if (lvl == null) continue;
+      const hit = sltpChipHit(px, py, sc.yOf(lvl), cv.width);
+      if (!hit) continue;
+      if (hit === 'close') {
+        const next = { ...sltpRef.current, [kind === 'sl' ? 'slPct' : 'tpPct']: null };
+        applySltp(next);
+        pushSltp(next);
+      } else {
+        dragRef.current = kind;
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      return;
+    }
+
     const pct = sltpFromEvent(e);
     if (pct == null) return;
     const long = s.openMarker.direction === 'long';
@@ -381,29 +418,45 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
     const kind: 'sl' | 'tp' = (long ? pct > s.openMarker.basePricePct : pct < s.openMarker.basePricePct) ? 'tp' : 'sl';
     dragRef.current = kind;
     e.currentTarget.setPointerCapture(e.pointerId);
-    applySltp({ ...sltpRef.current, [kind === 'sl' ? 'slPct' : 'tpPct']: pct });
+    applySltp({ ...sltpRef.current, [kind === 'sl' ? 'slPct' : 'tpPct']: clampSltp(kind, pct) });
+  };
+
+  /** 손절은 진입가 불리한 쪽, 익절은 유리한 쪽에만 놓일 수 있다 (서버 검증과 같은 규칙) */
+  const clampSltp = (kind: 'sl' | 'tp', pct: number): number => {
+    const mk = g.current.openMarker;
+    if (!mk) return pct;
+    const base = mk.basePricePct;
+    const eps = 0.01;
+    const wantAbove = mk.direction === 'long' ? kind === 'tp' : kind === 'sl';
+    return wantAbove ? Math.max(pct, base + eps) : Math.min(pct, base - eps);
   };
 
   const onChartMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!dragRef.current) return;
+    const kind = dragRef.current;
+    if (!kind) return;
     const pct = sltpFromEvent(e);
     if (pct == null) return;
-    applySltp({ ...sltpRef.current, [dragRef.current === 'sl' ? 'slPct' : 'tpPct']: pct });
+    applySltp({ ...sltpRef.current, [kind === 'sl' ? 'slPct' : 'tpPct']: clampSltp(kind, pct) });
+  };
+
+  /** 확정은 서버 판정 — 화면 %를 가격으로 바꿔 보낸다 */
+  const pushSltp = (lv: { slPct: number | null; tpPct: number | null }) => {
+    const s = g.current;
+    if (!s.openMarker || !s.bars || !s.ws) return;
+    const op = s.bars.openPrice;
+    const toPrice = (pct: number | null) => (pct == null ? null : op * (1 + pct / 100));
+    s.ws.setSltp(s.seq, toPrice(lv.slPct), toPrice(lv.tpPct));
   };
 
   const onChartUp = () => {
-    const s = g.current;
-    if (!dragRef.current || !s.openMarker || !s.bars || !s.ws) { dragRef.current = null; return; }
+    if (!dragRef.current) return;
     dragRef.current = null;
-    const op = s.bars.openPrice;
-    const toPrice = (pct: number | null) => (pct == null ? null : op * (1 + pct / 100));
-    s.ws.setSltp(s.seq, toPrice(sltpRef.current.slPct), toPrice(sltpRef.current.tpPct)); // 확정은 서버 판정
+    pushSltp(sltpRef.current);
   };
 
   const clearSltp = () => {
-    const s = g.current;
     applySltp({ slPct: null, tpPct: null });
-    if (s.openMarker && s.ws) s.ws.setSltp(s.seq, null, null);
+    pushSltp({ slPct: null, tpPct: null });
   };
 
   const closePosition = () => {

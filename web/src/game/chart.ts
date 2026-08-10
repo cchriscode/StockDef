@@ -17,6 +17,20 @@ const MA_COLORS: Record<number, string> = { 5: '#E8D9A0', 20: '#FFC53D', 60: '#6
 export interface SltpLevels {
   slPct: number | null; // 시가 대비 % (차트 좌표계와 동일 단위)
   tpPct: number | null;
+  slPnl?: number | null; // 그 레벨에 닿았을 때 실현 손익 (수수료 차감 후, AUM)
+  tpPnl?: number | null;
+  dragging?: 'sl' | 'tp' | null; // 끌고 있는 쪽을 강조
+}
+
+/** 손절·익절 라벨 칩 규격 — 화면이 × 클릭/칩 드래그를 히트테스트할 때 공유한다 (바이낸스식 우측 칩) */
+export const SLTP_CHIP = { w: 150, h: 20, closeW: 18, right: 2 };
+
+/** (x, y)가 라벨 칩 위인지 — 반환값 'close'면 취소 버튼, 'body'면 칩 본체(잡아끌기) */
+export function sltpChipHit(px: number, py: number, lineY: number, canvasW: number): 'close' | 'body' | null {
+  const x1 = canvasW - SLTP_CHIP.right;
+  const x0 = x1 - SLTP_CHIP.w;
+  if (px < x0 || px > x1 || Math.abs(py - lineY) > SLTP_CHIP.h / 2) return null;
+  return px >= x1 - SLTP_CHIP.closeW ? 'close' : 'body';
 }
 
 /** 차트 Y축 스케일 — 드래그 히트테스트가 화면 좌표 ↔ % 를 오갈 때 쓴다 */
@@ -174,22 +188,48 @@ export function drawChart(
 
   // FR-5.15 손절·익절 라인 (드래그로 설정)
   if (opts.sltp) {
-    const line = (pct: number | null, color: string, label: string) => {
+    // 라인 + 우측 라벨 칩 (가격% · 예상 손익 · 취소 ×)
+    const line = (pct: number | null, pnl: number | null | undefined, color: string, label: string, active: boolean) => {
       if (pct == null) return;
       const ly = y(pct);
       ctx.strokeStyle = color;
       ctx.setLineDash([3, 3]);
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(W, ly); ctx.stroke();
+      ctx.lineWidth = active ? 2 : 1.5;
+      ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(W - SLTP_CHIP.w - SLTP_CHIP.right, ly); ctx.stroke();
       ctx.setLineDash([]);
       ctx.lineWidth = 1;
+
+      const cx0 = W - SLTP_CHIP.right - SLTP_CHIP.w;
+      const cy0 = ly - SLTP_CHIP.h / 2;
+      ctx.fillStyle = '#0A0E14';
+      ctx.fillRect(cx0, cy0, SLTP_CHIP.w, SLTP_CHIP.h);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = active ? 2 : 1;
+      ctx.strokeRect(cx0 + 0.5, cy0 + 0.5, SLTP_CHIP.w - 1, SLTP_CHIP.h - 1);
+      ctx.lineWidth = 1;
+
       ctx.fillStyle = color;
-      ctx.textAlign = 'right';
+      ctx.textAlign = 'left';
       ctx.font = '10px monospace';
-      ctx.fillText(`${label} ${pct > 0 ? '+' : ''}${pct.toFixed(2)}%`, W - 46, ly - 3);
+      ctx.fillText(label, cx0 + 5, ly + 3.5);
+      ctx.fillText(`${pct > 0 ? '+' : ''}${pct.toFixed(2)}%`, cx0 + 34, ly + 3.5);
+      if (pnl != null) {
+        ctx.fillStyle = pnl >= 0 ? '#7BD8A0' : '#FF9E86';
+        ctx.textAlign = 'right';
+        ctx.fillText(`${pnl >= 0 ? '+' : ''}${Math.round(pnl).toLocaleString()}`, W - SLTP_CHIP.right - SLTP_CHIP.closeW - 4, ly + 3.5);
+      }
+      // 취소 ×
+      const bx = W - SLTP_CHIP.right - SLTP_CHIP.closeW;
+      ctx.strokeStyle = color;
+      ctx.beginPath(); ctx.moveTo(bx, cy0); ctx.lineTo(bx, cy0 + SLTP_CHIP.h); ctx.stroke();
+      ctx.fillStyle = '#7C89A3';
+      ctx.textAlign = 'center';
+      ctx.font = '11px monospace';
+      ctx.fillText('×', bx + SLTP_CHIP.closeW / 2, ly + 4);
     };
-    line(opts.sltp.slPct, '#E8654F', '손절');
-    line(opts.sltp.tpPct, '#46A574', '익절');
+    const d = opts.sltp.dragging;
+    line(opts.sltp.slPct, opts.sltp.slPnl, '#E8654F', '손절', d === 'sl');
+    line(opts.sltp.tpPct, opts.sltp.tpPnl, '#46A574', '익절', d === 'tp');
   }
 
   // FR-5.8 진입 마커
