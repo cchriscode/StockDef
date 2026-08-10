@@ -112,10 +112,8 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
     setTimeout(() => setNotice(''), 1800);
   };
 
-  const pickCountry = (key: string) => {
-    setSelCountry(key);
-    if (key === 'k') setView('kr');
-  };
+  // 지도 클릭은 **선택만** 한다 — 전선 진입은 우측 CTA로 (바로 들어가면 브리핑을 볼 틈이 없다)
+  const pickCountry = (key: string) => setSelCountry(key);
 
   const regions = map.regions;
   const sel = regions.find((r) => r.regionId === selRegion) ?? regions.find((r) => r.state === 'open') ?? regions[0];
