@@ -441,7 +441,11 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .ub-wrap { position: relative; display: inline-flex; align-items: stretch; }
 .ub-wrap .qmark {
   position: absolute; top: -6px; right: -6px; z-index: 2;
-  min-width: 20px; min-height: 20px; padding: 0; font-size: 11px; line-height: 1;
+  /* 폭·글자 크기를 못 박는다 — .cmd-units button의 width:100%·clamp 글꼴을 물려받으면
+     물음표가 버튼 전체를 덮어버린다 */
+  width: 20px; height: 20px; min-width: 20px; min-height: 20px; flex: none;
+  padding: 0; font-size: 11px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
   background: var(--head); border: 2px solid var(--line2); color: var(--mut);
 }
 .ub-wrap .qmark:hover { color: var(--cream); border-color: var(--mut); }
