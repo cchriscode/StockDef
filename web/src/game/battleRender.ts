@@ -267,7 +267,10 @@ export function slotScreenPos(b: Battle, slot: number, W: number): { x: number; 
   };
 }
 
-export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, selectedSlot: number | null, placingGroundOnly = false) {
+export function drawBattle(
+  canvas: HTMLCanvasElement, b: Battle, shake: number, selectedSlot: number | null,
+  placing: { groundOnly: boolean } | null = null, // 배치 모드일 때만 빈 슬롯 표시
+) {
   const ctx = canvas.getContext('2d')!;
   const W = canvas.width;
   const H = canvas.height;
@@ -353,13 +356,14 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const prevKey = st.prevTowers[s] ?? null;
     if (prevKey && !tw) st.lastHp.delete(`t${s}`);
     st.prevTowers[s] = tw ? tw.key : null;
-    if (!tw) { // 빈 슬롯 — 설치 가능 위치 표시 (사옥 위는 배경이 어두워 잘 안 보였다 → 대비 강화)
+    if (!tw) { // 빈 슬롯 — 배치 모드에서만 표시한다 (평소엔 점선이 전장을 어지럽힌다)
+      if (!placing) continue;
       const w2 = 30;
       const h2 = 38;
       const x2 = tx - w2 / 2;
       const y2 = by - h2;
       const sel = s === selectedSlot;
-      const blocked = placingGroundOnly && b.isBaseSlot(s); // 지면 전용 포탑 배치 중인 사옥 슬롯
+      const blocked = placing.groundOnly && b.isBaseSlot(s); // 지면 전용 포탑 배치 중인 사옥 슬롯
       ctx.fillStyle = 'rgba(6,10,18,0.72)'; // 어두운 받침 — 건물·배경 위에서도 테두리가 뜬다
       ctx.fillRect(x2, y2, w2, h2);
       ctx.fillStyle = sel ? 'rgba(123,216,160,0.22)' : 'rgba(110,143,181,0.16)';
@@ -396,7 +400,7 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const turretId = TURRET_BY_TYPE[tw.key]; // 타입별 스프라이트 (없으면 리그 스프라이트)
     let towerDrawn = false;
     if (turretId) {
-      towerDrawn = drawTurret(ctx, turretId, tx, by, firePhase, aim01, b.isBaseSlot(s));
+      towerDrawn = drawTurret(ctx, turretId, tx, by, firePhase, aim01);
     } else { // 배당 파밍(금고)·손절 방벽(서킷 브레이커)·복리 화염 — 기존 리그 스프라이트
       const rigIdx = RIG_TOWER[tw.key];
       const hitEl = b.t - (st.hitT.get(`t${s}`) ?? -9);
@@ -641,12 +645,13 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const unitY = p.air ? AIR_Y : groundTop - (MUZZLE[p.srcKey ?? '']?.y ?? 34);
     let y = laneY;
     if (turretId) {
-      // 포구에서 출발해 목표 레인까지 완만히 하강 — 사옥 탑재 포탑도 궤적이 이어져 보인다
-      const muzzleY = slotBaseY(slot) - (b.isBaseSlot(slot) ? 38 : 58);
+      // 포구에서 출발해 목표 레인까지 — 직선이 아니라 포물선으로 날린다 (발사체답게 위로 붕 떴다 떨어진다)
+      const muzzleY = slotBaseY(slot) - 52;
       const tgt = enemyX.get(p.targetId);
       const span = tgt != null ? Math.abs(tgt - x0) : 220;
       const prog = Math.max(0, Math.min(1, Math.abs(p.x - x0) / Math.max(span, 1)));
-      y = muzzleY + (laneY - muzzleY) * prog;
+      const arc = Math.min(90, 26 + span * 0.16); // 사거리가 길수록 높게 뜬다
+      y = muzzleY + (laneY - muzzleY) * prog - arc * Math.sin(Math.PI * prog);
     }
     if (turretId && drawTurretShot(ctx, turretId, px, y, b.t + p.id, null)) {
       // 포탑 탄 — travel 프레임 루프

@@ -238,6 +238,20 @@ export class Battle {
     return true;
   }
 
+  /** FR-6.4f 포탑 판매 — 들인 골드(설치 + 업그레이드)의 일부를 돌려준다. 반환값 = 환급액 */
+  sellTower(slot: number): number {
+    const tw = this.towers[slot];
+    if (!tw) return 0;
+    const spec = TOWERS.find((s) => s.key === tw.key)!;
+    const paid = spec.cost + (tw.lv === 2 ? spec.upgradeCost : 0);
+    const refund = Math.floor(paid * BALANCE.TOWER_SELL_RATE);
+    this.towers[slot] = null;
+    this.gold += refund;
+    this.goldSpent -= refund; // 순지출로 환산 — 서버 골드 검증(획득 = 잔액 + 지출)과 어긋나지 않게
+    this.pushFx('gold', this.towerSlotX(slot), false, refund);
+    return refund;
+  }
+
   upgradeTower(slot: number): boolean {
     const tw = this.towers[slot];
     if (!tw || tw.lv >= 2) return false;

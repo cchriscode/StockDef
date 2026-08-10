@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Battle } from '../src/battle.js';
-import { WAVE_TABLES } from '../src/balance.js';
+import { BALANCE, WAVE_TABLES } from '../src/balance.js';
 import type { StageParams } from '../src/types.js';
 
 function params(over: Partial<StageParams> = {}): StageParams {
@@ -46,6 +46,24 @@ describe('Battle 엔진', () => {
     expect(b.buildTower(2, 'spire')).toBe(true); // 지면 슬롯에는 가능
     expect(b.gold).toBe(15);
     expect(b.buildTower(1, 'cannon')).toBe(false); // 골드 부족
+  });
+  it('포탑 판매: 들인 골드의 60%를 돌려주고 슬롯을 비운다 (FR-6.4f)', () => {
+    const b = new Battle(params(), []);
+    b.addGold(1000);
+    b.buildTower(2, 'cannon'); // 225
+    const before = b.gold;
+    const refund = b.sellTower(2);
+    expect(refund).toBe(Math.floor(225 * BALANCE.TOWER_SELL_RATE));
+    expect(b.gold).toBe(before + refund);
+    expect(b.towers[2]).toBeNull();
+    expect(b.sellTower(2)).toBe(0); // 빈 슬롯은 판매 불가
+  });
+  it('업그레이드한 포탑은 업그레이드 비용까지 환급 대상', () => {
+    const b = new Battle(params(), []);
+    b.addGold(2000);
+    b.buildTower(2, 'cannon');
+    b.upgradeTower(2);
+    expect(b.sellTower(2)).toBe(Math.floor((225 + 315) * BALANCE.TOWER_SELL_RATE));
   });
   it('리스크 매니저: 사옥 체력을 회복시킨다 (BASE_HP 상한)', () => {
     const b = new Battle(params(), []);

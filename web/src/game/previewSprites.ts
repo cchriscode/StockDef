@@ -314,9 +314,9 @@ export function drawPreviews(
 // ─── 포탑 스프라이트 (turret-sprites 팩) — 슬롯별 고정 매핑 ───
 // 셀 1168×1136, 앵커(0.5, 0.9718) = 구조물 바닥. 1/5 축소본이라 배율만 맞추면 그대로 얹힌다.
 const TURRET_CELL = { ox: 0.5, oy: 0.9718 };
-// 사옥 슬롯은 층 높이(58px) 안에 들어가도록 작게, 지면 슬롯은 크게
-const TURRET_SCALE_BASE = 0.22;
-const TURRET_SCALE_GROUND = 0.34;
+// 2026-08-10: 사옥/지면에 따라 크기가 달라져 같은 포탑이 다른 물건처럼 보였다 → 하나로 통일.
+// 사옥 층 높이(약 81px) 안에 들어가면서도 지면에서 왜소하지 않은 값.
+const TURRET_SCALE = 0.3;
 /**
  * 타워 타입 → 포탑 스프라이트. 성격이 맞는 것끼리 배정하고, 나머지(비공격 구조물·화염)는
  * 기존 리그 스프라이트를 그대로 쓴다 (금고=배당 파밍, 서킷 브레이커=손절 방벽처럼 이미 잘 맞음).
@@ -348,9 +348,8 @@ function turretImg(id: string, motion: 'idle' | 'aim' | 'fire' | 'shot'): HTMLIm
  */
 export function drawTurret(
   ctx: CanvasRenderingContext2D, id: string, cx: number, baseY: number,
-  firePhase: number | null, aim01: number, onBase = false,
+  firePhase: number | null, aim01: number,
 ): boolean {
-  const TURRET_SCALE = onBase ? TURRET_SCALE_BASE : TURRET_SCALE_GROUND;
   const firing = firePhase != null && firePhase >= 0 && firePhase < 1;
   let img: HTMLImageElement | null = null;
   let frame = 0;

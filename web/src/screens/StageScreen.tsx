@@ -252,8 +252,8 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
       }
       if (battleRef.current) {
         const pk = placingRef.current;
-        const groundOnly = !!pk && !!TOWERS.find((t) => t.key === pk)?.groundOnly;
-        drawBattle(battleRef.current, s.battle, Date.now() < s.shakeUntil ? 5 : 0, slotMenuRef.current, groundOnly);
+        const placing = pk ? { groundOnly: !!TOWERS.find((t) => t.key === pk)?.groundOnly } : null;
+        drawBattle(battleRef.current, s.battle, Date.now() < s.shakeUntil ? 5 : 0, slotMenuRef.current, placing);
       }
 
       // 효과음: 골드 증가(수입·배당·환전) 코인음 / 아군 유닛 사망음
@@ -510,6 +510,23 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
       if (isTut && guide === 3) setGuide(4);
     }
     setSlotMenu(null);
+  };
+
+  /** 판매 시 돌려받는 골드 (표시용 — 엔진과 같은 계산) */
+  const sellValue = (slot: number): number => {
+    const tw = g.current.battle?.towers[slot];
+    if (!tw) return 0;
+    const spec = TOWERS.find((t) => t.key === tw.key)!;
+    return Math.floor((spec.cost + (tw.lv === 2 ? spec.upgradeCost : 0)) * BALANCE.TOWER_SELL_RATE);
+  };
+
+  const sellTower = (slot: number) => {
+    const b = g.current.battle;
+    if (!b) return;
+    const got = b.sellTower(slot);
+    if (got > 0) sfx.coin();
+    setSlotMenu(null);
+    forceUi((v) => v + 1);
   };
 
   const upgradeTower = (slot: number) => {
@@ -799,6 +816,10 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
                   업그레이드 {TOWERS.find((t) => t.key === battle.towers[slotMenu]!.key)!.upgradeCost} G
                 </button>
               ) : <span className="small dim">최대 레벨</span>}
+              {/* FR-6.4f 판매 — 들인 골드의 일부를 돌려받고 슬롯을 비운다 */}
+              <button className="sell" onClick={() => sellTower(slotMenu)}>
+                판매 +{sellValue(slotMenu).toLocaleString()} G
+              </button>
               <button className="ghost small" onClick={() => setSlotMenu(null)}>해제</button>
             </>
           ) : (
@@ -813,7 +834,12 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
                   <button className="qmark" title="타워 설명" onClick={() => setInfoKey({ kind: 'tower', key: t.key })}>?</button>
                 </span>
               ))}
-              {placing && <span className="small up">설치할 위치를 클릭하세요 (사옥 위 2칸 · 지면 1칸)</span>}
+              {placing && (
+                <span className="small up">
+                  설치할 위치를 클릭하세요
+                  {TOWERS.find((t) => t.key === placing)?.groundOnly ? ' (지면 슬롯 전용)' : ''}
+                </span>
+              )}
             </>
           )}
         </div>

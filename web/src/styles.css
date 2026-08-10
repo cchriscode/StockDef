@@ -862,3 +862,6 @@ u { text-decoration: none; } /* 상태 마커(●○) 전용 색 래퍼 */
   .dk-row { flex-wrap: wrap; }
   .dk-name { width: auto; }
 }
+
+/* FR-6.4f 포탑 판매 버튼 */
+.cmd-bar button.sell { border-color: var(--gold-dk); color: var(--gold); }

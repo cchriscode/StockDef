@@ -42,6 +42,7 @@ export const BALANCE = {
   TOWER_SLOTS_BASE: 3,
   TOWER_SLOTS_MAX: 6, // 사옥 2 + 지면 최대 3 + 점령 보상 1
   BASE_TOWER_SLOTS: 2, // 앞 2칸은 사옥 탑재 (지면 차단물 불가)
+  TOWER_SELL_RATE: 0.6, // FR-6.4f 포탑 판매 환급률 (설치·업그레이드에 쓴 골드 기준)
   SKILL_COST: 200,
   SKILL_COOLDOWN_S: 25, // 2026-08-05 난이도 개편: 스킬을 더 자주 쓰는 대신 적이 강해짐
   SKILL_DAMAGE: 80,
