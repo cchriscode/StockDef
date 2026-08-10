@@ -87,7 +87,7 @@ export function CodexScreen({ onBack }: { onBack: () => void }) {
                 <span className="small dim">{e.ticker} · {e.sector}</span>
                 <div className="cfoot">
                   <span>적중률 {(e.best_accuracy * 100).toFixed(0)}%</span>
-                  <span style={{ color: e.rarity === 'legendary' ? '#FFC53D' : undefined }}>RANK {e.best_grade}</span>
+                  <span className={`rank rank-${e.best_grade ?? 'C'}`}>RANK {e.best_grade}</span>
                 </div>
               </div>
             </div>

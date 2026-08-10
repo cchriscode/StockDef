@@ -156,7 +156,7 @@ export function RevealScreen({ sessionId, finish, regionId, onDone }: Props) {
     // 정산 카드 + 랭크 뱃지 + 점령 보상 선택 (FR-8.4~8.6)
     return (
       <div className="screen center reveal-final">
-        <div className={`rank-badge ${failed ? 'fail' : ''}`}><i>{failed ? '✕' : finish.grade}</i></div>
+        <div className={`rank-badge ${failed ? 'fail' : `grade-${finish.grade}`}`}><i>{failed ? '✕' : finish.grade}</i></div>
         <h2>{failed ? '패배 — 다시 도전하세요' : '방어 성공'}</h2>
         {finish.endReason && (
           <p className={`end-reason ${failed ? 'down' : 'up'}`}>

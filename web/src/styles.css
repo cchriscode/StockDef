@@ -486,6 +486,14 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-family: var(--ft); font-style: normal; font-size: 60px; color: var(--gold);
 }
+/* 정산 뱃지도 도감과 같은 등급 색 체계 */
+.rank-badge.grade-S { background: var(--gold); box-shadow: 0 0 22px rgba(255, 197, 61, 0.65); }
+.rank-badge.grade-A { background: var(--purple); }
+.rank-badge.grade-A i { color: #F2ECFF; }
+.rank-badge.grade-B { background: var(--green); }
+.rank-badge.grade-B i { color: #EAFBF2; }
+.rank-badge.grade-C { background: var(--line2); }
+.rank-badge.grade-C i { color: var(--text); }
 .rank-badge.fail { background: var(--line2); }
 .rank-badge.fail i { color: var(--mut); }
 .card.settle { text-align: center; }
@@ -505,6 +513,18 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
   border-radius: 0; padding: 8px; font-family: var(--fp); font-size: 13px;
 }
 .codex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+/* 도감 등급 배지 — S는 금색 발광으로 한눈에 구분 */
+.rank { font-family: var(--fm); font-weight: 700; letter-spacing: 0.5px; }
+.rank-S {
+  color: #FFC53D;
+  text-shadow: 0 0 6px rgba(255, 197, 61, 0.85), 0 0 2px rgba(255, 197, 61, 0.9);
+  animation: rank-s-pulse 1.6s ease-in-out infinite;
+}
+.rank-A { color: #9B6BFF; text-shadow: 0 0 4px rgba(155, 107, 255, 0.5); }
+.rank-B { color: #7BD8A0; }
+.rank-C { color: #7C89A3; }
+@keyframes rank-s-pulse { 50% { text-shadow: 0 0 10px rgba(255, 197, 61, 1), 0 0 3px rgba(255, 197, 61, 1); } }
+
 .codex-card { display: flex; flex-direction: column; background: var(--panel); border: 3px solid var(--line2); font-size: 13px; }
 .codex-card .chead {
   height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
