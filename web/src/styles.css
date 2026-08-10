@@ -197,11 +197,12 @@ b.danger { color: var(--red2); }
 
 /* 픽셀 지도 */
 .pixmap { position: relative; }
-.pixmap .cell { position: absolute; }
+.pixmap .cell { position: absolute; transform: translateZ(0); }
 .pixmap .grid-overlay {
   position: absolute; inset: 0; pointer-events: none;
-  background: repeating-linear-gradient(to right, rgba(7,10,18,.34) 0 1px, transparent 1px 8px),
-    repeating-linear-gradient(to bottom, rgba(7,10,18,.34) 0 1px, transparent 1px 8px);
+  background-image: linear-gradient(to right, rgba(7,10,18,.34) 0 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(7,10,18,.34) 0 1px, transparent 1px);
+  background-size: 8px 8px;
 }
 .map-caption { font-family: var(--fm); font-size: 10px; color: var(--dim); }
 .pixmap .lat { position: absolute; left: 0; width: 100%; pointer-events: none; background: rgba(124, 137, 163, 0.14); height: 1px; }
@@ -634,7 +635,7 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 
 .wr-body { display: flex; gap: 14px; align-items: stretch; flex: 1; min-height: 0; }
 .wr-radar {
-  flex: 1; min-width: 0; min-height: 420px; position: relative; overflow: hidden;
+  flex: 1; min-width: 0; min-height: 520px; position: relative; overflow: hidden;
   border: 2px solid #1B2A42; background: #080C16;
   display: flex; align-items: center; justify-content: center;
 }
@@ -652,8 +653,10 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
   mask-image: radial-gradient(circle, #000 0 66%, transparent 68%);
   -webkit-mask-image: radial-gradient(circle, #000 0 66%, transparent 68%);
 }
-.wr-radar .scanline { inset: 0; background: repeating-linear-gradient(to bottom, rgba(0,0,0,.24) 0 2px, transparent 2px 4px); }
+.wr-radar .scanline { inset: 0; background: repeating-linear-gradient(to bottom, rgba(0,0,0,.12) 0 2px, transparent 2px 4px); }
 .wr-radar .caption { position: absolute; left: 10px; bottom: 8px; font-family: var(--fm); font-size: 10px; color: var(--dim); }
+/* 세계지도 복귀 — 지도 위 우측 상단 (하단 액션 바까지 내려가지 않게) */
+.wr-back { position: absolute; right: 10px; top: 10px; z-index: 3; }
 
 /* 핑 마커 — 지도 좌표에 절대 배치 */
 .wr-ping { position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; pointer-events: none; }

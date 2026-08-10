@@ -14,8 +14,6 @@ interface Props {
 
 const WORLD_CELL = 8; // 목업 원본 스케일 (144×57 셀 = 1152×456)
 const KR_CELL = 8;    // 41×74 셀 = 328×592
-const WORLD_W = WORLD_COLS * WORLD_CELL;
-const WORLD_H = WORLD_ROWS * WORLD_CELL;
 // 한반도 지도 위 거점 좌표 (KR_CELL 기준 px)
 const KR_MARKS: Record<string, { x: number; y: number }> = {
   R1: { x: 106, y: 312 }, // 여의도 — DMZ(y≈302) 바로 남쪽 서울 서측
@@ -23,25 +21,30 @@ const KR_MARKS: Record<string, { x: number; y: number }> = {
   R3: { x: 218, y: 448 }, // 울산 — 남동 해안
 };
 const KR_ON_WORLD = { x: 984, y: 152 }; // 세계지도 위 한국 좌표 (핑·조준 브래킷)
-const JP_ON_WORLD = { x: 1012, y: 168 };
 
 const STATUS_LABEL = { open: '진행 중', next: '해금 예정', locked: '잠김' } as const;
 const STATUS_COLOR = { open: '#7BD8A0', next: '#FF9E86', locked: '#4E5B72' } as const;
 
-/** 가용 폭·높이에 맞춰 고정 크기 지도를 확대·축소 (양옆 패널과 겹치지 않게 딱 맞춤)
+/** 패널 크기에 맞는 **정수** 셀 크기를 고른다.
+ *  CSS scale로 늘리면 8px 셀이 소수 픽셀에 앉아 가장자리가 뭉개진다 —
+ *  셀 자체를 정수 px로 만들어 그리면 어떤 화면에서도 윤곽이 또렷하다.
  *  콜백 ref 사용: 로딩 화면 뒤에 늦게 마운트되어도 관측이 확실히 붙는다. */
-function useFitScale(naturalW: number, naturalH: number, cap: number) {
+function useCellSize(cols: number, rows: number, max: number) {
   const [el, setEl] = useState<HTMLDivElement | null>(null);
-  const [scale, setScale] = useState(1);
+  const [cell, setCell] = useState(6);
   useLayoutEffect(() => {
     if (!el) return;
-    const measure = () => setScale(Math.min(cap, el.clientWidth / naturalW, el.clientHeight > 40 ? el.clientHeight / naturalH : cap));
+    const measure = () => {
+      const w = el.clientWidth - 28;
+      const h = el.clientHeight - 44;
+      setCell(Math.max(2, Math.min(max, Math.floor(w / cols), Math.floor(h / rows))));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [el, naturalW, naturalH, cap]);
-  return { ref: setEl, scale };
+  }, [el, cols, rows, max]);
+  return { ref: setEl, cell };
 }
 
 /** 상황실 시계 — 목업 헤더의 실시간 타임스탬프 */
@@ -62,16 +65,18 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
   const [selCountry, setSelCountry] = useState('k');
   const [selRegion, setSelRegion] = useState<RegionId | null>(null);
   const [notice, setNotice] = useState('');
-  const { ref: midRef, scale } = useFitScale(WORLD_W + 8, WORLD_H + 40, 1.6);
-  const { ref: krRef, scale: krScale } = useFitScale(KR_COLS * KR_CELL + 16, KR_ROWS * KR_CELL + 30, 1.5);
+  const { ref: midRef, cell: wCell } = useCellSize(WORLD_COLS, WORLD_ROWS, 14);
+  const { ref: krRef, cell: kCell } = useCellSize(KR_COLS, KR_ROWS, 18);
   const clock = useClock();
 
   useEffect(() => {
     api.map().then(setMap).catch((e) => setNotice(String(e.message)));
   }, []);
 
-  const wSegs = useMemo(() => worldSegs(WORLD_CELL), []);
-  const kSegs = useMemo(() => krSegs(KR_CELL), []);
+  const wSegs = useMemo(() => worldSegs(wCell), [wCell]);
+  const kSegs = useMemo(() => krSegs(kCell), [kCell]);
+  const kq = kCell / KR_CELL; // 목업 8px 기준 좌표 → 현재 셀 크기
+  const wq = wCell / WORLD_CELL;
 
   if (!map) return <div className="screen center"><p className="dim">지도 로딩…</p></div>;
 
@@ -135,20 +140,22 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
           <div className="sweep" />
 
           {isKr ? (
-            <div style={{ transform: `scale(${krScale})`, transformOrigin: 'center' }}>
-              <div className="pixmap" style={{ width: KR_COLS * KR_CELL, height: KR_ROWS * KR_CELL }}>
+            <div>
+              <div className="pixmap" style={{ width: KR_COLS * kCell, height: KR_ROWS * kCell }}>
                 {kSegs.map((s, i) => (
-                  <div key={i} className="cell" style={{ left: s.x, top: s.y, width: s.w, height: s.h, background: s.y < 38 * KR_CELL ? '#1C3140' : '#22394A' }} />
+                  <div key={i} className="cell" style={{ left: s.x, top: s.y, width: s.w, height: s.h, background: s.y < 38 * kCell ? '#1C3140' : '#22394A' }} />
                 ))}
-                <div className="grid-overlay" />
+                <div className="grid-overlay" style={{ backgroundSize: `${kCell}px ${kCell}px` }} />
                 {/* DMZ 점선 */}
-                <div style={{ position: 'absolute', left: 32, top: 302, width: 216, height: 4, background: 'repeating-linear-gradient(to right, #7C89A3 0 8px, transparent 8px 16px)', opacity: 0.5, pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', left: 4 * kCell, top: 37.75 * kCell, width: 27 * kCell, height: Math.max(2, kCell / 2), background: `repeating-linear-gradient(to right, #7C89A3 0 ${kCell}px, transparent ${kCell}px ${kCell * 2}px)`, opacity: 0.5, pointerEvents: 'none' }} />
                 {regions.map((r, i) => {
-                  const pos = KR_MARKS[`R${i + 1}`] ?? { x: 120, y: 320 + i * 60 };
+                  const m = KR_MARKS[`R${i + 1}`] ?? { x: 120, y: 320 + i * 60 };
+                  const pos = { x: m.x * kq, y: m.y * kq };
                   return (
                     <div key={r.regionId}>
-                      {r.state !== 'locked' && (
-                        <div className="wr-ping" style={{ left: pos.x + 8, top: pos.y + 8, color: r.state === 'captured' ? '#7BD8A0' : '#FFC53D' }}>
+                      {/* 딩딩거리는 핑은 "지금 들어갈 수 있는 곳" 하나에만 — 점령지는 마커로 충분하다 */}
+                      {r.state === 'open' && (
+                        <div className="wr-ping" style={{ left: pos.x + kCell, top: pos.y + kCell, color: '#FFC53D' }}>
                           <i /><i className="d" /><b />
                         </div>
                       )}
@@ -166,11 +173,11 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
               </div>
             </div>
           ) : (
-            <div style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}>
-              <div className="pixmap" style={{ width: WORLD_W, height: WORLD_H }}>
+            <div>
+              <div className="pixmap" style={{ width: WORLD_COLS * wCell, height: WORLD_ROWS * wCell }}>
                 {wSegs.map((s, i) => {
                   const c = COUNTRIES.find((cc) => cc.key === s.k)!;
-                  const base = c.status === 'open' ? 1 : c.status === 'next' ? 0.85 : 0.36;
+                  const base = c.status === 'open' ? 1 : c.status === 'next' ? 0.92 : 0.62;
                   return (
                     <div
                       key={i}
@@ -180,16 +187,15 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
                     />
                   );
                 })}
-                <div className="grid-overlay" />
-                <div className="lat eq" style={{ top: 268 }} />
-                <div className="lat" style={{ top: 188 }} />
-                <div className="lat" style={{ top: 348 }} />
-                <div className="meridian" style={{ left: 576 }} />
+                <div className="grid-overlay" style={{ backgroundSize: `${wCell}px ${wCell}px` }} />
+                <div className="lat eq" style={{ top: 33.5 * wCell }} />
+                <div className="lat" style={{ top: 23.5 * wCell }} />
+                <div className="lat" style={{ top: 43.5 * wCell }} />
+                <div className="meridian" style={{ left: 72 * wCell }} />
 
-                {/* 한국 = 교전 중 / 일본 = 해금 예정 */}
-                <div className="wr-ping" style={{ left: KR_ON_WORLD.x, top: KR_ON_WORLD.y, color: '#7BD8A0' }}><i /><i className="d" /><b /></div>
-                <div className="wr-ping" style={{ left: JP_ON_WORLD.x, top: JP_ON_WORLD.y, color: '#FF9E86' }}><i /><i className="d" /><b /></div>
-                <div className="wr-lock" style={{ left: KR_ON_WORLD.x, top: KR_ON_WORLD.y }}>
+                {/* 플레이 가능한 전역은 한국뿐 — 핑도 하나만 (없는 지역을 있는 것처럼 보이지 않게) */}
+                <div className="wr-ping" style={{ left: KR_ON_WORLD.x * wq, top: KR_ON_WORLD.y * wq, color: '#7BD8A0' }}><i /><i className="d" /><b /></div>
+                <div className="wr-lock" style={{ left: KR_ON_WORLD.x * wq, top: KR_ON_WORLD.y * wq }}>
                   <i style={{ left: 0, top: 0, width: 8, height: 2 }} /><i style={{ left: 0, top: 0, width: 2, height: 8 }} />
                   <i style={{ right: 0, top: 0, width: 8, height: 2 }} /><i style={{ right: 0, top: 0, width: 2, height: 8 }} />
                   <i style={{ left: 0, bottom: 0, width: 8, height: 2 }} /><i style={{ left: 0, bottom: 0, width: 2, height: 8 }} />
@@ -197,13 +203,14 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
                 </div>
                 {/* 한국 클릭 히트박스 (셀이 작아 영역 전체를 클릭 가능하게) */}
                 <div
-                  style={{ position: 'absolute', left: 956, top: 124, width: 56, height: 56, cursor: 'pointer', background: 'rgba(255,255,255,0.02)' }}
+                  style={{ position: 'absolute', left: 119.5 * wCell, top: 15.5 * wCell, width: 7 * wCell, height: 7 * wCell, cursor: 'pointer', background: 'rgba(255,255,255,0.02)' }}
                   onClick={() => pickCountry('k')}
                 />
               </div>
             </div>
           )}
 
+          {isKr && <button className="ghost small wr-back" onClick={() => setView('world')}>← 세계지도</button>}
           <div className="scanline" />
           <div className="caption">
             {isKr ? `KOREAN PENINSULA · 8px/CELL · DMZ 38°N` : `MERCATOR · 8px/CELL · SWEEP 5.5s`}
@@ -309,7 +316,6 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
         <span className="tag">FEED</span>
         <div className="track"><div>{feed}   ·   {feed}   ·   </div></div>
         <div className="map-actions">
-          {isKr && <button className="ghost small" onClick={() => setView('world')}>← 세계지도</button>}
           <button className="ghost small" onClick={onTitle}>◀ 타이틀</button>
           <button className="small" onClick={onCodex}>도감</button>
         </div>
