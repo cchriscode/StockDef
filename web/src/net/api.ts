@@ -58,6 +58,7 @@ export interface CodexEntry {
   best_accuracy: number;
   best_grade: string;
   best_mode: 'easy' | 'hard';
+  best_return_pct: number | null; // 그 차트로 낸 최고 수익률
   ticker: string;
   company_name: string;
   trade_date: string;

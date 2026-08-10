@@ -13,6 +13,7 @@ const SKIN: Record<string, DeptSkin> = {
   ir: { code: 'IRT', accent: '#22A0A0', light: '#3ED8D8', icon: [[6, 14, 10, 12, 1], [16, 8, 12, 24, 0], [30, 4, 6, 6, 1], [30, 30, 6, 6, 0]] },
   margin: { code: 'MGN', accent: '#E8654F', light: '#FF9E86', icon: [[4, 28, 32, 8, 1], [8, 8, 6, 20, 0], [18, 14, 6, 14, 1], [28, 20, 6, 8, 0]] },
   research: { code: 'RSC', accent: '#F08B2E', light: '#FFC48E', icon: [[6, 6, 12, 28, 1], [22, 6, 12, 28, 0], [18, 4, 4, 32, 1]] },
+  facility: { code: 'FAC', accent: '#4E7FB8', light: '#8FC4F0', icon: [[4, 26, 32, 10, 1], [8, 14, 10, 12, 0], [22, 8, 10, 18, 1], [16, 20, 6, 6, 0]] },
 };
 
 function useClock() {

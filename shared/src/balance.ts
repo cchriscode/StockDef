@@ -40,7 +40,7 @@ export const BALANCE = {
   RETRY_CAPITAL_MULT: 0.5,
   // FR-6.3c (2026-08-10): 슬롯 3칸 — 사옥 위 2 + 지면 1. 사옥을 등분해 옥상·중층에 포탑을 얹는다
   TOWER_SLOTS_BASE: 3,
-  TOWER_SLOTS_MAX: 5,
+  TOWER_SLOTS_MAX: 6, // 사옥 2 + 지면 최대 3 + 점령 보상 1
   BASE_TOWER_SLOTS: 2, // 앞 2칸은 사옥 탑재 (지면 차단물 불가)
   SKILL_COST: 200,
   SKILL_COOLDOWN_S: 25, // 2026-08-05 난이도 개편: 스킬을 더 자주 쓰는 대신 적이 강해짐
@@ -126,12 +126,13 @@ export interface TowerSpec {
   barrierHP: number; // 손절 방벽: 내구도 (0 = 차단 없음)
   rampPct: number; // 복리 화염: 같은 대상 연속 명중당 피해 증가율 (0 = 없음)
   rampMax: number; // 복리 화염: 증가 상한 (배수 가산치)
+  groundOnly: boolean; // FR-6.4e 사옥 위에는 올릴 수 없는 포탑 (지면 슬롯 전용)
 }
 
 export const TOWERS: TowerSpec[] = [
-  { key: 'limit', name: '지정가 포탑', cost: 165, upgradeCost: 240, target: 'both', dmgType: 'physical', dmg: 14, rate: 1.4, range: 380, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
-  { key: 'cannon', name: '공매도 캐논', cost: 225, upgradeCost: 315, target: 'ground', dmgType: 'physical', dmg: 18, rate: 0.5, range: 330, splashRadius: 60, slowPct: 0, slowDur: 0, projSpeed: 420, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
-  { key: 'spire', name: '옵션 스파이어', cost: 210, upgradeCost: 300, target: 'both', dmgType: 'magic', dmg: 10, rate: 0.9, range: 350, splashRadius: 0, slowPct: 0.3, slowDur: 1.5, projSpeed: 620, lv2Mult: 1.6, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0 },
+  { key: 'limit', name: '지정가 포탑', cost: 165, upgradeCost: 240, target: 'both', dmgType: 'physical', dmg: 14, rate: 1.4, range: 380, splashRadius: 0, slowPct: 0, slowDur: 0, projSpeed: 680, lv2Mult: 1.8, lv2Pierce: true, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0, groundOnly: false },
+  { key: 'cannon', name: '공매도 캐논', cost: 225, upgradeCost: 315, target: 'ground', dmgType: 'physical', dmg: 18, rate: 0.5, range: 330, splashRadius: 60, slowPct: 0, slowDur: 0, projSpeed: 420, lv2Mult: 1.8, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0, groundOnly: false },
+  { key: 'spire', name: '옵션 스파이어', cost: 210, upgradeCost: 300, target: 'both', dmgType: 'magic', dmg: 10, rate: 0.9, range: 350, splashRadius: 0, slowPct: 0.3, slowDur: 1.5, projSpeed: 620, lv2Mult: 1.6, lv2Pierce: false, incomeAmount: 0, incomePeriod: 0, barrierHP: 0, rampPct: 0, rampMax: 0, groundOnly: true },
 ];
 
 // FR-6.5 유닛 — handoff 리그 팩 6직군: 블로커 / 원거리 / 근접 브루저 / 관통 창병 / 마법 원거리 / 서포터
@@ -434,6 +435,7 @@ export const DEPTS: DeptSpec[] = [
   { key: 'ir', name: 'IR팀', desc: (lv) => `정산 보너스 +${[0, 5, 10][lv - 1]}%`, maxLv: 3, costs: [1000, 2500] },
   { key: 'margin', name: '마진 데스크', desc: (lv) => `레버리지 최대 ${[1, 3, 5][lv - 1]}×`, maxLv: 3, costs: [1200, 3200] }, // FR-5.6b: Lv2 → 2·3× / Lv3 → 5× 해금
   { key: 'research', name: '리서치 데스크', desc: (lv) => `스테이지당 거래 ${[10, 15, 20][lv - 1]}회`, maxLv: 3, costs: [900, 2400] }, // FR-5.13
+  { key: 'facility', name: '시설팀', desc: (lv) => `지면 포탑 슬롯 ${[1, 2, 3][lv - 1]}칸`, maxLv: 3, costs: [1100, 2800] }, // FR-6.4e
 ];
 
 export const DEPT_EFFECTS = {
@@ -443,6 +445,7 @@ export const DEPT_EFFECTS = {
   irBonus: (lv: number) => [0, 0.05, 0.1][lv - 1],
   maxLeverage: (lv: number) => [1, 3, 5][lv - 1],
   maxPositions: (lv: number) => BALANCE.MAX_POSITIONS + (lv - 1) * BALANCE.POSITIONS_PER_DESK_LV,
+  groundSlots: (lv: number) => [1, 2, 3][lv - 1], // FR-6.4e 시설팀 — 지면 슬롯 수
 };
 
 // FR-12.2b 튜토리얼 첫 거래 규칙 — 서버(진입 창 계산)와 클라(가이드 잠금)가 공유한다

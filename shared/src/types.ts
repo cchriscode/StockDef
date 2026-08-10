@@ -28,7 +28,7 @@ export interface BarsFile {
 export type RegionId = 'R1' | 'R2' | 'R3' | 'TUT';
 export type StageMode = 'easy' | 'hard'; // FR-2.6 난이도 모드
 export type RewardLine = 'finance' | 'info' | 'defense' | 'offense';
-export type DeptKey = 'trading_desk' | 'rnd' | 'hr' | 'legal' | 'ir' | 'margin' | 'research';
+export type DeptKey = 'trading_desk' | 'rnd' | 'hr' | 'legal' | 'ir' | 'margin' | 'research' | 'facility';
 export type Grade = 'S' | 'A' | 'B' | 'C';
 export type Outcome = 'win' | 'lose' | 'draw';
 export type Direction = 'long' | 'short';

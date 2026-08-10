@@ -150,6 +150,12 @@ const hasMode = db
   .get() as { n: number };
 if (hasMode.n === 0) db.exec("ALTER TABLE codex_entries ADD COLUMN best_mode TEXT NOT NULL DEFAULT 'hard'");
 
+// 마이그레이션: 도감에 그 차트로 낸 수익률 기록 (FR-10.2)
+const hasRet = db
+  .prepare("SELECT COUNT(*) AS n FROM pragma_table_info('codex_entries') WHERE name = 'best_return_pct'")
+  .get() as { n: number };
+if (hasRet.n === 0) db.exec('ALTER TABLE codex_entries ADD COLUMN best_return_pct REAL');
+
 export interface ChartSetRow {
   id: string; ticker: string; company_name: string; trade_date: string;
   market: string; sector: string; cap_tier: string; region_id: string;

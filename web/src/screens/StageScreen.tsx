@@ -251,7 +251,9 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
         });
       }
       if (battleRef.current) {
-        drawBattle(battleRef.current, s.battle, Date.now() < s.shakeUntil ? 5 : 0, slotMenuRef.current);
+        const pk = placingRef.current;
+        const groundOnly = !!pk && !!TOWERS.find((t) => t.key === pk)?.groundOnly;
+        drawBattle(battleRef.current, s.battle, Date.now() < s.shakeUntil ? 5 : 0, slotMenuRef.current, groundOnly);
       }
 
       // 효과음: 골드 증가(수입·배당·환전) 코인음 / 아군 유닛 사망음
@@ -552,6 +554,12 @@ export function StageScreen({ regionId, mode = 'hard', onFinish, onSkipTutorial 
     }
     if (best < 0) { setSlotMenu(null); return; }
     if (placingRef.current) { // 배치 모드 — 빈 슬롯이면 건설
+      const spec = TOWERS.find((t) => t.key === placingRef.current)!;
+      if (b.isBaseSlot(best) && spec.groundOnly) {
+        setErrMsg(`${spec.name}은(는) 지면 슬롯에만 설치할 수 있습니다`);
+        setTimeout(() => setErrMsg(''), 1800);
+        return; // 배치 모드는 유지 — 다른 슬롯을 고르면 된다
+      }
       if (!b.towers[best]) buildTower(best, placingRef.current);
       setPlacing(null);
       setSlotMenu(null);

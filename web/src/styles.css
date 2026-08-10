@@ -580,7 +580,7 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .codex-card .cpct.neg { background: #3A1512; border-color: var(--red); color: var(--red2); }
 .codex-card .cbody { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 .codex-card .cbody b { font-size: 17px; }
-.codex-card .cfoot { display: flex; justify-content: space-between; font-family: var(--fm); font-size: 11px; color: var(--mut); margin-top: 4px; }
+.codex-card .cfoot { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; font-family: var(--fm); font-size: 11px; color: var(--mut); margin-top: 4px; }
 .codex-card.rarity-rare { border-color: var(--blue); }
 .codex-card.rarity-rare .chead { background: #15304C; color: #9CC4E8; }
 .codex-card.rarity-rare .cchart { border-bottom-color: var(--blue); }

@@ -99,6 +99,11 @@ export function CodexScreen({ onBack, from = 'map' }: { onBack: () => void; from
                 <span className="small dim">{e.ticker} · {e.sector}</span>
                 <div className="cfoot">
                   <span>적중률 {(e.best_accuracy * 100).toFixed(0)}%</span>
+                  {e.best_return_pct != null && (
+                    <span className={e.best_return_pct >= 0 ? 'up' : 'down'}>
+                      수익률 {e.best_return_pct >= 0 ? '+' : ''}{(e.best_return_pct * 100).toFixed(1)}%
+                    </span>
+                  )}
                   <span className={`rank rank-${e.best_grade ?? 'C'}`}>RANK {e.best_grade}</span>
                 </div>
               </div>

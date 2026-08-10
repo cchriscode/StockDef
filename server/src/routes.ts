@@ -221,6 +221,9 @@ router.post('/stage/finish', (req, res) => {
     mode: params.mode, // FR-2.6
   });
 
+  // 수익률은 도감 기록에도 쓰이므로 먼저 계산한다
+  const returnPct = live.stakeSum > 0 ? Math.round(((live.payoutSum - live.stakeSum) / live.stakeSum) * 1000) / 1000 : 0;
+
   const isTut = row.region_id === 'TUT';
   // FR-6.9 패배: 자본금 0 / FR-12.5 튜토리얼: 고정 500
   const capitalAwarded = !cleared ? 0 : isTut ? BALANCE.TUTORIAL_CAPITAL : s.capital;
@@ -250,16 +253,16 @@ router.post('/stage/finish', (req, res) => {
   // FR-10.1 도감 등록 (클리어만, 튜토리얼 제외)
   if (cleared && !isTut) {
     db.prepare(
-      `INSERT INTO codex_entries (account_id, chart_set_id, best_accuracy, best_grade, best_mode) VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO codex_entries (account_id, chart_set_id, best_accuracy, best_grade, best_mode, best_return_pct) VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT (account_id, chart_set_id) DO UPDATE SET
          best_accuracy = MAX(best_accuracy, excluded.best_accuracy),
          best_grade = CASE WHEN excluded.best_grade < best_grade THEN excluded.best_grade ELSE best_grade END,
-         best_mode = CASE WHEN excluded.best_mode = 'hard' THEN 'hard' ELSE best_mode END`,
-    ).run(accountId, row.chart_set_id, s.accuracy, s.grade, params.mode ?? 'hard');
+         best_mode = CASE WHEN excluded.best_mode = 'hard' THEN 'hard' ELSE best_mode END,
+         best_return_pct = MAX(COALESCE(best_return_pct, -999), excluded.best_return_pct)`,
+    ).run(accountId, row.chart_set_id, s.accuracy, s.grade, params.mode ?? 'hard', returnPct);
   }
 
   dropLive(sessionId);
-  const returnPct = live.stakeSum > 0 ? Math.round(((live.payoutSum - live.stakeSum) / live.stakeSum) * 1000) / 1000 : 0;
   const out: FinishRes = {
     status, grade: cleared ? s.grade : null, accuracy: s.accuracy, returnPct, aumLeftRate: s.aumLeftRate,
     capitalAwarded, eligibleLines: selectable, alreadyOwnedLines: eligible.filter((l) => owned.includes(l)),
@@ -354,7 +357,7 @@ router.get('/codex', (req, res) => {
   const accountId = (req as unknown as AuthedRequest).accountId;
   const { sector, rarity, sort } = req.query as { sector?: string; rarity?: string; sort?: string };
   let rows = db.prepare(
-    `SELECT ce.first_cleared_at, ce.best_accuracy, ce.best_grade, ce.best_mode,
+    `SELECT ce.first_cleared_at, ce.best_accuracy, ce.best_grade, ce.best_mode, ce.best_return_pct,
             cs.id AS chart_set_id, cs.ticker, cs.company_name, cs.trade_date, cs.sector,
             cs.day_change_pct, cs.rarity, cs.region_id, cs.difficulty, cs.ohlcv_day, cs.bars_url
      FROM codex_entries ce JOIN chart_sets cs ON cs.id = ce.chart_set_id

@@ -42,9 +42,10 @@ describe('Battle 엔진', () => {
     expect(b.buildTower(0, 'limit')).toBe(true);
     expect(b.gold).toBe(225);
     expect(b.buildTower(0, 'cannon')).toBe(false); // 점유된 슬롯
-    expect(b.buildTower(1, 'spire')).toBe(true);
+    expect(b.buildTower(1, 'spire')).toBe(false); // FR-6.4e 스파이어는 사옥 위 불가
+    expect(b.buildTower(2, 'spire')).toBe(true); // 지면 슬롯에는 가능
     expect(b.gold).toBe(15);
-    expect(b.buildTower(2, 'cannon')).toBe(false); // 골드 부족
+    expect(b.buildTower(1, 'cannon')).toBe(false); // 골드 부족
   });
   it('리스크 매니저: 사옥 체력을 회복시킨다 (BASE_HP 상한)', () => {
     const b = new Battle(params(), []);

@@ -7,7 +7,7 @@ import { db, type TerritoryRow } from './db.js';
 
 export function getDeptLevels(accountId: string): Record<DeptKey, number> {
   const rows = db.prepare('SELECT dept_key, level FROM departments WHERE account_id = ?').all(accountId) as { dept_key: DeptKey; level: number }[];
-  const out = { trading_desk: 1, rnd: 1, hr: 1, legal: 1, ir: 1, margin: 1, research: 1 } as Record<DeptKey, number>;
+  const out = { trading_desk: 1, rnd: 1, hr: 1, legal: 1, ir: 1, margin: 1, research: 1, facility: 1 } as Record<DeptKey, number>;
   for (const r of rows) out[r.dept_key] = r.level;
   return out;
 }
@@ -51,7 +51,8 @@ export function buildStageParams(accountId: string, regionId: RegionId, mode: St
     enemyCountMult: mode === 'easy' ? BALANCE.EASY_COUNT_MULT : 1,
     payoutBase: BALANCE.PAYOUT_BASE,
     drawBand: BALANCE.DRAW_BAND,
-    towerSlots: Math.min(BALANCE.TOWER_SLOTS_BASE + defenseRewards, BALANCE.TOWER_SLOTS_MAX),
+    // FR-6.4e 사옥 2칸 + 시설팀이 여는 지면 칸 + 점령(방어 계열) 보상
+    towerSlots: Math.min(BALANCE.BASE_TOWER_SLOTS + DEPT_EFFECTS.groundSlots(depts.facility) + defenseRewards, BALANCE.TOWER_SLOTS_MAX),
     maxPositions: DEPT_EFFECTS.maxPositions(depts.research), // FR-5.13 리서치 데스크로 확장
     waveCount,
     unitHpMult: DEPT_EFFECTS.unitHpMult(depts.hr),

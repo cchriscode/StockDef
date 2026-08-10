@@ -267,7 +267,7 @@ export function slotScreenPos(b: Battle, slot: number, W: number): { x: number; 
   };
 }
 
-export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, selectedSlot: number | null) {
+export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, selectedSlot: number | null, placingGroundOnly = false) {
   const ctx = canvas.getContext('2d')!;
   const W = canvas.width;
   const H = canvas.height;
@@ -353,17 +353,38 @@ export function drawBattle(canvas: HTMLCanvasElement, b: Battle, shake: number, 
     const prevKey = st.prevTowers[s] ?? null;
     if (prevKey && !tw) st.lastHp.delete(`t${s}`);
     st.prevTowers[s] = tw ? tw.key : null;
-    if (!tw) { // 빈 슬롯 — 설치 가능 위치 표시
-      ctx.fillStyle = 'rgba(110,143,181,0.14)';
-      ctx.fillRect(tx - 12, by - 34, 24, 32);
-      ctx.strokeStyle = s === selectedSlot ? '#7BD8A0' : '#6E8FB5';
-      ctx.setLineDash([3, 3]);
-      ctx.strokeRect(tx - 12, by - 34, 24, 32);
+    if (!tw) { // 빈 슬롯 — 설치 가능 위치 표시 (사옥 위는 배경이 어두워 잘 안 보였다 → 대비 강화)
+      const w2 = 30;
+      const h2 = 38;
+      const x2 = tx - w2 / 2;
+      const y2 = by - h2;
+      const sel = s === selectedSlot;
+      const blocked = placingGroundOnly && b.isBaseSlot(s); // 지면 전용 포탑 배치 중인 사옥 슬롯
+      ctx.fillStyle = 'rgba(6,10,18,0.72)'; // 어두운 받침 — 건물·배경 위에서도 테두리가 뜬다
+      ctx.fillRect(x2, y2, w2, h2);
+      ctx.fillStyle = sel ? 'rgba(123,216,160,0.22)' : 'rgba(110,143,181,0.16)';
+      ctx.fillRect(x2, y2, w2, h2);
+      ctx.strokeStyle = blocked ? '#E8654F' : sel ? '#7BD8A0' : '#9FC3E8';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 3]);
+      ctx.strokeRect(x2 + 1, y2 + 1, w2 - 2, h2 - 2);
       ctx.setLineDash([]);
-      ctx.fillStyle = '#8FA8C7';
-      ctx.font = '10px sans-serif';
+      ctx.lineWidth = 1;
+      // 모서리 갈고리 — 점선만으로는 배경에 묻힌다
+      const arm = 7;
+      ctx.strokeStyle = blocked ? '#FF9E86' : sel ? '#7BD8A0' : '#CFE3F7';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x2, y2 + arm); ctx.lineTo(x2, y2); ctx.lineTo(x2 + arm, y2);
+      ctx.moveTo(x2 + w2 - arm, y2); ctx.lineTo(x2 + w2, y2); ctx.lineTo(x2 + w2, y2 + arm);
+      ctx.moveTo(x2, y2 + h2 - arm); ctx.lineTo(x2, y2 + h2); ctx.lineTo(x2 + arm, y2 + h2);
+      ctx.moveTo(x2 + w2 - arm, y2 + h2); ctx.lineTo(x2 + w2, y2 + h2); ctx.lineTo(x2 + w2, y2 + h2 - arm);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.fillStyle = blocked ? '#FF9E86' : sel ? '#7BD8A0' : '#CFE3F7';
+      ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${s + 1}`, tx, by - 14);
+      ctx.fillText(blocked ? '✕' : `${s + 1}`, tx, y2 + h2 / 2 + 4);
       continue;
     }
     const spec = TOWERS.find((t) => t.key === tw.key)!;

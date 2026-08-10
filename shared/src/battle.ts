@@ -228,6 +228,7 @@ export class Battle {
     if (slot < 0 || slot >= this.towers.length || this.towers[slot]) return false;
     const spec = TOWERS.find((s) => s.key === key)!;
     if (this.isBaseSlot(slot) && spec.barrierHP > 0) return false; // 사옥 위엔 경로 차단물을 놓을 수 없다
+    if (this.isBaseSlot(slot) && spec.groundOnly) return false; // FR-6.4e 지면 전용 포탑 (옵션 스파이어)
     if (!this.spend(spec.cost)) return false;
     this.towers[slot] = {
       slot, key, lv: 1, cooldown: 0, mode: 'first', lastTargetX: null, lastTargetId: null, rampN: 0, fireT: -9,
