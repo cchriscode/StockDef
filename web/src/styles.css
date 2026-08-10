@@ -687,7 +687,10 @@ canvas.battle { width: 100%; display: block; background: var(--bg2); border: 2px
 .wr-ping i { position: absolute; inset: 0; border: 2px solid currentColor; border-radius: 50%; animation: wr-ping 2.6s ease-out infinite; }
 .wr-ping i.d { inset: 11px; animation-delay: .5s; }
 .wr-ping b { position: absolute; left: 19px; top: 19px; width: 8px; height: 8px; background: currentColor; animation: wr-blink 1.1s steps(1) infinite; }
-.wr-lock { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; pointer-events: none; color: var(--green2); animation: wr-lock .8s ease-out infinite alternate; }
+.wr-lock {
+  position: absolute; pointer-events: none; color: var(--green2);
+  animation: wr-lock .8s ease-out infinite alternate;
+}
 .wr-lock i { position: absolute; background: currentColor; }
 
 /* 우측 브리핑 패널 */

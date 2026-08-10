@@ -90,8 +90,8 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
   }, []);
 
   const wSegs = useMemo(() => worldSegs(wCell), [wCell]);
-  /** 국가별 레이더 중심 — 지도 셀 바운딩 박스의 중앙 (선택한 나라로 레이더가 옮겨간다) */
-  const centers = useMemo(() => {
+  /** 국가별 지도 위 바운딩 박스 — 레이더 중심과 선택 박스 크기가 여기서 나온다 */
+  const bounds = useMemo(() => {
     const bb = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
     for (const g of wSegs) {
       const o = bb.get(g.k) ?? { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
@@ -99,9 +99,7 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
       o.x1 = Math.max(o.x1, g.x + g.w); o.y1 = Math.max(o.y1, g.y + g.h);
       bb.set(g.k, o);
     }
-    const out = new Map<string, { x: number; y: number }>();
-    for (const [k, o] of bb) out.set(k, { x: (o.x0 + o.x1) / 2, y: (o.y0 + o.y1) / 2 });
-    return out;
+    return bb;
   }, [wSegs]);
   const kSegs = useMemo(() => krSegs(kCell), [kCell]);
   const kq = kCell / KR_CELL; // 목업 8px 기준 좌표 → 현재 셀 크기
@@ -139,8 +137,15 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
     `자본금 ${map.capital.toLocaleString()}`,
   ].join('   ·   ');
 
-  // 선택 국가의 지도상 중심 — 레이더 링·스윕·조준 브래킷이 여기로 옮겨간다
-  const focus = centers.get(selCountry) ?? { x: KR_ON_WORLD.x * wq, y: KR_ON_WORLD.y * wq };
+  // 선택 국가의 지도상 위치·크기 — 레이더는 중심으로, 조준 박스는 영토 크기에 맞춰 그린다
+  const bb = bounds.get(selCountry);
+  const focus = bb
+    ? { x: (bb.x0 + bb.x1) / 2, y: (bb.y0 + bb.y1) / 2 }
+    : { x: KR_ON_WORLD.x * wq, y: KR_ON_WORLD.y * wq };
+  const selPad = Math.max(6, wCell);
+  const selBox = bb
+    ? { left: bb.x0 - selPad, top: bb.y0 - selPad, w: bb.x1 - bb.x0 + selPad * 2, h: bb.y1 - bb.y0 + selPad * 2 }
+    : { left: focus.x - 17, top: focus.y - 17, w: 34, h: 34 };
 
   const openCount = regions.filter((r) => r.state !== 'locked').length;
   const contested = Math.round((openCount / Math.max(regions.length, 1)) * 100);
@@ -230,12 +235,21 @@ export function MapScreen({ onEnterStage, onCodex, onTutorial, onTitle }: Props)
 
                 <div className="wr-ping" style={{ left: KR_ON_WORLD.x * wq, top: KR_ON_WORLD.y * wq, color: '#7BD8A0' }}><i /><i className="d" /><b /></div>
                 <div className="wr-ping" style={{ left: JP_ON_WORLD.x * wq, top: JP_ON_WORLD.y * wq, color: '#FF9E86' }}><i /><i className="d" /><b /></div>
-                <div className="wr-lock" style={{ left: focus.x, top: focus.y, color: country.color }}>
-                  <i style={{ left: 0, top: 0, width: 9, height: 2 }} /><i style={{ left: 0, top: 0, width: 2, height: 9 }} />
-                  <i style={{ right: 0, top: 0, width: 9, height: 2 }} /><i style={{ right: 0, top: 0, width: 2, height: 9 }} />
-                  <i style={{ left: 0, bottom: 0, width: 9, height: 2 }} /><i style={{ left: 0, bottom: 0, width: 2, height: 9 }} />
-                  <i style={{ right: 0, bottom: 0, width: 9, height: 2 }} /><i style={{ right: 0, bottom: 0, width: 2, height: 9 }} />
-                </div>
+                {/* 조준 박스는 선택한 나라의 영토 크기에 맞춘다 (모든 나라가 같은 크기면 의미가 없다) */}
+                {(() => {
+                  const arm = Math.max(9, Math.min(28, Math.min(selBox.w, selBox.h) * 0.28));
+                  return (
+                    <div
+                      className="wr-lock"
+                      style={{ left: selBox.left, top: selBox.top, width: selBox.w, height: selBox.h, color: country.color }}
+                    >
+                      <i style={{ left: 0, top: 0, width: arm, height: 2 }} /><i style={{ left: 0, top: 0, width: 2, height: arm }} />
+                      <i style={{ right: 0, top: 0, width: arm, height: 2 }} /><i style={{ right: 0, top: 0, width: 2, height: arm }} />
+                      <i style={{ left: 0, bottom: 0, width: arm, height: 2 }} /><i style={{ left: 0, bottom: 0, width: 2, height: arm }} />
+                      <i style={{ right: 0, bottom: 0, width: arm, height: 2 }} /><i style={{ right: 0, bottom: 0, width: 2, height: arm }} />
+                    </div>
+                  );
+                })()}
 
                 {/* 지도 위 국가 콜아웃 — 리더선 + 라벨 (목업 핵심 인상) */}
                 {CALLOUTS.map((co) => {
